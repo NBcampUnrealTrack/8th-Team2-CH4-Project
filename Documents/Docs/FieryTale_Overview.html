@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FieryTale Game Overview</title>
+  <style>
+    :root {
+      --paper: #f7f2e8;
+      --ink: #232323;
+      --muted: #6b6258;
+      --line: #d9cdbb;
+      --brown: #6e4a2f;
+      --blue: #253c58;
+      --teal: #1f6c68;
+      --gold: #c28a2c;
+      --red: #93403c;
+      --panel: rgba(255, 252, 245, 0.94);
+      --shadow: 0 18px 50px rgba(33, 25, 17, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Segoe UI", "Noto Sans KR", Arial, sans-serif;
+      background: var(--paper);
+      line-height: 1.62;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .hero {
+      min-height: 92vh;
+      display: grid;
+      align-items: end;
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(19, 24, 31, 0.26) 0%, rgba(20, 18, 15, 0.42) 48%, rgba(15, 12, 9, 0.76) 100%),
+        url("../ConceptArt/StorybookWorld_Concept_01.png") center / cover no-repeat;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 120px;
+      background: linear-gradient(180deg, rgba(247, 242, 232, 0), var(--paper));
+    }
+
+    .hero-inner {
+      width: min(1120px, calc(100% - 48px));
+      margin: 0 auto 92px;
+      position: relative;
+      z-index: 1;
+      color: #fffaf0;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0;
+      color: #f1d7a0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(48px, 8vw, 104px);
+      line-height: 0.96;
+      letter-spacing: 0;
+      text-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+    }
+
+    .hero-copy {
+      max-width: 760px;
+      margin: 24px 0 0;
+      font-size: clamp(18px, 2vw, 25px);
+      color: #fff4df;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 48px 0 88px;
+    }
+
+    section {
+      padding: 56px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    section:last-child {
+      border-bottom: 0;
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      color: var(--blue);
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      color: var(--brown);
+      font-size: 20px;
+      line-height: 1.28;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .lead {
+      max-width: 830px;
+      color: #40392f;
+      font-size: 20px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .card {
+      min-height: 100%;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 8px 24px rgba(56, 42, 28, 0.08);
+    }
+
+    .card p {
+      color: var(--muted);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 12px;
+      border: 1px solid rgba(37, 60, 88, 0.22);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.58);
+      color: var(--blue);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 34px;
+      align-items: center;
+    }
+
+    .image-frame {
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      background: #e9dfcf;
+      aspect-ratio: 16 / 10;
+    }
+
+    .image-frame img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .rule-flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .step {
+      min-height: 142px;
+      padding: 18px;
+      border-radius: 8px;
+      color: #fffaf0;
+      background: var(--blue);
+    }
+
+    .step:nth-child(2) {
+      background: var(--teal);
+    }
+
+    .step:nth-child(3) {
+      background: var(--brown);
+    }
+
+    .step:nth-child(4) {
+      background: var(--red);
+    }
+
+    .step:nth-child(5) {
+      background: #3f2d4f;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .step span {
+      display: block;
+      color: rgba(255, 250, 240, 0.82);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .spec-table {
+      width: 100%;
+      margin-top: 26px;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 252, 245, 0.78);
+    }
+
+    .spec-table th,
+    .spec-table td {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .spec-table tr:last-child th,
+    .spec-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .spec-table th {
+      width: 210px;
+      color: var(--blue);
+      font-weight: 800;
+      background: rgba(255, 255, 255, 0.42);
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 26px;
+    }
+
+    .week {
+      padding: 20px;
+      border-left: 5px solid var(--gold);
+      border-radius: 8px;
+      background: rgba(255, 252, 245, 0.78);
+      box-shadow: 0 8px 24px rgba(56, 42, 28, 0.07);
+    }
+
+    .week strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--blue);
+      font-size: 18px;
+    }
+
+    .week span {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .accent {
+      color: var(--red);
+      font-weight: 800;
+    }
+
+    .footer-note {
+      padding-top: 24px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .grid.two,
+      .grid.three,
+      .split,
+      .rule-flow,
+      .timeline {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-inner {
+        width: min(100% - 32px, 720px);
+        margin-bottom: 72px;
+      }
+
+      main {
+        width: min(100% - 32px, 720px);
+      }
+
+      section {
+        padding: 44px 0;
+      }
+
+      .spec-table th,
+      .spec-table td {
+        display: block;
+        width: 100%;
+      }
+
+      .spec-table th {
+        border-bottom: 0;
+        padding-bottom: 6px;
+      }
+
+      .spec-table td {
+        padding-top: 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">Unreal Engine Multiplayer Prototype</p>
+      <h1>FieryTale</h1>
+      <p class="hero-copy">
+        전 세계의 동화, 설화, 민담 속 인물들이 하나의 책 세계 전장에서 충돌하는 TPS 기반 2 vs 2 팀 PvP 게임.
+      </p>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>한 줄 콘셉트</h2>
+      <p class="lead">
+        FieryTale은 동화 캐릭터 크로스오버의 매력을 TPS 조작감과 AOS식 구조물 목표로 풀어내는 소규모 팀 대전 게임이다.
+        플레이어는 캐릭터를 직접 조준하고 움직이며, 라인을 압박하고, 방어타워를 무너뜨린 뒤 상대 넥서스를 파괴한다.
+      </p>
+      <div class="pill-row">
+        <span class="pill">2 vs 2 PvP</span>
+        <span class="pill">TPS Action</span>
+        <span class="pill">AOS Objective</span>
+        <span class="pill">Server Authority</span>
+        <span class="pill">Gameplay Ability System</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="grid three">
+        <article class="card">
+          <h3>동화 크로스오버</h3>
+          <p>빨간 모자, 신데렐라, 앨리스, 알라딘, 카구야 등 익숙한 원전 캐릭터를 전투 역할과 스킬로 재해석한다.</p>
+        </article>
+        <article class="card">
+          <h3>작은 전장의 빠른 판단</h3>
+          <p>초기 전장은 2라인과 팀별 넥서스, 방어타워로 구성된다. 복잡한 성장보다 한 판의 흐름과 목표 이해를 우선한다.</p>
+        </article>
+        <article class="card">
+          <h3>직접 조작하는 전투감</h3>
+          <p>쿼터뷰가 아닌 TPS 시점으로 캐릭터 실루엣, 조준, 거리 조절, 스킬 적중의 체감을 전면에 둔다.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="split">
+        <div>
+          <h2>첫 전장 방향</h2>
+          <p class="lead">
+            첫 번째 전장은 특정 동화 하나가 아니라 <span class="accent">책과 이야기 자체로 이루어진 세계</span>다.
+            책으로 된 성, 접힌 종이 방벽, 양피지 길, 부유하는 페이지, 원경의 악기 실루엣이 하나의 전장을 만든다.
+          </p>
+          <table class="spec-table">
+            <tr>
+              <th>시각 키워드</th>
+              <td>책, 종이, 잉크, 금박, 부유하는 페이지, 악기 실루엣</td>
+            </tr>
+            <tr>
+              <th>분위기</th>
+              <td>몽환적이고 동화적이지만, PvP 전장의 목표물이 명확하게 읽히는 방향</td>
+            </tr>
+            <tr>
+              <th>맵 기준</th>
+              <td>TPS 시점에서 라인, 타워, 넥서스의 방향과 실루엣을 쉽게 인식할 수 있어야 한다.</td>
+            </tr>
+          </table>
+        </div>
+        <figure class="image-frame" aria-label="Storybook world concept art">
+          <img src="../ConceptArt/StorybookWorld_Concept_01.png" alt="책과 이야기 세계를 표현한 FieryTale 배경 콘셉트아트">
+        </figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>한 판의 핵심 흐름</h2>
+      <p class="lead">
+        MVP의 목표는 많은 시스템을 넣는 것이 아니라, 서버 권한으로 한 판이 처음부터 끝까지 돌아가는 얇은 프로토타입을 완성하는 것이다.
+      </p>
+      <div class="rule-flow">
+        <div class="step">
+          <strong>1. 로비</strong>
+          <span>플레이어 접속, 서버 팀 배정, 캐릭터 선택 상태 확인</span>
+        </div>
+        <div class="step">
+          <strong>2. 스폰</strong>
+          <span>팀별 시작 위치에 배치, 체력과 Ability 상태 초기화</span>
+        </div>
+        <div class="step">
+          <strong>3. 교전</strong>
+          <span>TPS 조준 기반 기본 공격과 스킬로 플레이어와 구조물 공격</span>
+        </div>
+        <div class="step">
+          <strong>4. 타워 파괴</strong>
+          <span>두 라인 중 하나의 방어타워가 파괴되면 넥서스 취약화</span>
+        </div>
+        <div class="step">
+          <strong>5. 승패</strong>
+          <span>상대 넥서스 체력을 0으로 만들면 서버가 승패 확정</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>MVP 규칙 요약</h2>
+      <table class="spec-table">
+        <tr>
+          <th>매치 규모</th>
+          <td>최종 시연 목표는 2 vs 2, 최소 검증은 1 vs 1도 가능해야 한다.</td>
+        </tr>
+        <tr>
+          <th>시점</th>
+          <td>캐릭터 뒤쪽 위에서 보는 TPS 시점. 파라곤, 사이퍼즈 계열의 직접 조작감을 기준으로 한다.</td>
+        </tr>
+        <tr>
+          <th>전장</th>
+          <td>2라인 압축형 전장. 팀별 방어타워 2개, 넥서스 1개, 스폰 지점을 둔다.</td>
+        </tr>
+        <tr>
+          <th>리스폰</th>
+          <td>사망 시 입력과 공격을 막고, 5초 뒤 자기 팀 스폰 지점에서 MaxHealth로 부활한다.</td>
+        </tr>
+        <tr>
+          <th>승리 조건</th>
+          <td>상대 팀 방어타워 중 하나 이상을 파괴해 넥서스를 취약화한 뒤, 넥서스를 파괴한다.</td>
+        </tr>
+        <tr>
+          <th>제외 범위</th>
+          <td>2주 MVP에서는 미니언, 성장, 아이템, 미니맵, 정교한 매치메이킹, 타워 자동 공격을 제외한다.</td>
+        </tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>기술 방향</h2>
+      <div class="grid two">
+        <article class="card">
+          <h3>서버 권한 멀티플레이</h3>
+          <p>피해, 사망, 리스폰, 구조물 파괴, 넥서스 취약화, 승패 판정은 서버가 확정한다. 4주 필수 목표는 Listen Server 기반 2 vs 2 시연이며, Dedicated Server는 선택 목표다.</p>
+        </article>
+        <article class="card">
+          <h3>GAS 기반 전투 구조</h3>
+          <p>공통 BaseCharacter에 AbilitySystemComponent, AttributeSet, 기본 공격, 공격 스킬, 이동 스킬, 궁극기 슬롯을 붙이고, 이후 캐릭터는 데이터와 Ability 조합으로 확장한다.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>4주 프로토타입 목표</h2>
+      <div class="timeline">
+        <div class="week">
+          <strong>1주차</strong>
+          <span>BaseCharacter, TPS 카메라, GAS 기본 공격, 체력/피해/사망, 구조물 피해 흐름 검증</span>
+        </div>
+        <div class="week">
+          <strong>2주차</strong>
+          <span>로비, 캐릭터 선택, 팀 스폰, 타워 파괴, 넥서스 파괴 승패까지 한 판 완성</span>
+        </div>
+        <div class="week">
+          <strong>3주차</strong>
+          <span>채팅, 킬로그, TAB 리더보드, 로비 개선, 시스템 알림 등 시연 정보 보강</span>
+        </div>
+        <div class="week">
+          <strong>4주차</strong>
+          <span>조작감, 공격/피격 피드백, 구조물 파괴 피드백, UI 가독성, 네트워크 안정성 폴리싱</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>현재 기획 상태</h2>
+      <div class="grid two">
+        <article class="card">
+          <h3>확정된 큰 방향</h3>
+          <p>동화 캐릭터 크로스오버, TPS 시점, 2 vs 2 소규모 PvP, 2라인 전장, 서버 권한 전투, GAS 기반 캐릭터 확장 구조.</p>
+        </article>
+        <article class="card">
+          <h3>다음 설계 과제</h3>
+          <p>GAS 세부 규칙, 2 vs 2 역할군, 초기 테스트 캐릭터 2종, 2라인 블록아웃, 4주 프로토타입 백로그 정리.</p>
+        </article>
+      </div>
+      <p class="footer-note">
+        기준 문서: InitialConcept, MVPScopeDecision, MVPViewpointDecision, CoreMatchRules, Week1_TeamPlan, StorybookWorld_ConceptGuide.
+      </p>
+    </section>
+  </main>
+</body>
+</html>
