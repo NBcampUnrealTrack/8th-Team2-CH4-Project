@@ -7,6 +7,47 @@
 
 namespace FTTags
 {
+	namespace FTAbilities
+	{
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(NomalAttack);	// 평타
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackSkill);	// 공격 스킬
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(UtillSkill);		// 유틸 스킬
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(UltimateSkill);	// 궁극기
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivateOnGiven);
+	}
+	
+	namespace FTStates
+	{
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Invincible);     // 무적
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Invisibility);   // 은신
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Flying);			// 비행
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Stunned);        // 기절
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Rooted);         // 속박
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Taunted);		// 도발
+		
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Slow);     // 슬로우
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Bleeding); // 출혈 지속 피해
+	}
+	
+	namespace FTCombat
+	{
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(WeaponMode_Aiming);  // 스코프 모드
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Channelling);  // 채널링 상태
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Target_Insignia);    // 시계 토끼 태엽 인장
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Structure_Muted);	// 적 포탑 포격 마비 상태
+	}
+	
+	namespace FTAugments
+	{
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Eligible_Phase1); 
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Eligible_Phase2); 
+		
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Applied_RedRidingHood_TopBody); 
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Applied_Aladdin_MercyMirage);   
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Applied_Alice_TimeIsMedicine);  
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(Applied_Kaguya_BulwarkHeal);
+	}
+	
 	namespace Events
 	{
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(KillScored);
