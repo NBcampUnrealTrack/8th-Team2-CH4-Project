@@ -18,7 +18,9 @@ public class FieryTale : ModuleRules
 			"GameplayAbilities",
 			"GameplayTasks",
 			"GameplayTags",
-			"UMG"
+			"UMG",
+			"OnlineSubsystem",
+			"OnlineSubsystemUtils"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "AIModule" });
