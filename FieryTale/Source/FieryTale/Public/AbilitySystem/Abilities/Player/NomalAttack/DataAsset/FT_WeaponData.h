@@ -63,7 +63,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FT|Projectile Options", meta = (ClampMin = "1"))
 	int32 ProjectilesPerShot;
 
-	/** 연사(Burst) 형태로 투사체가 나갈 때 탄환 간의 시간 간격 디레이 (알라딘용 3연사 타이머용) */
+	/** 연사(Burst) 형태로 투사체가 나갈 때 탄환 간의 시간 간격 딜레이 (알라딘용 3연사 타이머용) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FT|Projectile Options", meta = (EditCondition = "ProjectilesPerShot > 1"))
 	float BurstDelay;
 
