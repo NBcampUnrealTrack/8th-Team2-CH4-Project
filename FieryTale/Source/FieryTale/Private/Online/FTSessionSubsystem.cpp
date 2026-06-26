@@ -141,7 +141,9 @@ void UFTSessionSubsystem::FindSessions(int32 MaxResults, bool bUseLAN)
 	SessionSearch->QuerySettings.Set(Key_MatchType, FieryTaleMatchType, EOnlineComparisonOp::Equals);
 	if (!bUseLAN)
 	{
-		SessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
+		// UE 5.8에는 SEARCH_PRESENCE가 없다. 프레즌스 검색은 SEARCH_LOBBIES로 대체됨.
+		// (호스트가 CreateSession 시 bUseLobbiesIfAvailable=true 로 만든 로비를 검색)
+		SessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
 	}
 
 	FindSessionsCompleteDelegateHandle = SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
