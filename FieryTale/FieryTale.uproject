@@ -36,6 +36,10 @@
 		{
 			"Name": "OnlineSubsystemNull",
 			"Enabled": true
+		},
+		{
+			"Name": "ModelContextProtocol",
+			"Enabled": true
 		}
 	]
 }
