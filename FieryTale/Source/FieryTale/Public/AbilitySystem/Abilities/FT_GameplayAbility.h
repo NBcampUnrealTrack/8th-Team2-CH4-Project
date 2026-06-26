@@ -23,6 +23,6 @@ public:
 	 * 디버깅용 시각화 활성화 여부
 	 * 에디터에서 체크하면 해당 스킬의 히트박스나 사거리 등을 화면에 그리는 로직에 활용할 수 있습니다.
 	 */
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category = "Crash|Debug")
+	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly, Category = "Fiery|Debug")
 	bool bDrawDebugs = false;
 };

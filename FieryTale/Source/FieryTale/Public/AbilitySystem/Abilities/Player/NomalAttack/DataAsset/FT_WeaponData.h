@@ -19,7 +19,7 @@ enum class EWeaponFireType : uint8
 	Melee           UMETA(DisplayName = "Melee (근접 판정)")       // 가구야 공주
 };
 
-UCLASS()
+UCLASS(BlueprintType, Blueprintable)
 class FIERYTALE_API UFT_WeaponData : public UDataAsset
 {
 	GENERATED_BODY()

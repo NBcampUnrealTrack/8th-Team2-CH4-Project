@@ -5,18 +5,15 @@
 #include "CoreMinimal.h"
 #include "AttributeSet.h"
 #include "AbilitySystemComponent.h"
+#include "FT_AttributeSet.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FAttributeInitialized);
 
-#include "FT_AttributeSet.generated.h"
-
-// GAS 속성 전용 매크로 정의 (Getter, Setter, Init 함수 자동 생성)
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
-	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
-	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
-	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
-	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
-
+    GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
+    GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
+    GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
+    GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
 /**
  * FieryTale 게임 내 모든 액터(영웅, 미니언, 포탑)가 공유하는 마스터 속성 집합입니다.
@@ -24,59 +21,94 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FAttributeInitialized);
 UCLASS()
 class FIERYTALE_API UFT_AttributeSet : public UAttributeSet
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UFT_AttributeSet();
+    UFT_AttributeSet();
 
-	// 네트워크 복제 및 값 변경 전후 처리를 위한 오버라이드
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
-	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+    virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 
 public:
-	/** 현재 체력 (기획 기준 초기 180.f 고정) */
-	UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_Health)
-	FGameplayAttributeData Health;
-	ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Health)
+    /** 현재 체력 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_Health)
+    FGameplayAttributeData Health;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Health)
 
-	/** 최대 체력 (기웅 기준 180.f 고정, 버프/증강 등으로 변동 가능) */
-	UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxHealth)
-	FGameplayAttributeData MaxHealth;
-	ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxHealth)
+    /** 최대 체력 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxHealth)
+    FGameplayAttributeData MaxHealth;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxHealth)
 
-	/** 흡수 보호막 (알라딘 +40, 가구야 +300, 빨간 망토 +200 등) */
-	UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_Shield)
-	FGameplayAttributeData Shield;
-	ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Shield)
+    /** 현재 흡수 보호막 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_Shield)
+    FGameplayAttributeData Shield;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Shield)
 
-	/** TPS 이동 속도 (기본값 600 cm/s 상정, 정조준/비행 시 -30% 등 연동) */
-	UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MoveSpeed)
-	FGameplayAttributeData MoveSpeed;
-	ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MoveSpeed)
+    /**  최대 흡수 보호막 한계치  */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxShield)
+    FGameplayAttributeData MaxShield;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxShield)
 
-	/** 공격력 가중치 계수 (기본 1.0f, 앨리스 사형선고 시 0.7f 등 조절용) */
-	UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_AttackPower)
-	FGameplayAttributeData AttackPower;
-	ATTRIBUTE_ACCESSORS(UFT_AttributeSet, AttackPower)
+    /** TPS 이동 속도 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MoveSpeed)
+    FGameplayAttributeData MoveSpeed;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MoveSpeed)
 
-	/** 궁극기 게이지 (0.0f ~ 100.0f 범위 소유) */
-	UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_UltimateGauge)
-	FGameplayAttributeData UltimateGauge;
-	ATTRIBUTE_ACCESSORS(UFT_AttributeSet, UltimateGauge)
+    /** 공격력 가중치 계수 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_AttackPower)
+    FGameplayAttributeData AttackPower;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, AttackPower)
+
+    /** 현재 궁극기 게이지 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_UltimateGauge)
+    FGameplayAttributeData UltimateGauge;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, UltimateGauge)
+
+    /** 최대 궁극기 요구 게이지 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxUltimateGauge)
+    FGameplayAttributeData MaxUltimateGauge;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxUltimateGauge)
+
+    /** 현재 무기 탄퍼짐 레벨 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_WeaponSpread)
+    FGameplayAttributeData WeaponSpread;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, WeaponSpread)
+
+    /** 최대 무기 탄퍼짐 한계치 */
+    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxWeaponSpread)
+    FGameplayAttributeData MaxWeaponSpread;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxWeaponSpread)
 
 protected:
-	// 멀티플레이 데디케이트 서버 복제용 OnRep 함수군
-	UFUNCTION()
-	virtual void OnRep_Health(const FGameplayAttributeData& OldHealth);
-	UFUNCTION() 
-	virtual void OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth);
-	UFUNCTION()
-	virtual void OnRep_Shield(const FGameplayAttributeData& OldShield);
-	UFUNCTION() 
-	virtual void OnRep_MoveSpeed(const FGameplayAttributeData& OldMoveSpeed);
-	UFUNCTION()
-	virtual void OnRep_AttackPower(const FGameplayAttributeData& OldAttackPower);
-	UFUNCTION()
-	virtual void OnRep_UltimateGauge(const FGameplayAttributeData& OldUltimateGauge);
+    UFUNCTION() 
+    virtual void OnRep_Health(const FGameplayAttributeData& OldHealth);
+    
+    UFUNCTION() 
+    virtual void OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth);
+    
+    UFUNCTION() 
+    virtual void OnRep_Shield(const FGameplayAttributeData& OldShield);
+    
+    UFUNCTION() 
+    virtual void OnRep_MaxShield(const FGameplayAttributeData& OldMaxShield); 
+    
+    UFUNCTION() 
+    virtual void OnRep_MoveSpeed(const FGameplayAttributeData& OldMoveSpeed);
+    
+    UFUNCTION() 
+    virtual void OnRep_AttackPower(const FGameplayAttributeData& OldAttackPower);
+    
+    UFUNCTION()
+    virtual void OnRep_UltimateGauge(const FGameplayAttributeData& OldUltimateGauge);
+    
+    UFUNCTION()
+    virtual void OnRep_MaxUltimateGauge(const FGameplayAttributeData& OldMaxUltimateGauge);
+    
+    UFUNCTION() 
+    virtual void OnRep_WeaponSpread(const FGameplayAttributeData& OldWeaponSpread);
+    
+    UFUNCTION() 
+    virtual void OnRep_MaxWeaponSpread(const FGameplayAttributeData& OldMaxWeaponSpread);
 };
