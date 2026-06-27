@@ -47,8 +47,12 @@ struct FFTSessionInfo
 
 // UMG 위젯이 바인딩할 결과 이벤트들. (Dynamic Multicast 라서 BlueprintAssignable 가능)
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFTOnCreateSessionComplete, bool, bWasSuccessful);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FFTOnFindSessionsComplete, const TArray<FFTSessionInfo>&, SessionResults, bool, bWasSuccessful);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FFTOnFindSessionsComplete, const TArray<FFTSessionInfo>&, SessionResults,
+                                             bool, bWasSuccessful);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFTOnJoinSessionComplete, bool, bWasSuccessful);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFTOnDestroySessionComplete, bool, bWasSuccessful);
 
 /**
@@ -75,7 +79,8 @@ public:
 
 	/** 방을 만들고(세션 생성) 성공하면 대기방(Lobby) 맵으로 ServerTravel 한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
-	void HostSession(int32 MaxPlayers = 4, const FString& RoomName = "FieryTale Room", const FString& Password = "", bool bUseLAN = true);
+	void HostSession(int32 MaxPlayers = 4, const FString& RoomName = "FieryTale Room", const FString& Password = "",
+	                 bool bUseLAN = true);
 
 	/** 방 목록을 검색한다. 완료 시 OnFindSessionsCompleteEvent 로 결과를 전달한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
@@ -150,6 +155,12 @@ private:
 	FString PendingRoomName;
 	FString PendingPassword;
 	bool bPendingUseLAN = true;
+
+	// 기존 세션을 파괴한 뒤 다시 입장해야 할 때 사용하는 보류 값
+	// (이전 PIE 실행에서 남은 GameSession 때문에 JoinSession 이 "already exists" 로 실패하는 것을 자가 치유)
+	bool bJoinSessionOnDestroyComplete = false;
+	int32 PendingJoinIndex = -1;
+	FString PendingJoinPassword;
 
 	// 세션 설정에 저장하는 커스텀 키
 	static const FName Key_MatchType;

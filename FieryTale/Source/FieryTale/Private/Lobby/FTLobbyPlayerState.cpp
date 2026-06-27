@@ -3,6 +3,7 @@
 
 #include "Lobby/FTLobbyPlayerState.h"
 
+#include "FieryTaleLog.h"
 #include "Net/UnrealNetwork.h"
 
 AFTLobbyPlayerState::AFTLobbyPlayerState()
@@ -18,6 +19,10 @@ void AFTLobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 void AFTLobbyPlayerState::SetReady(bool bInReady)
 {
+	UE_LOG(LogFTSession, Log, TEXT("[Ready] 3) 서버 SetReady: %s, %s → %s"),
+		*GetPlayerName(), bIsReady ? TEXT("Ready") : TEXT("NotReady"),
+		bInReady ? TEXT("Ready") : TEXT("NotReady"));
+
 	if (bIsReady != bInReady)
 	{
 		bIsReady = bInReady;
@@ -28,5 +33,7 @@ void AFTLobbyPlayerState::SetReady(bool bInReady)
 
 void AFTLobbyPlayerState::OnRep_IsReady()
 {
+	UE_LOG(LogFTSession, Log, TEXT("[Ready] 4) 복제 수신(클라) OnRep_IsReady: %s → %s"),
+		*GetPlayerName(), bIsReady ? TEXT("Ready") : TEXT("NotReady"));
 	OnReadyStateChanged.Broadcast();
 }
