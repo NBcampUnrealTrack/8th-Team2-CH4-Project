@@ -3,81 +3,80 @@
 #include "Character/FTPlayerController.h"
 #include "Character/FTPlayerState.h"
 #include "Character/FTPlayerCharacterBase.h"
+#include "AbilitySystemComponent.h"
+#include "Engine/World.h"
 
-// 초기 게임 시작할 때, 사망 후 부활시 World에 캐릭터를 재배치한다고 가정함. 
-// 이때, PlayerState에 이미 플레이어가 어떤 캐릭터를 설정할지가 선행적으로 세팅되어야 함.
-// 하지만, PlayerState가 세팅되었다는 가정하에 함수를 호출해야 한다는 자체가 번거롭기 때문에 확정된 구조는 아니고 고민중임.
-// Character Spawn위치를 누가 가지고 있어야 하는가, 일단 Controller쪽은 아니고 외부에 있다고 가정함
+DEFINE_LOG_CATEGORY(FTPlayerController);
+
+// TODO:: 삭제 예정
 void AFTPlayerController::SpawnCharacter(const FVector& LocationSpawn, const FRotator& SpawnRotation = FRotator::ZeroRotator)
 {
-	// 서버 권위에서만 실행되게
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	AFTPlayerState* CurrentFTPlayerState = GetPlayerState<AFTPlayerState>();
-	if (!CurrentFTPlayerState || !CurrentFTPlayerState->SelectedCharacterClass)
+	if (!SelectedCharacterClass)
 	{
+		UE_LOG(FTPlayerController, Error, TEXT("SelectedCharacterClass가 설정되지 않음"));
 		return;
 	}
-	
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-	
-	APawn* NewPawn = GetWorld()->SpawnActor<APawn>(CurrentFTPlayerState->SelectedCharacterClass, LocationSpawn, SpawnRotation, SpawnParams);
+	APawn* NewPawn = GetWorld()->SpawnActor<APawn>(SelectedCharacterClass, LocationSpawn, SpawnRotation, SpawnParams);
 	if (NewPawn)
 	{
 		Possess(NewPawn);
 	}
 }
 
-void AFTPlayerController::SetSelectedCharacter(TSubclassOf<AFTPlayerCharacterBase> NewCharacterClass)
+void AFTPlayerController::SetSelectedCharacterClass(TSubclassOf<AFTPlayerCharacterBase> InCharacterClass)
 {
-	ServerSetSelectedCharacter(NewCharacterClass);
+	SelectedCharacterClass = InCharacterClass;
 }
 
-void AFTPlayerController::ServerSetSelectedCharacter_Implementation(TSubclassOf<AFTPlayerCharacterBase> NewCharacterClass)
+void AFTPlayerController::OnPossess(APawn* InPawn)
 {
+	Super::OnPossess(InPawn);
+
 	AFTPlayerState* PS = GetPlayerState<AFTPlayerState>();
-	if (!PS) return;
-
-	PS->SelectedCharacterClass = NewCharacterClass;
-}
-
-void AFTPlayerController::SetupInputComponent()
-{
-	Super::SetupInputComponent();
-
-	// TODO:: 임시 키 할당
-	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AFTPlayerController::ReleaseCharacterBase);
-	InputComponent->BindKey(EKeys::V, IE_Pressed, this, &AFTPlayerController::BindingCharacterBase);
-}
-
-void AFTPlayerController::ReleaseCharacterBase()
-{
-	if (GetPawn() == nullptr || GetPawn() == PossessedCharacter)
+	if (!PS)
 	{
 		return;
 	}
 
-	// TODO:: Pawn분리 임시 처리
-	PossessedCharacter = GetPawn();
-	UnPossess();
-	ChangeState(NAME_Spectating);
+	PS->SpawnedCharacter = InPawn;
+
+	// TODO: 캐릭터 사망관련 상태가 될 경우,  
+	// UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent();
+	// if (ASC)
+	// {
+	// 	ASC->RegisterGameplayTagEvent(FTTags::FTStates::Dead, EGameplayTagEventType::NewOrRemoved)
+	// 		.AddUObject(this, &AFTPlayerController::OnDeadStateChanged);
+	// }
 }
 
-void AFTPlayerController::BindingCharacterBase()
+void AFTPlayerController::OnDeadStateChanged(const FGameplayTag Tag, int32 DeadTagCount)
 {
-	if (PossessedCharacter == nullptr)
+	if (!HasAuthority())
 	{
 		return;
 	}
 
-	// CharacterBase로 변경
-	ChangeState(NAME_Playing);
-	Possess(PossessedCharacter);
-	PossessedCharacter = nullptr;
+	if (DeadTagCount > 0)
+	{
+		// 사망 상태 진입
+		// - 현재 Pawn 파괴 또는 비활성화
+		// - SetViewTarget으로 시야 전환 (팀원 Pawn, 관전 카메라, 구조물 등 기획 미확정)
+	}
+	else
+	{
+		// 부활 — Dead GE Duration 만료 시 도달
+		// 부활시 배치를 하는 게 맞는가? 그냥 안쓰는 공간에 BaseCharacter를 박아두고 걔의 위치를 옮긴 다음 거기에 빙의시켜 재사용하는 쪽이 맞지 않을까?
+		// TODO: GameMode에서 스폰 위치를 받아올 예정
+		// SpawnCharacter(SpawnLocation, SpawnRotation);
+	}
 }

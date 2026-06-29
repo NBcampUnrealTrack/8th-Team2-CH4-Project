@@ -11,17 +11,16 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Character/FTPlayerState.h"
+#include "AbilitySystemComponent.h"
+#include "GameplayEffect.h" 
+#include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerCharacter);
 
 void AFTPlayerCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
-	if (!IsLocallyControlled())
-	{
-		CameraBoom->Deactivate();
-		FollowCamera->Deactivate();
-	}
 }
 
 // Sets default values
@@ -60,6 +59,13 @@ AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectI
 
 }
 
+// ──► [인터페이스 구현] 중앙 집중식 ASC 반환 체계
+UAbilitySystemComponent* AFTPlayerCharacterBase::GetAbilitySystemComponent() const
+{
+	AFTPlayerState* PS = GetPlayerState<AFTPlayerState>();
+	return PS ? PS->GetAbilitySystemComponent() : nullptr;
+}
+
 void AFTPlayerCharacterBase::Move(const FInputActionValue& Value)
 {
 	FVector2D MovementVector = Value.Get<FVector2D>();
@@ -88,11 +94,30 @@ void AFTPlayerCharacterBase::Look(const FInputActionValue& Value)
 	}
 }
 
+void AFTPlayerCharacterBase::OnLeftClick(const FInputActionValue& Value)
+{
+	//UE_LOG(FTPlayerCharacter, Display, TEXT("LeftClick"));
+
+}
+
+void AFTPlayerCharacterBase::OnRightClick(const FInputActionValue& Value)
+{
+	//UE_LOG(FTPlayerCharacter, Display, TEXT("RightClick"));
+}
+
+void AFTPlayerCharacterBase::OnShift(const FInputActionValue& Value)
+{
+	//UE_LOG(FTPlayerCharacter, Display, TEXT("ShiftPressed"));
+}
+
 void AFTPlayerCharacterBase::NotifyControllerChanged()
 {
 	Super::NotifyControllerChanged();
-	
-	// TODO:: Local일때 적용
+
+	const bool bIsLocal = IsLocallyControlled();
+	CameraBoom->SetActive(bIsLocal);
+	FollowCamera->SetActive(bIsLocal);
+
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
@@ -111,9 +136,19 @@ void AFTPlayerCharacterBase::SetupPlayerInputComponent(class UInputComponent* Pl
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AFTPlayerCharacterBase::Move);
-
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFTPlayerCharacterBase::Look);
+		// Left Click
+		EnhancedInputComponent->BindAction(LeftClickAction, ETriggerEvent::Started, this, &AFTPlayerCharacterBase::OnLeftClick);
+		// Right Click
+		EnhancedInputComponent->BindAction(RightClickAction, ETriggerEvent::Started, this, &AFTPlayerCharacterBase::OnRightClick);
+		// Shift
+		EnhancedInputComponent->BindAction(ShiftAction, ETriggerEvent::Started, this, &AFTPlayerCharacterBase::OnShift);
+		
+		
+		
+		
+		
 	}
 	else
 	{
@@ -121,15 +156,66 @@ void AFTPlayerCharacterBase::SetupPlayerInputComponent(class UInputComponent* Pl
 	}
 }
 
+// [서버 인프라 초기화 및 데이터 주입]
 void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
 {
-	Super::PossessedBy(NewController);
+    Super::PossessedBy(NewController);
 
-	// TODO: 캐릭터에 따라 자기 어빌리티를 Grant
-	// 컨트롤러에서 PlayerState를 가져오고 거기에서 AbilitySystemComponent를 가져와서 Character에 걸맞는 Ability를 추가함
-	
-	
+    AFTPlayerState* PS = GetPlayerState<AFTPlayerState>();
+    if (PS)
+    {
+        UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent();
+        if (ASC)
+        {
+            // 1. GAS 액터 정보 등록 (Owner: PlayerState, Avatar: 캐릭터 본체)
+            ASC->InitAbilityActorInfo(PS, this);
+            
+            // 2. 서버 권한 하에 기획자가 에디터에서 배치한 스킬 및 평타 목록을 엔진에 등록(Grant)
+            if (HasAuthority())
+            {
+                for (const TSubclassOf<UGameplayAbility>& AbilityClass : StartupAbilities)
+                {
+                    if (AbilityClass)
+                    {
+                        ASC->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1, -1, this));
+                    }
+                }
+
+                // [변경 지점] 지저분한 태그 수동 주입을 제거하고, 
+                // 레퍼런스 스타일의 정석대로 디테일 창의 기본 이펙트(GE)를 순회하며 일괄 발동(Apply)시킵니다.
+                for (const TSubclassOf<UGameplayEffect>& EffectClass : DefaultGameplayEffects)
+                {
+                    if (EffectClass)
+                    {
+                        FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
+                        EffectContext.AddSourceObject(this);
+
+                        FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(EffectClass, 1.0f, EffectContext);
+                        if (SpecHandle.IsValid())
+                        {
+                            // 내 자신(Avatar)에게 버프 및 스탯 이펙트를 안전하게 적용시킵니다.
+                            ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
+// ──► [클라이언트 인프라 동기화]
+void AFTPlayerCharacterBase::OnRep_PlayerState()
+{
+    Super::OnRep_PlayerState();
 
-
+    AFTPlayerState* PS = GetPlayerState<AFTPlayerState>();
+    if (PS)
+    {
+        UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent();
+        if (ASC)
+        {
+            // 클라이언트 사이드 예측(Prediction)과 태그 동기화를 위해 액터 정보를 매핑합니다.
+            ASC->InitAbilityActorInfo(PS, this);
+        }
+    }
+}

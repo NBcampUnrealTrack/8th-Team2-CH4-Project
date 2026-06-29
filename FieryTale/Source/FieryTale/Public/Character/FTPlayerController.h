@@ -4,9 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "GameplayTagContainer.h"
 #include "FTPlayerController.generated.h"
 
 class AFTPlayerCharacterBase;
+
+DECLARE_LOG_CATEGORY_EXTERN(FTPlayerController, Log, All);
 
 UCLASS()
 class FIERYTALE_API AFTPlayerController : public APlayerController
@@ -14,28 +17,20 @@ class FIERYTALE_API AFTPlayerController : public APlayerController
 	GENERATED_BODY()
 
 public:
-	// TODO:: 확정 X
 	// GameMode에서 스폰 위치를 전달받아 PlayerState의 SelectedCharacterClass를 기반으로 캐릭터를 스폰 후 Possess
 	void SpawnCharacter(const FVector& SpawnLocation, const FRotator& SpawnRotation);
 
-	// TODO:: 확정 X
-	// 클라이언트에서 캐릭터 선택 시 호출 → 서버 PlayerState에 반영
-	UFUNCTION(BlueprintCallable, Category = "Character")
-	void SetSelectedCharacter(TSubclassOf<AFTPlayerCharacterBase> NewCharacterClass);
+	// 사용할 캐릭터 넘겨주는 Setter
+	// Controller에서 Spawn을 한다는 가정하에 만듬
+	void SetSelectedCharacterClass(TSubclassOf<AFTPlayerCharacterBase> InCharacterClass);
 
 protected:
-	virtual void SetupInputComponent() override;
+	virtual void OnPossess(APawn* InPawn) override;
 
 private:
-	UFUNCTION(Server, Reliable)
-	void ServerSetSelectedCharacter(TSubclassOf<AFTPlayerCharacterBase> NewCharacterClass);
+	// Dead 태그 카운트 변화 시 호출 — 사망/부활 분기 처리
+	void OnDeadStateChanged(const FGameplayTag Tag, int32 DeadTagCount);
 
-private:
-	// TODO:: 삭제 예정
-	void ReleaseCharacterBase();  // F: pawn에서 분리
-	void BindingCharacterBase();  // V: pawn와 결합
-
-	// 분리 전 캐릭터를 저장해두기 위한 포인터
 	UPROPERTY()
-	TObjectPtr<APawn> PossessedCharacter = nullptr;
+	TSubclassOf<AFTPlayerCharacterBase> SelectedCharacterClass;
 };
