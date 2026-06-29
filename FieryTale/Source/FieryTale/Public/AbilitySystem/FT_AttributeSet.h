@@ -32,52 +32,52 @@ public:
 
 public:
     /** 현재 체력 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_Health)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_Health)
     FGameplayAttributeData Health;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Health)
 
     /** 최대 체력 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxHealth)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MaxHealth)
     FGameplayAttributeData MaxHealth;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxHealth)
 
     /** 현재 흡수 보호막 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_Shield)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_Shield)
     FGameplayAttributeData Shield;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Shield)
 
     /**  최대 흡수 보호막 한계치  */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxShield)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MaxShield)
     FGameplayAttributeData MaxShield;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxShield)
 
     /** TPS 이동 속도 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MoveSpeed)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MoveSpeed)
     FGameplayAttributeData MoveSpeed;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MoveSpeed)
 
     /** 공격력 가중치 계수 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_AttackPower)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_AttackPower)
     FGameplayAttributeData AttackPower;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, AttackPower)
 
     /** 현재 궁극기 게이지 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_UltimateGauge)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_UltimateGauge)
     FGameplayAttributeData UltimateGauge;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, UltimateGauge)
 
     /** 최대 궁극기 요구 게이지 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxUltimateGauge)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MaxUltimateGauge)
     FGameplayAttributeData MaxUltimateGauge;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxUltimateGauge)
 
     /** 현재 무기 탄퍼짐 레벨 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_WeaponSpread)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_WeaponSpread)
     FGameplayAttributeData WeaponSpread;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, WeaponSpread)
 
     /** 최대 무기 탄퍼짐 한계치 */
-    UPROPERTY(BlueprintReadOnly, Category = "FT|Attributes", ReplicatedUsing = OnRep_MaxWeaponSpread)
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MaxWeaponSpread)
     FGameplayAttributeData MaxWeaponSpread;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxWeaponSpread)
 

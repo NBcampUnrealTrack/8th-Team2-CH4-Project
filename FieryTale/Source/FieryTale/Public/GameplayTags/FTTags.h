@@ -9,7 +9,7 @@ namespace FTTags
 {
 	namespace FTAbilities
 	{
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(NomalAttack);	// 평타
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(NormalAttack);	// 평타
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackSkill);	// 공격 스킬
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(UtillSkill);		// 유틸 스킬
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(UltimateSkill);	// 궁극기

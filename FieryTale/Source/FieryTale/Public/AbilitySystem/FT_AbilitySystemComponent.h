@@ -17,10 +17,10 @@ public:
 	
 	virtual void OnRep_ActivateAbilities() override;
 	
-	UFUNCTION(BlueprintCallable, Category = "Fiery|Abilities")
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Abilities")
 	void SetAbilityLevel(TSubclassOf<UGameplayAbility>AbilityClass, int32 Level);
 	
-	UFUNCTION(BlueprintCallable, Category = "Fiery|Abilities")
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Abilities")
 	void AddToAbilityLevel(TSubclassOf<UGameplayAbility>AbilityClass, int32 Level = 1);
 	
 private:
