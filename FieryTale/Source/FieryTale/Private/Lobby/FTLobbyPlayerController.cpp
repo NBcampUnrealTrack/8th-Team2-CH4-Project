@@ -7,6 +7,50 @@
 #include "Lobby/FTLobbyPlayerState.h"
 #include "Lobby/FTLobbyGameMode.h"
 #include "Engine/World.h"
+#include "Blueprint/UserWidget.h"
+#include "Lobby/FTLobbyWidget.h"
+
+void AFTLobbyPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// 로컬 화면에만 UI를 띄움
+	if (IsLocalPlayerController() && LobbyWidgetClass)
+	{
+		// UUserWidget 대신 UFTLobbyWidget으로 캐스팅하여 생성
+		UFTLobbyWidget* LobbyUI = CreateWidget<UFTLobbyWidget>(this, LobbyWidgetClass);
+		if (LobbyUI)
+		{
+			LobbyWidgetInstance = LobbyUI;
+			LobbyWidgetInstance->AddToViewport();
+			
+			bShowMouseCursor = true;
+			FInputModeUIOnly InputModeData;
+			InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			SetInputMode(InputModeData);
+
+			// 플레이어 스테이트가 존재한다면 바로 초기화
+			if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
+			{
+				LobbyUI->InitWidget(this, LobbyPS);
+			}
+		}
+	}
+}
+
+void AFTLobbyPlayerController::OnRep_PlayerState() // 플레이어 스테이트 복제완료시 자동 호출되는 함수
+{
+	Super::OnRep_PlayerState();
+	
+	// 클라이언트 컴퓨터에서 뒤늦게 PlayerState가 전달되었을 때 UI와 연결
+	UFTLobbyWidget* LobbyUI = Cast<UFTLobbyWidget>(LobbyWidgetInstance);
+	AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>();
+	
+	if (LobbyUI && LobbyPS)
+	{
+		LobbyUI->InitWidget(this, LobbyPS);
+	}
+}
 
 void AFTLobbyPlayerController::RequestSetReady(bool bReady)
 {

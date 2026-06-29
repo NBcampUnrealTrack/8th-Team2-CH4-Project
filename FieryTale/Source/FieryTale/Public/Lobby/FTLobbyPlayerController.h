@@ -16,7 +16,11 @@ UCLASS()
 class FIERYTALE_API AFTLobbyPlayerController : public APlayerController
 {
 	GENERATED_BODY()
-
+protected:
+	virtual void BeginPlay() override;
+	
+	void OnRep_PlayerState() override;
+	
 public:
 	/** 자기 Ready 상태 변경 요청. (소유 클라이언트에서 호출) */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Lobby")
@@ -25,6 +29,10 @@ public:
 	/** 매치 시작 요청. (대기방 호스트 버튼에서 호출) */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Lobby")
 	void RequestStartMatch();
+	
+	// 로비 위젯 변수
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<class UUserWidget> LobbyWidgetClass;
 
 protected:
 	UFUNCTION(Server, Reliable)
@@ -32,4 +40,8 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerStartMatch();
+	
+	// 로비 위젯 인스턴스
+	UPROPERTY()
+	class UFTLobbyWidget* LobbyWidgetInstance;
 };

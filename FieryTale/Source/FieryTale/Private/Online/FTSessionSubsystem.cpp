@@ -246,6 +246,16 @@ void UFTSessionSubsystem::HandleFindSessionsComplete(bool bWasSuccessful)
 
 			Info.MaxPlayers = Result.Session.SessionSettings.NumPublicConnections;
 			Info.CurrentPlayers = Info.MaxPlayers - Result.Session.NumOpenPublicConnections;
+			
+			// OSS Null 버그 보정: 방을 팠으면 최소 방장(1명)은 무조건 있으므로 0 이하가 나오면 1로 강제 고정합니다.
+			if (Info.CurrentPlayers <= 0)
+			{
+				Info.CurrentPlayers = 1;
+			}
+
+			// (참고) 남은 자리가 0 미만으로 떨어지는 것도 방지
+			Info.CurrentPlayers = FMath::Clamp(Info.CurrentPlayers, 1, Info.MaxPlayers);
+			
 			Info.PingMs = Result.PingInMs;
 
 			FString Password;
@@ -344,11 +354,18 @@ void UFTSessionSubsystem::HandleJoinSessionComplete(FName SessionName, EOnJoinSe
 
 	if (bSuccess)
 	{
-		// 호스트가 열어 둔 대기방으로 ClientTravel 한다.
 		FString ConnectString;
 		APlayerController* PlayerController = GetGameInstance() ? GetGameInstance()->GetFirstLocalPlayerController() : nullptr;
+		
 		if (PlayerController != nullptr && SessionInterface->GetResolvedConnectString(NAME_GameSession, ConnectString))
 		{
+			// 🌟 [추가할 부분] OSS Null 포트 0 버그 해결용 핫픽스
+			if (ConnectString.EndsWith(TEXT(":0")))
+			{
+				ConnectString = ConnectString.LeftChop(2) + TEXT(":7777");
+				UE_LOG(LogFTSession, Warning, TEXT("[Join] 포트가 0으로 반환되어 7777로 강제 수정합니다."));
+			}
+
 			UE_LOG(LogFTSession, Log, TEXT("[Join] 7) 접속 주소 확보: %s -> ClientTravel 실행"), *ConnectString);
 			PlayerController->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
 		}
