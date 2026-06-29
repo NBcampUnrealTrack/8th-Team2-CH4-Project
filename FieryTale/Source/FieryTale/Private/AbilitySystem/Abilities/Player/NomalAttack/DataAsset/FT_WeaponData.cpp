@@ -20,4 +20,5 @@ UFT_WeaponData::UFT_WeaponData()
 	, MaxBounceCount(0)
 	, AttackMontage(nullptr)
 {
+	// 데이터 에셋 생성 시 기본 전투 능력치 및 AOS 진영 스펙에 맞추어 초기화 리스트를 구동합니다
 }
