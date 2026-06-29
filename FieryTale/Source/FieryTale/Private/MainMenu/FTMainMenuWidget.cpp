@@ -85,6 +85,13 @@ void UFTMainMenuWidget::HandleCreateSessionComplete(bool bWasSuccessful)
 	{
 		Text_StatusMessage->SetText(bWasSuccessful ? FText::FromString(TEXT("방 생성 성공! 로비로 이동합니다.")) : FText::FromString(TEXT("방 생성 실패.")));
 	}
+	
+	if (!bWasSuccessful)
+	{	//	방 생성이 실패한 경우
+		//	버튼 돌려주기
+		if (Btn_HostSession) Btn_HostSession->SetIsEnabled(true);
+		if (Btn_FindSessions) Btn_FindSessions->SetIsEnabled(true);
+	}
 }
 
 void UFTMainMenuWidget::HandleFindSessionsComplete(const TArray<FFTSessionInfo>& SessionResults, bool bWasSuccessful)
