@@ -6,12 +6,15 @@
 #include "AbilitySystem/Abilities/FT_GameplayAbility.h"
 #include "FT_AladdinFlySkill.generated.h"
 
+class AFTPlayerCharacterBase;
+
 /**
- * FieryTale 알라딘 전용 Shift 양탄자 비행 유틸 스킬 클래스입니다
+ * 알라딘 Shift 기술 - 양탄자 기류 어빌리티 시스템
  */
 UCLASS()
 class FIERYTALE_API UFT_AladdinFlySkill : public UFT_GameplayAbility
-{GENERATED_BODY()
+{
+	GENERATED_BODY()
 
 public:
 	UFT_AladdinFlySkill();
@@ -20,19 +23,18 @@ public:
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
-	// 비행 지속 시간이 만료되었을 때 호출될 타이머 콜백 함수입니다
+	// 5초 비행 지속 시간이 만료되었을 때 호출될 타이머 콜백 함수
+	UFUNCTION()
 	void OnFlyDurationExpired();
 
-	// 양탄자 비행이 유지될 총 지속 시간 초 단위입니다
-	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|Movement")
+	// 5초 유지를 정밀하게 제어할 순정 타이머 핸들
+	FTimerHandle FlyDurationTimerHandle;
+
+	// 기획 스펙: 양탄자 비행이 유지될 총 지속 시간 (5.0초)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Movement")
 	float FlyDuration;
 
-	// 비행 도중 추가적으로 가산될 이동 속도 보정치입니다
-	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|Movement")
-	float FlySpeedBoost;
-
-	FTimerHandle FlyTimerHandle;
-    
-	// 복구용 원본 걷기 속도 저장 변수입니다
-	float OrigWalkSpeed;
+	// 기획 스펙: 비행 중 이동 속도 페널티 배율 (30% 감소 -> 원래 속도의 0.7배)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Movement")
+	float FlySpeedPenaltyMultiplier;
 };

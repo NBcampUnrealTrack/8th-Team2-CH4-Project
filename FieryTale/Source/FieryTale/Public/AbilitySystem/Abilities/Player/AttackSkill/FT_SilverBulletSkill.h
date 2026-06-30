@@ -4,34 +4,34 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/FT_GameplayAbility.h"
-#include "FT_RedRollSkill.generated.h"
-
-class AFTPlayerCharacterBase;
+#include "GameplayTagContainer.h"
+#include "FT_SilverBulletSkill.generated.h"
 
 /**
- * 빨간 망토 Shift 기술 - 필사적인 도주 어빌리티 시스템
+ * RMB 보조 공격 - 은빛 탄환 (1초 장전 후 강력한 관통 사격)
  */
 UCLASS()
-class FIERYTALE_API UFT_RedRollSkill : public UFT_GameplayAbility
+class FIERYTALE_API UFT_SilverBulletSkill : public UFT_GameplayAbility
 {
 	GENERATED_BODY()
 
 public:
-	UFT_RedRollSkill();
+	UFT_SilverBulletSkill();
 
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
-	// 이동 제어 태스크나 타이머 완료 시 호출될 콜백 함수
-	UFUNCTION()
-	void OnRootMotionTimedOut();
+	// 1초 장전 메커니즘을 제어할 타이머 핸들
+	FTimerHandle ChannellingTimerHandle;
 
-	// 기획 스펙: 회피 구르기 이동 속도 계수
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Movement")
-	float RollSpeed;
+	// 1초 장전이 끝난 후 실제로 탄환을 발사하는 함수
+	void FireSilverBullet();
 
-	// 기획 스펙: 회피 기동이 유지될 총 시간 (초 단위)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Movement")
-	float RollDuration;
+	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|Combat")
+	float BaseDamage;
+
+	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|Combat")
+	float ChannellingDuration;
+	
 };

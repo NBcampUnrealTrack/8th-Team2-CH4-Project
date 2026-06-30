@@ -109,6 +109,7 @@ void UGEEC_Damage::Execute_Implementation(const FGameplayEffectCustomExecutionPa
     }
 
     // 최종 연산된 감산 수치들을 피격자의 AttributeSet에 마이너스 반영 값으로 등록합니다
+    // 디파인 매크로(DEFINE_ATTRIBUTE_CAPTUREDEF)에 의해 내부 생성된 Property 심볼명을 정확하게 호출합니다
     if (DamageToShield > 0.f)
     {
         ExecutionOutputs.AddOutputModifier(FGameplayModifierEvaluatedData(DamageStatCapture().ShieldProperty, EGameplayModOp::Additive, -DamageToShield));

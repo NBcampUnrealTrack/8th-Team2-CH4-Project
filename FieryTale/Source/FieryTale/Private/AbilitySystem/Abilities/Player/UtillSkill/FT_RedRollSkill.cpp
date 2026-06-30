@@ -22,6 +22,9 @@ UFT_RedRollSkill::UFT_RedRollSkill()
     AssetTags.AddTag(FTTags::FTAbilities::UtillSkill);
     SetAssetTags(AssetTags);
 
+    // Shift 이동/생존 기술 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정상 빨간 망토는 15초 쿨타임 작동)
+    CooldownTag = FTTags::FTStates::Cooldown_UtilSkill;
+
     // 구르는 동안 일시적으로 회피 기동 상태임을 나타내는 태그를 캐릭터에게 부여합니다
     ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.Evading")));
 }
@@ -32,7 +35,7 @@ void UFT_RedRollSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 스킬을 쓸 수 있는 자원 상태를 검사하고 승인 처리합니다
+    // 스킬을 쓸 수 있는 자원 상태(15초 쿨다운)를 검사하고 승인 처리합니다
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -95,9 +98,9 @@ void UFT_RedRollSkill::OnRootMotionTimedOut()
 void UFT_RedRollSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+    // 취소되지 않고 정상 종료될 때만 시스템 공용 쿨타임(15초)을 확정 가동시킵니다
     if (!bWasCancelled)
     {
-        // 정상 격발 완료 시점에 쿨타임을 회전시킵니다
         (void)CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
     }
 

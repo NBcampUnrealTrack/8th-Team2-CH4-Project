@@ -3,15 +3,15 @@
 
 #include "AbilitySystem/Abilities/Player/AttackSkill/FT_AliceSkill.h"
 #include "Character/FTPlayerCharacterBase.h"
-#include "TimerManager.h"
 #include "Engine/World.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemInterface.h" 
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
-#include "Kismet/KismetSystemLibrary.h"
 #include "GameplayTags/FTTags.h"
 
 UFT_AliceSkill::UFT_AliceSkill()
+    : BaseDamage(30.0f) // 기획 스펙: 관통 피해량 30
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
@@ -20,7 +20,8 @@ UFT_AliceSkill::UFT_AliceSkill()
     AssetTags.AddTag(FTTags::FTAbilities::AttackSkill);
     SetAssetTags(AssetTags);
 
-    ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.HackingMode")));
+    // [RMB] 보조 공격 공용 재사용 대기시간 10초 매핑
+    CooldownTag = FTTags::FTStates::Cooldown_RightClick;
 }
 
 void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -29,113 +30,50 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    TrackedTargets.Empty();
+    // 10초 쿨다운 및 자원 검증
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
 
-    GetWorld()->GetTimerManager().SetTimer(LockOnTimerHandle, this, &UFT_AliceSkill::ScanHackingTargets, 0.2f, true);
+    AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get());
+    if (Character && Character->GetWeaponData())
+    {
+        UFT_WeaponData* WeaponData = Character->GetWeaponData();
+        UWorld* World = GetWorld();
+
+        if (World && WeaponData->ProjectileClass)
+        {
+            // 캐릭터 전방에서 회중시계 토끼 환영 투사체 생성
+            FVector SpawnLocation = Character->GetActorLocation() + FVector(0, 0, 60);
+            FVector LaunchDirection = Character->GetActorForwardVector();
+            FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
+
+            FActorSpawnParameters SpawnParams;
+            SpawnParams.Owner = Character;
+            SpawnParams.Instigator = Character;
+            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+            // 직선으로 빠르게 달리는 회중시계 토끼 환영 액터 사출
+            AActor* SpawnedRabbit = World->SpawnActor<AActor>(WeaponData->ProjectileClass, SpawnTransform, SpawnParams);
+            
+            if (SpawnedRabbit)
+            {
+                // [기획 구현 가이드] 사출된 토끼 투사체 내부에 앨리스의 고정 피해(30) 설정 전달
+                // 이 투사체는 충돌 시 Destroy되지 않고 Overlap 채널을 통해 적들을 '관통'하며,
+                // 적중된 대상의 ASC에 Damage(30), Debuff_Slow(2초), Target_Insignia(태엽 인장) GE를 찌르도록 블루프린트와 연동됩니다.
+            }
+        }
+    }
+
+    // 환영 사출 직후 스킬 즉시 종료 및 쿨다운 돌입
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_AliceSkill::EndAbility(const FGameplayAbilitySpecHandle Handle,
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     bool bReplicateEndAbility, bool bWasCancelled)
 {
-    GetWorld()->GetTimerManager().ClearTimer(LockOnTimerHandle);
-
-    if (!bWasCancelled)
-    {
-       (void)CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
-
-       AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get());
-       if (Character && Character->GetWeaponData())
-       {
-           UFT_WeaponData* WeaponData = Character->GetWeaponData();
-           UWorld* World = GetWorld();
-
-           if (World && WeaponData->ProjectileClass)
-           {
-               FVector SpawnLocation = Character->GetActorLocation() + FVector(0, 0, 60);
-               
-               FActorSpawnParameters SpawnParams;
-               SpawnParams.Owner = Character;
-               SpawnParams.Instigator = Character;
-               SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-               for (AActor* TargetActor : TrackedTargets)
-               {
-                   if (IsValid(TargetActor))
-                   {
-                       FVector Direction = (TargetActor->GetActorLocation() - SpawnLocation).GetSafeNormal();
-                       FTransform SpawnTransform(Direction.Rotation(), SpawnLocation);
-
-                       World->SpawnActor<AActor>(WeaponData->ProjectileClass, SpawnTransform, SpawnParams);
-                   }
-               }
-           }
-       }
-    }
-
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
-}
-
-void UFT_AliceSkill::ScanHackingTargets()
-{
-    AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get());
-    if (!Character || !Character->GetWeaponData()) return;
-
-    UWorld* World = GetWorld();
-    if (!World) return;
-
-    FVector StartLocation = Character->GetActorLocation() + FVector(0, 0, 60);
-    FVector ForwardVector = Character->GetActorForwardVector();
-    
-    float ScanRange = Character->GetWeaponData()->AttackRange;
-    FVector EndLocation = StartLocation + (ForwardVector * ScanRange);
-
-    TArray<FHitResult> HitResults;
-    FCollisionShape ScanShape = FCollisionShape::MakeSphere(250.0f);
-    FCollisionQueryParams QueryParams;
-    QueryParams.AddIgnoredActor(Character);
-
-    bool bHit = World->SweepMultiByChannel(
-        HitResults,
-        StartLocation,
-        EndLocation,
-        FQuat::Identity,
-        ECollisionChannel::ECC_WorldDynamic,
-        ScanShape,
-        QueryParams
-    );
-
-    if (bHit)
-    {
-        UAbilitySystemComponent* SourceASC = CurrentActorInfo->AbilitySystemComponent.Get();
-        if (!SourceASC) return;
-
-        FGameplayTag BlueTeamTag = FGameplayTag::RequestGameplayTag(FName("Team.Blue"));
-        FGameplayTag RedTeamTag = FGameplayTag::RequestGameplayTag(FName("Team.Red"));
-
-        for (const FHitResult& Hit : HitResults)
-        {
-            AActor* HitActor = Hit.GetActor();
-            if (IsValid(HitActor))
-            {
-                // 정석적인 언리얼 인터페이스 캐스팅 방식을 적용하여 안전하게 검증합니다
-                if (IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(HitActor))
-                {
-                    if (UAbilitySystemComponent* TargetASC = ASI->GetAbilitySystemComponent())
-                    {
-                        if ((SourceASC->HasMatchingGameplayTag(BlueTeamTag) && TargetASC->HasMatchingGameplayTag(BlueTeamTag)) ||
-                            (SourceASC->HasMatchingGameplayTag(RedTeamTag) && TargetASC->HasMatchingGameplayTag(RedTeamTag)))
-                        {
-                            continue;
-                        }
-
-                        if (!TrackedTargets.Contains(HitActor))
-                        {
-                            TrackedTargets.Add(HitActor);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }

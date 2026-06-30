@@ -8,6 +8,8 @@
 #include "GameplayTags/FTTags.h"
 
 UFT_ChargedShotSkill::UFT_ChargedShotSkill()
+    : BaseDamage(50.0f)      // 기획 스펙: 지니의 주먹 적중 고정 피해량 50
+    , KnockbackForce(800.0f) // 기획 스펙: 중심부 바깥쪽 넉백 물리 강도 설정
 {
     // 인스턴싱 정책 캐릭터마다 이 스킬 객체를 독립적으로 생성해서 관리합니다
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -19,6 +21,9 @@ UFT_ChargedShotSkill::UFT_ChargedShotSkill()
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::AttackSkill);
     SetAssetTags(AssetTags);
+
+    // 우클릭 보조 공격 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정상 알라딘은 9초 쿨타임 작동)
+    CooldownTag = FTTags::FTStates::Cooldown_RightClick;
 }
 
 void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -30,7 +35,7 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     // 차징이 시작된 절대 시간을 기록합니다
     ChargeStartTime = GetWorld()->GetTimeSeconds();
     
-    // 추후 구현 포인트 차징 스태이지 진입 시 재생할 클라이언트 전용 차징 나이아가라 이펙트 및 루프 사운드 부착 구역
+    // 추후 구현 포인트 차징 스테이지 진입 시 재생할 클라이언트 전용 차징 나이아가라 이펙트 및 루프 사운드 부착 구역
 }
 
 void UFT_ChargedShotSkill::EndAbility(const FGameplayAbilitySpecHandle Handle,
@@ -47,7 +52,7 @@ void UFT_ChargedShotSkill::EndAbility(const FGameplayAbilitySpecHandle Handle,
        // 1초 이상 마우스를 홀드하여 풀 차징 상태에 도달했는지 검사합니다
        if (ChargeDuration >= 1.0f)
        {
-          // 풀 차징 조건 만족 시 스킬 쿨타임을 정상 작동시킵니다
+          // 풀 차징 조건 만족 시 스킬 쿨타임(9초)을 정상 작동시킵니다
           (void)CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
           
           // 캐릭터의 무기 데이터 에셋으로부터 투사체 정보를 로드하여 격발 인프라를 가동합니다
@@ -67,9 +72,15 @@ void UFT_ChargedShotSkill::EndAbility(const FGameplayAbilitySpecHandle Handle,
 
                   FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
 
-                  // 풀 차징 전용 폭발 투사체 액터를 월드에 사출합니다
-                  // 추후 해당 투사체가 적중 시 타깃의 GEEC_Damage를 관통하여 광역 폭발 피해를 주도록 연동합니다
-                  World->SpawnActor<AActor>(WeaponData->ProjectileClass, SpawnTransform, SpawnParams);
+                  // 풀 차징 전용 폭발 투사체(지니의 거대한 주먹) 액터를 월드에 사출합니다
+                  AActor* SpawnedInwardPunch = World->SpawnActor<AActor>(WeaponData->ProjectileClass, SpawnTransform, SpawnParams);
+                  
+                  if (SpawnedInwardPunch)
+                  {
+                      // [기획 구현 가이드] 사출된 지니의 주먹 내부에 피해량(50)과 중심부 바깥 밀쳐내기(넉백) 매커니즘을 연동합니다
+                      // 투사체가 지정 원형 범위 중심부에 도달하거나 적과 충돌 시, 
+                      // 범위 내의 모든 적 ASC에 Damage(50) 이펙트를 적용하고 LaunchCharacter 기반 외곽 넉백을 연산하도록 블루프린트와 조립됩니다.
+                  }
               }
           }
        }

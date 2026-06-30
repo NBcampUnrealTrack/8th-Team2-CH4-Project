@@ -15,7 +15,7 @@ namespace FTTags
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(NormalAttack, "FTTags.Ability.NormalAttack", "LMB 기본 평타 공격 능력 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(AttackSkill, "FTTags.Ability.AttackSkill", "RMB 보조/강공격 능력 태그");
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(UtillSkill, "FTTags.Ability.UtillSkill", "Shift 이동/생존 기술 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(UtillSkill, "FTTags.Ability.UtilSkill", "Shift 이동/생존 기술 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(UltimateSkill, "FTTags.Ability.UltimateSkill", "Q 궁극기 능력 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActivateOnGiven, "FTTags.Ability.ActivateOnGiven", "부여 시 즉시 활성화되는 패시브 능력용 태그");
     }
@@ -34,14 +34,27 @@ namespace FTTags
        
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_AttackSkill, "FTTags.State.Cooldown.AttackSkill", "우클릭 스킬에대한 쿨타임 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_UtilSkill, "FTTags.State.Cooldown.UtilSkill", "유틸 스킬에대한 쿨타임 태그");
+
+       // 우클릭 보조 공격 스킬 고유 쿨타임 태그
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Cooldown_RightClick, "FTTags.State.Cooldown.RightClick", "보조 공격(우클릭) 스킬의 12초 고유 쿨타임 태그");
     }
     
     namespace FTCombat
     {
+       // 평타 및 모든 스킬 대미지 연산용 마스터 대미지 태그
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage, "FTTags.Combat.Damage", "SetByCaller 대미지 연산 및 가감용 마스터 대미지 태그");
+
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(WeaponMode_Aiming, "FTTags.Combat.WeaponMode.Aiming", "빨간 망토가 2배율 정조준 사격 중인 상태 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Channelling, "FTTags.Combat.Skill.Channelling", "스킬 선시전/선딜레이 중 고정 상태 (인터럽트 체크용)");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Target_Insignia, "FTTags.Combat.Target.Insignia", "앨리스 시계 토끼에 피격된 대상의 태엽 인장 표식");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Muted, "FTTags.Combat.Structure.Muted", "포탑의 AI 포격 루프를 강제로 중단시키는 마비 태그");
+    }
+
+    // ◄◄◄ 가구야 궁극기 에러(LNK2001) 해결을 위한 구조물 식별 구현부 추가
+    namespace FTObjectType
+    {
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Turret, "FTTags.ObjectType.Structure.Turret", "피아식별 및 예외 처리를 위한 포탑 구조물 식별 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Nexus, "FTTags.ObjectType.Structure.Nexus", "피아식별 및 예외 처리를 위한 넥서스 구조물 식별 태그");
     }
     
     namespace FTAugments

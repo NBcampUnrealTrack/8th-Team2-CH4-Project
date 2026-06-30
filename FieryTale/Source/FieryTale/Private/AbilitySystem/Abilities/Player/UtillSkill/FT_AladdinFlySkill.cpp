@@ -9,9 +9,8 @@
 #include "GameplayTags/FTTags.h"
 
 UFT_AladdinFlySkill::UFT_AladdinFlySkill()
-    : FlyDuration(1.5f)
-    , FlySpeedBoost(400.0f)
-    , OrigWalkSpeed(0.0f)
+    : FlyDuration(5.0f)                 // 기획 스펙: 5초 비행 유지
+    , FlySpeedPenaltyMultiplier(0.7f)   // 기획 스펙: 이동 속도 30% 감산 (0.7배)
 {
     // 인스턴싱 정책 캐릭터마다 이 스킬 객체를 독립적으로 생성해서 관리합니다
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -24,7 +23,10 @@ UFT_AladdinFlySkill::UFT_AladdinFlySkill()
     AssetTags.AddTag(FTTags::FTAbilities::UtillSkill);
     SetAssetTags(AssetTags);
 
-    // 비행 상태 동안 일시적으로 공중 비행 상태 태그를 캐릭터에게 부여합니다
+    // Shift 이동/생존 기술 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정상 알라딘은 15초 쿨타임 작동)
+    CooldownTag = FTTags::FTStates::Cooldown_UtilSkill;
+
+    // 비행 상태 동안 부여할 전용 태그
     ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.Flying")));
 }
 
@@ -42,62 +44,66 @@ void UFT_AladdinFlySkill::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     }
 
     ACharacter* Character = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
-    if (!Character || !Character->GetCharacterMovement())
+    UCharacterMovementComponent* MoveComp = Character ? Character->GetCharacterMovement() : nullptr;
+    
+    if (!Character || !MoveComp)
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
 
-    UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement();
-
-    // 원본 속도를 기억하고 양탄자 고속 비행을 위해 무브먼트 모드를 전환 및 가속합니다
-    OrigWalkSpeed = MoveComp->MaxWalkSpeed;
-    MoveComp->MaxFlySpeed = OrigWalkSpeed + FlySpeedBoost;
+    // 기획 스펙 반영: 비행 전개 시 원래 이동 속도의 30% 감산 적용
+    MoveComp->MaxFlySpeed = MoveComp->MaxWalkSpeed * FlySpeedPenaltyMultiplier;
     MoveComp->MaxWalkSpeed = MoveComp->MaxFlySpeed;
     
-    // 지면 마찰과 중력의 영향을 끄고 비행 모드로 강제 설정합니다
+    // 지면 마찰과 중력의 영향을 끄고 비행 모드로 강제 설정
     MoveComp->SetMovementMode(EMovementMode::MOVE_Flying);
 
-    // 공중으로 살짝 떠오르는 부력을 인위적으로 한 번 튕겨줍니다
+    // 공중으로 떠오르는 부력 연출
     Character->LaunchCharacter(FVector(0.0f, 0.0f, 250.0f), false, true);
 
-    // 기획 스펙 지정된 비행 지속 시간 타이머를 구동합니다
-    GetWorld()->GetTimerManager().SetTimer(FlyTimerHandle, this, &UFT_AladdinFlySkill::OnFlyDurationExpired, FlyDuration, false);
+    // 기획 스펙 반영: 5초간의 비행 유지 타이머 가동
+    GetWorld()->GetTimerManager().SetTimer(
+        FlyDurationTimerHandle, 
+        this, 
+        &UFT_AladdinFlySkill::OnFlyDurationExpired, 
+        FlyDuration, 
+        false
+    );
 
-    // 추후 구현 포인트 비행 시작 시 스폰할 양탄자 스켈레탈 메쉬 컴포넌트 부착 및 기류 바람 나이아가라 이펙트 구동 구역
+    // 추후 구현 포인트 양탄자 메쉬 부착 및 기류 바람 나이아가라 이펙트 구동
 }
 
 void UFT_AladdinFlySkill::OnFlyDurationExpired()
 {
-    // 지속 시간이 다 닳는 즉시 어빌리티를 정리하는 관문으로 안전하게 진입합니다
+    // 지속 시간 만료 즉시 마감 관문 진입
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_AladdinFlySkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머가 돌고 있다면 강제로 해제하여 좀도둑 크래시를 방지합니다
-    GetWorld()->GetTimerManager().ClearTimer(FlyTimerHandle);
+    // 타이머 안전 해제
+    if (GetWorld())
+    {
+        GetWorld()->GetTimerManager().ClearTimer(FlyDurationTimerHandle);
+    }
 
     ACharacter* Character = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
     if (Character && Character->GetCharacterMovement())
     {
         UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement();
         
-        // 비행이 끝났으므로 원래 정통 걷기 무브먼트 모드로 완벽하게 복원합니다
+        // 무브먼트 모드 복원 및 속도 원상 복구 (페널티 배율 해제)
         MoveComp->SetMovementMode(EMovementMode::MOVE_Walking);
+        MoveComp->MaxWalkSpeed /= FlySpeedPenaltyMultiplier;
         
-        if (OrigWalkSpeed > 0.0f)
-        {
-            MoveComp->MaxWalkSpeed = OrigWalkSpeed;
-        }
-        
-        // 추후 구현 포인트 부착했던 양탄자 메쉬 액터 파괴 및 지면 착지 애니메이션 연동 구역
+        // 추후 구현 포인트 부착했던 양탄자 메쉬 액터 파괴 및 착지 연출
     }
 
+    // 정상 비행 완료 시점에 15초 공용 유틸기 쿨타임 확정 가동
     if (!bWasCancelled)
     {
-        // 정상 비행 완료 시점에 쿨타임을 정상 가동합니다
         (void)CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
     }
 

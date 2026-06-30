@@ -46,15 +46,20 @@ public:
     FGameplayAttributeData Shield;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Shield)
 
-    /**  최대 흡수 보호막 한계치  */
+    /** 최대 흡수 보호막 한계치 */
     UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MaxShield)
     FGameplayAttributeData MaxShield;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxShield)
 
-    /** TPS 이동 속도 */
+    /** 현재 TPS 이동 속도 */
     UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MoveSpeed)
     FGameplayAttributeData MoveSpeed;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MoveSpeed)
+
+    /** 최대 TPS 이동 속도 한계치 (가구야 방벽 속도 페널티 및 영웅 복구 연산용 기본 배관) */
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MaxMoveSpeed)
+    FGameplayAttributeData MaxMoveSpeed;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxMoveSpeed)
 
     /** 공격력 가중치 계수 */
     UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_AttackPower)
@@ -81,6 +86,14 @@ public:
     FGameplayAttributeData MaxWeaponSpread;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxWeaponSpread)
 
+    /** * 대미지 연산용 메타 속성 (임시 우체통)
+     * GEEC_Damage의 출력을 받아 PostGameplayEffectExecute에서 체력 및 보호막 실시간 감산을 원격 처리합니다.
+     * 서버-클라이언트 간 동기화(Replication)가 불필요한 일회성 속성입니다.
+     */
+    UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes")
+    FGameplayAttributeData Damage;
+    ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Damage)
+
 protected:
     UFUNCTION() 
     virtual void OnRep_Health(const FGameplayAttributeData& OldHealth);
@@ -96,6 +109,9 @@ protected:
     
     UFUNCTION() 
     virtual void OnRep_MoveSpeed(const FGameplayAttributeData& OldMoveSpeed);
+
+    UFUNCTION() 
+    virtual void OnRep_MaxMoveSpeed(const FGameplayAttributeData& OldMaxMoveSpeed);
     
     UFUNCTION() 
     virtual void OnRep_AttackPower(const FGameplayAttributeData& OldAttackPower);

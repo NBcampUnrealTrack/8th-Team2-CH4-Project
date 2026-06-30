@@ -67,11 +67,11 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Spread Data")
     float InitMaxSpread;
 
+    // --- 투사체 사격 세부 옵션 (알라딘, 앨리스 공용) ---
     /** Projectile 타입 영웅일 때 발사할 투사체 액터 클래스 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Spread Data", meta = (EditCondition = "FireType == EWeaponFireType::Projectile"))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Projectile Options", meta = (EditCondition = "FireType == EWeaponFireType::Projectile"))
     TSubclassOf<AActor> ProjectileClass;
 
-    // --- 투사체 사격 세부 옵션 ---
     /** 1회 공격 인풋당 동시 또는 연속으로 사출될 투사체 총 개수 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Projectile Options", meta = (ClampMin = "1"))
     int32 ProjectilesPerShot;
@@ -91,5 +91,9 @@ public:
 
 public:
     /** 공격 중 이동 패널티 배율을 안전하게 반환하는 인라인 함수입니다 */
-    FORCEINLINE float GetMovementPenaltyMultiplier() const { return MovementSpeedMultiplier; }
+    FORCEINLINE float GetMovementPenaltyMultiplier() const 
+    { 
+        // 에디터 기입 실수로 0 이하의 값이 들어갔을 때 이동 속도가 마비되는 것을 선제 차단합니다
+        return MovementSpeedMultiplier > 0.0f ? MovementSpeedMultiplier : 1.0f; 
+    }
 };
