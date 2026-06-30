@@ -4,12 +4,24 @@
 #include "Character/FTPlayerState.h"
 #include "Character/FTPlayerCharacterBase.h"
 #include "UI/FTHUDLayoutSubsystem.h"
+#include "Character/FTCharacterBase.h"
 #include "AbilitySystemComponent.h"
 #include "Components/InputComponent.h"
 #include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
+#include "TimerManager.h"
+#include "Blueprint/UserWidget.h"
+#include "GameplayTags/FTTags.h"
+#include "GameFramework/GameModeBase.h"
+   
 
 DEFINE_LOG_CATEGORY(FTPlayerController);
+
+AFTPlayerController::AFTPlayerController(const FObjectInitializer& Initializer)
+	:Super(Initializer)
+{
+	RespawnDelay = 3.0f;
+}
 
 // TODO:: 삭제 예정
 void AFTPlayerController::SpawnCharacter(const FVector& LocationSpawn, const FRotator& SpawnRotation = FRotator::ZeroRotator)
@@ -41,6 +53,70 @@ void AFTPlayerController::SetSelectedCharacterClass(TSubclassOf<AFTPlayerCharact
 	SelectedCharacterClass = InCharacterClass;
 }
 
+void AFTPlayerController::OnPlayerDeath()
+{
+	// TODO:: DeadScreen 등 처리
+	if (DeathOverlayClass)                                                                                                                                                                                                            
+	{                                                                                                                                                                                                                                 
+		DeathOverlayWidgetInstance = CreateWidget<UUserWidget>(this, DeathOverlayClass);                                                                                                                                                      
+		if (DeathOverlayWidgetInstance)
+		{
+			DeathOverlayWidgetInstance->AddToViewport();
+		}
+	} 
+}
+
+
+void AFTPlayerController::RequestRespawn()
+{
+	// 서버권한에서만 동작함
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	// 이미 작동중인 리스폰 타이머가 있는 경우 중복 실행 방지
+	if (GetWorld()->GetTimerManager().IsTimerActive(RespawnTimerHandle))
+	{
+		return;
+	}
+	
+	GetWorldTimerManager().SetTimer(
+		RespawnTimerHandle, 
+		this, 
+		&AFTPlayerController::ExecuteRespawn, 
+		RespawnDelay, 
+		false
+	);
+	
+	
+	
+}
+
+
+void AFTPlayerController::ExecuteRespawn()
+{
+	// 서버에서만 처리
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	if (DeathOverlayWidgetInstance)                                                                                                                                                                                                           
+	{                                                                                                                                                                                                                                 
+		DeathOverlayWidgetInstance->RemoveFromParent();                                                                                                                                                                                       
+		DeathOverlayWidgetInstance = nullptr;                                                                                                                                                                                                 
+	}
+	
+	AFTPlayerCharacterBase* CurrentCharacter = Cast<AFTPlayerCharacterBase>(GetPawn());
+	if (CurrentCharacter)
+	{
+		CurrentCharacter->TeleportTo(RespawnLocation, RespawnRotation);
+		CurrentCharacter->Revive();
+	}
+	
+}
+
 void AFTPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -53,13 +129,15 @@ void AFTPlayerController::OnPossess(APawn* InPawn)
 
 	PS->SpawnedCharacter = InPawn;
 
-	// TODO: 캐릭터 사망관련 상태가 될 경우,  
-	// UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent();
-	// if (ASC)
-	// {
-	// 	ASC->RegisterGameplayTagEvent(FTTags::FTStates::Dead, EGameplayTagEventType::NewOrRemoved)
-	// 		.AddUObject(this, &AFTPlayerController::OnDeadStateChanged);
-	// }
+	RespawnLocation = InPawn->GetActorLocation();
+	RespawnRotation = InPawn->GetActorRotation();
+	
+	AFTPlayerCharacterBase* TargetCharacter = Cast<AFTPlayerCharacterBase>(InPawn);
+	if (TargetCharacter)
+	{
+		// 캐릭터의 사망 델리게이트에 컨트롤러의 기능을 바인딩
+		TargetCharacter->OnCharacterDied.AddDynamic(this, &AFTPlayerController::HandleCharacterDeath);
+	}
 }
 
 void AFTPlayerController::SetupInputComponent()
@@ -87,24 +165,17 @@ void AFTPlayerController::ToggleHUDEditMode()
 	}
 }
 
-void AFTPlayerController::OnDeadStateChanged(const FGameplayTag Tag, int32 DeadTagCount)
+void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter)
 {
-	if (!HasAuthority())
+	// 내가 현재 조종하고 있던 메인 캐릭터가 죽은 게 맞는지 검증
+	if (DiedCharacter == GetPawn())
 	{
-		return;
-	}
-
-	if (DeadTagCount > 0)
-	{
-		// 사망 상태 진입
-		// - 현재 Pawn 파괴 또는 비활성화
-		// - SetViewTarget으로 시야 전환 (팀원 Pawn, 관전 카메라, 구조물 등 기획 미확정)
+		// 내 메인 캐릭터가 죽었을 때의 UI/입력 처리 실행
+		OnPlayerDeath(); 
+		RequestRespawn();
 	}
 	else
 	{
-		// 부활 — Dead GE Duration 만료 시 도달
-		// 부활시 배치를 하는 게 맞는가? 그냥 안쓰는 공간에 BaseCharacter를 박아두고 걔의 위치를 옮긴 다음 거기에 빙의시켜 재사용하는 쪽이 맞지 않을까?
-		// TODO: GameMode에서 스폰 위치를 받아올 예정
-		// SpawnCharacter(SpawnLocation, SpawnRotation);
+		// 죽은 게 메인캐릭터가 아닌 경우?
 	}
 }

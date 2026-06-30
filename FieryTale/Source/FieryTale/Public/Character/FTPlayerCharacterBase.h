@@ -3,10 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Character.h"
-#include "AbilitySystemInterface.h"
+#include "Character/FTCharacterBase.h"
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
-
+#include "GameplayTagContainer.h"
 #include "FTPlayerCharacterBase.generated.h"
 
 class USpringArmComponent;
@@ -14,14 +13,11 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
-class UGameplayAbility;
-class UGameplayEffect; // ◄◄◄ 이펙트 클래스 처리를 위한 전방 선언 추가
-
 
 DECLARE_LOG_CATEGORY_EXTERN(FTPlayerCharacter, Log, All);
 
 UCLASS()
-class FIERYTALE_API AFTPlayerCharacterBase : public ACharacter, public IAbilitySystemInterface
+class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 {
 	GENERATED_BODY()
 
@@ -57,26 +53,32 @@ class FIERYTALE_API AFTPlayerCharacterBase : public ACharacter, public IAbilityS
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ShiftAction;
 
-	// =============================================================================
-	// [WEAPON SYSTEM DATA ASSET]
-	// =============================================================================
+	// TODO:: 사망 확인을 위한 임시코드 삭제 예정
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* DebugDieAction;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Weapon", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UFT_WeaponData> CurrentWeaponData;
 
 	virtual void BeginPlay() override;
-	
+
 public:
 	AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
-	// [인터페이스 구현] PlayerState를 추적하여 ASC를 중앙 집중식으로 반환합니다.
+	// ASC는 PlayerState에서 가져옴
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	// 평타 어빌리티(GA)가 실시간으로 캐릭터의 무기 스펙을 동적으로 읽어갈 수 있도록 열어주는 Getter /
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Weapon")
 	UFT_WeaponData* GetWeaponData() const { return CurrentWeaponData; }
-	
-protected:
 
+	/** Returns CameraBoom subobject **/
+	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+	/** Returns FollowCamera subobject **/
+	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+	virtual void Revive();
+
+protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
 
@@ -87,31 +89,13 @@ protected:
 	virtual void OnRightClick(const FInputActionValue& Value);
 	virtual void OnShift(const FInputActionValue& Value);
 
+	// TODO:: 사망 확인을 위한 임시코드 삭제 예정
+	void DebugDie();
+
 	virtual void PossessedBy(AController* NewController) override;
-	
 	virtual void OnRep_PlayerState() override;
-	
 	virtual void NotifyControllerChanged() override;
-
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-	
-private:
-	// =============================================================================
-	// [ 레퍼런스 스타일을 반영한 GAS 기획 노출 변수 구역]
-	// =============================================================================
-	/* 기획자가 에디터 디테일 창에서 이 캐릭터에게 쥐어줄 기본 스킬/평타 목록입니다. (예: GA_RRD_NormalAttack) */
-	UPROPERTY(EditDefaultsOnly, Category = "FieryTale | GAS", meta = (AllowPrivateAccess = "true"))
-	TArray<TSubclassOf<UGameplayAbility>> StartupAbilities;
 
-	/* 캐릭터 생성 시 기본 스탯 주입 및 캐릭터 식별 태그를 일괄 부여하기 위한 기본 게임플레이 이펙트 리스트입니다. 
-     기획자가 GE_Initialize_RedRidingHood 같은 자산을 디테일 창에 툭 넣어주면 끝납니다! */
-  UPROPERTY(EditDefaultsOnly, Category = "FieryTale | GAS", meta = (AllowPrivateAccess = "true"))
-	TArray<TSubclassOf<UGameplayEffect>> DefaultGameplayEffects;	
-
-public:	
-	/** Returns CameraBoom subobject **/
-	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
-	/** Returns FollowCamera subobject **/
-	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-
+	void ActivateAbilityByInputTag(const FGameplayTag& InputTag, bool bIsPressed) const;
 };
