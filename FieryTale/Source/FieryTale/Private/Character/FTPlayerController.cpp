@@ -168,6 +168,10 @@ void AFTPlayerController::SetupInputComponent()
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
+		if (UIMappingContext)
+		{
+			Subsystem->AddMappingContext(UIMappingContext, 1);
+		}
 	}
 
 	// 레거시 한 줄 바인딩 — IA/IMC 에셋 없이 바로 키 연결
@@ -180,9 +184,16 @@ void AFTPlayerController::SetupInputComponent()
 		EIC->BindAction(LeftClickAction,  ETriggerEvent::Started,   this, &AFTPlayerController::OnLeftClick);
 		EIC->BindAction(RightClickAction, ETriggerEvent::Started,   this, &AFTPlayerController::OnRightClick);
 		EIC->BindAction(ShiftAction,      ETriggerEvent::Started,   this, &AFTPlayerController::OnShift);
-		EIC->BindAction(ToggleHUDEditModeAction,      ETriggerEvent::Started,   this, &AFTPlayerController::ToggleHUDEditMode);
-
+		EIC->BindAction(ToggleHUDEditModeAction, ETriggerEvent::Started,   this, &AFTPlayerController::ToggleHUDEditMode);
+		EIC->BindAction(ScoreboardAction,        ETriggerEvent::Started,   this, &AFTPlayerController::OnScoreboardPressed);
+		EIC->BindAction(AltMouseAction,          ETriggerEvent::Started,   this, &AFTPlayerController::OnAltPressed);
+		EIC->BindAction(AltMouseAction,          ETriggerEvent::Completed, this, &AFTPlayerController::OnAltReleased);
+		EIC->BindAction(ChatAction,              ETriggerEvent::Started,   this, &AFTPlayerController::OnChatPressed);
 	}
+	
+	
+	
+	
 }
 
 void AFTPlayerController::Move(const FInputActionValue& Value)
@@ -260,4 +271,25 @@ void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter)
 	{
 		// 죽은 게 메인캐릭터가 아닌 경우?
 	}
+}
+void AFTPlayerController::OnScoreboardPressed()
+{
+	
+}
+
+void AFTPlayerController::OnAltPressed()
+{
+	bShowMouseCursor = true;
+	// SetIgnoreLookInput(true); // 카메라 입력 무시
+}
+
+void AFTPlayerController::OnAltReleased()
+{
+	bShowMouseCursor = false;
+	// SetIgnoreLookInput(false); // 카메라 입력 다시 받음
+}
+
+void AFTPlayerController::OnChatPressed()
+{
+	
 }

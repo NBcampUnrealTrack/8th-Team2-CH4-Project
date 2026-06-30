@@ -46,27 +46,40 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Setting")
 	float RespawnDelay;
 
-	// Input
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	// Input | GamePlay
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|GamePlay", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|GamePlay", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> MoveAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|GamePlay", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> LookAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|GamePlay", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> LeftClickAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|GamePlay", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> RightClickAction;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|GamePlay", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> ShiftAction;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+
+	// Input | UI
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|UI", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputMappingContext> UIMappingContext;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|UI", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> ToggleHUDEditModeAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|UI", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> ScoreboardAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|UI", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> AltMouseAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|UI", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> ChatAction;
 
 protected:
 	
@@ -105,6 +118,11 @@ private:
 
 	// HUD 편집 모드 토글 (F11) — Movable 위젯 위치 조정
 	void ToggleHUDEditMode();
+
+	void OnScoreboardPressed();
+	void OnAltPressed();
+	void OnAltReleased();
+	void OnChatPressed();
 	
 	UFUNCTION()
 	void HandleCharacterDeath(AFTCharacterBase* DiedCharacter);
