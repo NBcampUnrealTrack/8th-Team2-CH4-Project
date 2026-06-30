@@ -26,10 +26,14 @@ public:
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
+	virtual void SetupInputComponent() override;
 
 private:
 	// Dead 태그 카운트 변화 시 호출 — 사망/부활 분기 처리
 	void OnDeadStateChanged(const FGameplayTag Tag, int32 DeadTagCount);
+
+	// HUD 편집 모드 토글 (F11) — Movable 위젯 위치 조정
+	void ToggleHUDEditMode();
 
 	UPROPERTY()
 	TSubclassOf<AFTPlayerCharacterBase> SelectedCharacterClass;

@@ -3,8 +3,11 @@
 #include "Character/FTPlayerController.h"
 #include "Character/FTPlayerState.h"
 #include "Character/FTPlayerCharacterBase.h"
+#include "UI/FTHUDLayoutSubsystem.h"
 #include "AbilitySystemComponent.h"
+#include "Components/InputComponent.h"
 #include "Engine/World.h"
+#include "Engine/LocalPlayer.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerController);
 
@@ -57,6 +60,31 @@ void AFTPlayerController::OnPossess(APawn* InPawn)
 	// 	ASC->RegisterGameplayTagEvent(FTTags::FTStates::Dead, EGameplayTagEventType::NewOrRemoved)
 	// 		.AddUObject(this, &AFTPlayerController::OnDeadStateChanged);
 	// }
+}
+
+void AFTPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	if (InputComponent)
+	{
+		// 레거시 키 바인딩 — 추후 Enhanced Input의 InputAction으로 교체 가능
+		InputComponent->BindKey(EKeys::F11, IE_Pressed, this, &AFTPlayerController::ToggleHUDEditMode);
+	}
+}
+
+void AFTPlayerController::ToggleHUDEditMode()
+{
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		return;
+	}
+
+	if (UFTHUDLayoutSubsystem* Subsystem = LocalPlayer->GetSubsystem<UFTHUDLayoutSubsystem>())
+	{
+		Subsystem->ToggleEditMode();
+	}
 }
 
 void AFTPlayerController::OnDeadStateChanged(const FGameplayTag Tag, int32 DeadTagCount)
