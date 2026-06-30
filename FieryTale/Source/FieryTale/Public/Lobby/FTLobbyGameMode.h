@@ -20,9 +20,11 @@ class FIERYTALE_API AFTLobbyGameMode : public AGameModeBase
 
 public:
 	AFTLobbyGameMode();
-
+	
+	virtual void BeginPlay() override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
+	
 
 	/** 어떤 플레이어의 Ready 상태가 바뀌었을 때 PlayerController(서버)가 호출한다. */
 	void NotifyReadyStateChanged();

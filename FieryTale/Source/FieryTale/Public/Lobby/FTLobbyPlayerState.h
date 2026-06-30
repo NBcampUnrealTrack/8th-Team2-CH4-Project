@@ -15,6 +15,17 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFTOnLobbyReadyStateChanged);
  * bIsReady 는 서버 권한으로만 바뀌고, 모든 클라이언트에 복제되어
  * 대기방 위젯이 "누가 준비됐는지"를 표시할 수 있게 한다.
  */
+
+UENUM(BlueprintType)
+enum class EFTCharacterType : uint8
+{
+	None UMETA(DisplayName = "None"),
+	RedHood UMETA(DisplayName = "RedHood"),
+	Aladdin UMETA(DisplayName = "Aladdin"),
+	Kaguya UMETA(DisplayName = "Kaguya"),
+	Alice UMETA(DisplayName = "Alice")
+};
+
 UCLASS()
 class FIERYTALE_API AFTLobbyPlayerState : public APlayerState
 {
@@ -35,10 +46,24 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "FieryTale|Lobby")
 	FFTOnLobbyReadyStateChanged OnReadyStateChanged;
 
+	// 플레이어 진열대 자리 번호
+	UPROPERTY(Replicated)
+	int32 PlayerIndex = -1;
+	
+	// 캐릭터 변경 요청 및 조회
+	void SetCharacterType(EFTCharacterType InCharacterType);
+	EFTCharacterType GetCharacterType() const { return SelectedCharacter; }
+	
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, BlueprintReadOnly, Category = "FieryTale|Lobby")
 	bool bIsReady = false;
 
 	UFUNCTION()
 	void OnRep_IsReady();
+	
+	UPROPERTY(ReplicatedUsing = OnRep_SelectedCharacter)
+	EFTCharacterType SelectedCharacter;
+	
+	UFUNCTION()
+	void OnRep_SelectedCharacter();
 };

@@ -42,13 +42,12 @@ void AFTLobbyPlayerController::OnRep_PlayerState() // 플레이어 스테이트 
 {
 	Super::OnRep_PlayerState();
 	
-	// 클라이언트 컴퓨터에서 뒤늦게 PlayerState가 전달되었을 때 UI와 연결
-	UFTLobbyWidget* LobbyUI = Cast<UFTLobbyWidget>(LobbyWidgetInstance);
-	AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>();
-	
-	if (LobbyUI && LobbyPS)
+	if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
 	{
-		LobbyUI->InitWidget(this, LobbyPS);
+		if (LobbyWidgetInstance)
+		{
+			LobbyWidgetInstance->InitWidget(this, LobbyPS);
+		}
 	}
 }
 
@@ -64,6 +63,20 @@ void AFTLobbyPlayerController::RequestStartMatch()
 	UE_LOG(LogFTSession, Log, TEXT("[Ready] 호스트 시작 버튼 RequestStartMatch → ServerRPC (%s)"), *GetName());
 	ServerStartMatch();
 }
+
+void AFTLobbyPlayerController::RequestSetCharacter(EFTCharacterType NewCharacter)
+{
+	ServerSetCharacter(NewCharacter);
+}
+
+void AFTLobbyPlayerController::ServerSetCharacter_Implementation(EFTCharacterType NewCharacter)
+{
+	if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
+	{
+		LobbyPS->SetCharacterType(NewCharacter);
+	}
+}
+
 
 void AFTLobbyPlayerController::ServerSetReady_Implementation(bool bReady)
 {
