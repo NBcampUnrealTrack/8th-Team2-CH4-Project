@@ -7,6 +7,9 @@
 #include "Character/FTCharacterBase.h"
 #include "AbilitySystemComponent.h"
 #include "Components/InputComponent.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputActionValue.h"
 #include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
 #include "TimerManager.h"
@@ -117,6 +120,20 @@ void AFTPlayerController::ExecuteRespawn()
 	
 }
 
+void AFTPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	if (ArenaHUDWidget)                                                                                                                            
+	{                                                                                                                                                                                                                                 
+		ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);                                                                                                                                                      
+		if (ArenaHUDWidgetInstance)
+		{
+			ArenaHUDWidgetInstance->AddToViewport();
+		}
+	} 
+}
+
 void AFTPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -144,10 +161,75 @@ void AFTPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	if (InputComponent)
+	// IMC 등록 — Controller 생성 시 한 번만 실행, 리스폰 후에도 유지됨
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 	{
-		// 레거시 키 바인딩 — 추후 Enhanced Input의 InputAction으로 교체 가능
-		InputComponent->BindKey(EKeys::F11, IE_Pressed, this, &AFTPlayerController::ToggleHUDEditMode);
+		if (DefaultMappingContext)
+		{
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+	}
+
+	// 레거시 한 줄 바인딩 — IA/IMC 에셋 없이 바로 키 연결
+	InputComponent->BindKey(EKeys::K,   IE_Pressed, this, &AFTPlayerController::DebugDie); // TODO:: 삭제 예정
+
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
+	{
+		EIC->BindAction(MoveAction,       ETriggerEvent::Triggered, this, &AFTPlayerController::Move);
+		EIC->BindAction(LookAction,       ETriggerEvent::Triggered, this, &AFTPlayerController::Look);
+		EIC->BindAction(LeftClickAction,  ETriggerEvent::Started,   this, &AFTPlayerController::OnLeftClick);
+		EIC->BindAction(RightClickAction, ETriggerEvent::Started,   this, &AFTPlayerController::OnRightClick);
+		EIC->BindAction(ShiftAction,      ETriggerEvent::Started,   this, &AFTPlayerController::OnShift);
+		EIC->BindAction(ToggleHUDEditModeAction,      ETriggerEvent::Started,   this, &AFTPlayerController::ToggleHUDEditMode);
+
+	}
+}
+
+void AFTPlayerController::Move(const FInputActionValue& Value)
+{
+	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
+	{
+		Char->Move(Value);
+	}
+}
+
+void AFTPlayerController::Look(const FInputActionValue& Value)
+{
+	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
+	{
+		Char->Look(Value);
+	}
+}
+
+void AFTPlayerController::OnLeftClick()
+{
+	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
+	{
+		Char->OnLeftClick();
+	}
+}
+
+void AFTPlayerController::OnRightClick()
+{
+	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
+	{
+		Char->OnRightClick();
+	}
+}
+
+void AFTPlayerController::OnShift()
+{
+	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
+	{
+		Char->OnShift();
+	}
+}
+
+void AFTPlayerController::DebugDie()
+{
+	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
+	{
+		Char->DebugDie();
 	}
 }
 

@@ -10,8 +10,6 @@
 
 class USpringArmComponent;
 class UCameraComponent;
-class UInputMappingContext;
-class UInputAction;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(FTPlayerCharacter, Log, All);
@@ -28,34 +26,6 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
-
-	/** MappingContext */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputMappingContext* DefaultMappingContext;
-
-	/** Move Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* MoveAction;
-
-	/** Look Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* LookAction;
-
-	/** Left Click Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* LeftClickAction;
-
-	/** Right Click Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* RightClickAction;
-
-	/** Shift Input Action */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* ShiftAction;
-
-	// TODO:: 사망 확인을 위한 임시코드 삭제 예정
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* DebugDieAction;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Weapon", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UFT_WeaponData> CurrentWeaponData;
@@ -78,24 +48,18 @@ public:
 
 	virtual void Revive();
 
-protected:
-	/** Called for movement input */
+	// FTPlayerController에서 호출 — 추후 NormalAttack/SpecialAttack 등으로 확장 예정
 	void Move(const FInputActionValue& Value);
-
-	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
+	virtual void OnLeftClick();
+	virtual void OnRightClick();
+	virtual void OnShift();
+	void DebugDie(); // TODO:: 삭제 예정
 
-	virtual void OnLeftClick(const FInputActionValue& Value);
-	virtual void OnRightClick(const FInputActionValue& Value);
-	virtual void OnShift(const FInputActionValue& Value);
-
-	// TODO:: 사망 확인을 위한 임시코드 삭제 예정
-	void DebugDie();
-
+protected:
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
 	virtual void NotifyControllerChanged() override;
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	void ActivateAbilityByInputTag(const FGameplayTag& InputTag, bool bIsPressed) const;
 };

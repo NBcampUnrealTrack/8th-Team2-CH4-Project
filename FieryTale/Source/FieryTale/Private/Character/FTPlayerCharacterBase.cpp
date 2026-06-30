@@ -7,8 +7,6 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
-#include "EnhancedInputComponent.h"
-#include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Character/FTPlayerState.h"
 #include "AbilitySystemComponent.h"
@@ -87,17 +85,17 @@ void AFTPlayerCharacterBase::Look(const FInputActionValue& Value)
 	}
 }
 
-void AFTPlayerCharacterBase::OnLeftClick(const FInputActionValue& Value)
+void AFTPlayerCharacterBase::OnLeftClick()
 {
 	UE_LOG(FTPlayerCharacter, Display, TEXT("LeftClick"));
 	ActivateAbilityByInputTag(FTTags::FTAbilities::NormalAttack, true);
 }
 
-void AFTPlayerCharacterBase::OnRightClick(const FInputActionValue& Value)
+void AFTPlayerCharacterBase::OnRightClick()
 {
 }
 
-void AFTPlayerCharacterBase::OnShift(const FInputActionValue& Value)
+void AFTPlayerCharacterBase::OnShift()
 {
 }
 
@@ -125,39 +123,8 @@ void AFTPlayerCharacterBase::NotifyControllerChanged()
 	const bool bIsLocal = IsLocallyControlled();
 	CameraBoom->SetActive(bIsLocal);
 	FollowCamera->SetActive(bIsLocal);
-
-	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
-	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
-		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
-		}
-	}
 }
 
-void AFTPlayerCharacterBase::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
-	{
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AFTPlayerCharacterBase::Move);
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AFTPlayerCharacterBase::Look);
-		EnhancedInputComponent->BindAction(LeftClickAction, ETriggerEvent::Started, this, &AFTPlayerCharacterBase::OnLeftClick);
-		EnhancedInputComponent->BindAction(RightClickAction, ETriggerEvent::Started, this, &AFTPlayerCharacterBase::OnRightClick);
-		EnhancedInputComponent->BindAction(ShiftAction, ETriggerEvent::Started, this, &AFTPlayerCharacterBase::OnShift);
-
-		// TODO:: 사망 확인을 위한 임시코드 삭제 예정
-		if (DebugDieAction)
-		{
-			EnhancedInputComponent->BindAction(DebugDieAction, ETriggerEvent::Started, this, &AFTPlayerCharacterBase::DebugDie);
-		}
-	}
-	else
-	{
-		UE_LOG(FTPlayerCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
-	}
-}
 
 // [서버 인프라 초기화 및 데이터 주입]
 void AFTPlayerCharacterBase::PossessedBy(AController* NewController)

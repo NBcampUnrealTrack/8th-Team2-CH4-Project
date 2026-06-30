@@ -9,6 +9,9 @@
 #include "FTPlayerController.generated.h"
 
 class AFTPlayerCharacterBase;
+class UInputMappingContext;
+class UInputAction;
+struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(FTPlayerController, Log, All);
 
@@ -37,11 +40,37 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")                                                                                                                                                                                      
 	TSubclassOf<UUserWidget> DeathOverlayClass;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")                                                                                                                                                                                      
+	TSubclassOf<UUserWidget> ArenaHUDWidget;
 
 	UPROPERTY(EditAnywhere, Category = "Setting")
 	float RespawnDelay;
 
+	// Input
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputMappingContext> DefaultMappingContext;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> MoveAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> LookAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> LeftClickAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> RightClickAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> ShiftAction;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> ToggleHUDEditModeAction;
+
 protected:
+	
+	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
 
@@ -52,6 +81,8 @@ protected:
 	UPROPERTY()                                                                                                                                                                                                                       
 	TObjectPtr<UUserWidget> DeathOverlayWidgetInstance;
 	
+	UPROPERTY()                                                                                                                                                                                                                       
+	TObjectPtr<UUserWidget> ArenaHUDWidgetInstance;
 
 	// 타이머 만료 후 실제 리스폰을 실행할 함수
 	void ExecuteRespawn();
@@ -63,6 +94,14 @@ private:
 
 	FVector  RespawnLocation;
 	FRotator RespawnRotation;
+
+	// Enhanced Input → Character 위임
+	void Move(const FInputActionValue& Value);
+	void Look(const FInputActionValue& Value);
+	void OnLeftClick();
+	void OnRightClick();
+	void OnShift();
+	void DebugDie(); // TODO:: 삭제 예정
 
 	// HUD 편집 모드 토글 (F11) — Movable 위젯 위치 조정
 	void ToggleHUDEditMode();
