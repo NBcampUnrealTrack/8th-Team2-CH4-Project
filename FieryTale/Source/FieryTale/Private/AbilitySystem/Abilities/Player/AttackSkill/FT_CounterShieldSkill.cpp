@@ -27,7 +27,7 @@ UFT_CounterShieldSkill::UFT_CounterShieldSkill()
     SetAssetTags(AssetTags);
     
     // 강공격(우클릭) 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정상 가구야는 6초 쿨타임 작동)
-    CooldownTag = FTTags::FTStates::Cooldown_RightClick;
+    CooldownTag = FTTags::FTStates::Cooldown::RightClick;
 
     // 가구야가 반격 가드 태세에 진입했음을 알리는 상태 태그를 부여합니다 (GEEC_Damage에서 이 태그를 읽어 대미지를 무효화합니다)
     ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.CounterReady")));

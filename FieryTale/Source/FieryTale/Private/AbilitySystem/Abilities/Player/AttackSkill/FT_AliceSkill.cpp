@@ -19,9 +19,8 @@ UFT_AliceSkill::UFT_AliceSkill()
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::AttackSkill);
     SetAssetTags(AssetTags);
-
-    // [RMB] 보조 공격 공용 재사용 대기시간 10초 매핑
-    CooldownTag = FTTags::FTStates::Cooldown_RightClick;
+    
+    CooldownTag = FTTags::FTStates::Cooldown::RightClick;
 }
 
 void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,

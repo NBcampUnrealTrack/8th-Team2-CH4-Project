@@ -26,7 +26,7 @@ UFT_AliceStealthDashSkill::UFT_AliceStealthDashSkill()
     SetAssetTags(AssetTags);
 
     // Shift 이동/생존 기술 공용 재사용 대기시간 태그 매핑 (15초 쿨타임 작동)
-    CooldownTag = FTTags::FTStates::Cooldown_UtilSkill;
+    CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
     // 버프 유지 시간 동안 캐릭터의 상태를 나타낼 수 있는 태그 지정 구역
     ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.ShrinkActive")));

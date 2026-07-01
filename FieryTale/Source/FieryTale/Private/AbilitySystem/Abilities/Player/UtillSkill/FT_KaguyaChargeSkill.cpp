@@ -24,7 +24,7 @@ UFT_KaguyaChargeSkill::UFT_KaguyaChargeSkill()
     SetAssetTags(AssetTags);
 
     // Shift 이동/생존 기술 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정에 따라 쿨타임 가동)
-    CooldownTag = FTTags::FTStates::Cooldown_UtilSkill;
+    CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
     // 연막 안개를 전개하는 동안 일시적인 버프 또는 시전 상태를 나타내는 태그 설정 구역
     ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.BambooGroveDeploying")));

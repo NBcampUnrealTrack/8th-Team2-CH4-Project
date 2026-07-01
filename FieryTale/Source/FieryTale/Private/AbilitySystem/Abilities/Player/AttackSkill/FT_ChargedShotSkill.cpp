@@ -23,7 +23,7 @@ UFT_ChargedShotSkill::UFT_ChargedShotSkill()
     SetAssetTags(AssetTags);
 
     // 우클릭 보조 공격 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정상 알라딘은 9초 쿨타임 작동)
-    CooldownTag = FTTags::FTStates::Cooldown_RightClick;
+    CooldownTag = FTTags::FTStates::Cooldown::RightClick;
 }
 
 void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,

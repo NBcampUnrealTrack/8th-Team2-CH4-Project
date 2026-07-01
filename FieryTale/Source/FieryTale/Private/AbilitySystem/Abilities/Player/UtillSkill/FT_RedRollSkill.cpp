@@ -23,7 +23,7 @@ UFT_RedRollSkill::UFT_RedRollSkill()
     SetAssetTags(AssetTags);
 
     // Shift 이동/생존 기술 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정상 빨간 망토는 15초 쿨타임 작동)
-    CooldownTag = FTTags::FTStates::Cooldown_UtilSkill;
+    CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
     // 구르는 동안 일시적으로 회피 기동 상태임을 나타내는 태그를 캐릭터에게 부여합니다
     ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.Evading")));

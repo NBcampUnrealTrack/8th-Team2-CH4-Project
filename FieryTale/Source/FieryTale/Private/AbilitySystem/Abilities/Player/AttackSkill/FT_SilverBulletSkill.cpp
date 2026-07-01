@@ -24,7 +24,7 @@ UFT_SilverBulletSkill::UFT_SilverBulletSkill()
     SetAssetTags(AssetTags);
 
     //  우클릭 보조 공격 스킬 쿨다운 태그 매핑
-    CooldownTag = FTTags::FTStates::Cooldown_RightClick;
+    CooldownTag = FTTags::FTStates::Cooldown::RightClick;
 }
 
 void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,

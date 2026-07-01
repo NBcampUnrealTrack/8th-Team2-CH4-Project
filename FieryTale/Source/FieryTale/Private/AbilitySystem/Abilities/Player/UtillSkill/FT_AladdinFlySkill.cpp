@@ -24,7 +24,7 @@ UFT_AladdinFlySkill::UFT_AladdinFlySkill()
     SetAssetTags(AssetTags);
 
     // Shift 이동/생존 기술 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정상 알라딘은 15초 쿨타임 작동)
-    CooldownTag = FTTags::FTStates::Cooldown_UtilSkill;
+    CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
     // 비행 상태 동안 부여할 전용 태그
     ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.Flying")));
