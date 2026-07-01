@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/FT_GameplayAbility.h"
+#include "GameplayEffectTypes.h" // FActiveGameplayEffectHandle 참조를 위한 순정 헤더 포함
 #include "FT_NormalAttack.generated.h"
 
 class UFT_WeaponData;
@@ -26,6 +27,8 @@ public:
     virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+    
+    // [M-2 완치 보장] 인터럽트 캔슬(기절 등)을 맞더라도 부착된 이속 패널티 GE를 무결하게 소거하는 방어선 관문입니다.
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
@@ -51,10 +54,18 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
     TSubclassOf<class UGameplayEffect> BaseDamageEffectClass;
 
+    // =========================================================================
+    // [M-2 속도 패널티 이관용 GAS 에셋 슬롯 및 핸들 장부 완착]
+    // =========================================================================
+    
+    /** 평타 가동 중 캐릭터에게 적용할 이동속도 배율 감산 GameplayEffect 에셋 클래스입니다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
+    TSubclassOf<class UGameplayEffect> MovementPenaltyGameplayEffectClass;
+
 private:
     /** 평타 연사 도중 강제 인터럽트 캔슬 시 투사체 무한 유실을 차단하기 위한 멤버 타이머 핸들 변수 */
     FTimerHandle BurstTimerHandle;
 
-    /** 평타 가감 배율 누적 오차로 인한 무브먼트 영구 왜곡을 방쇄하기 위한 순정 최대 속도 백업 보관소 */
-    float OriginalMaxWalkSpeed;
+    /** 런타임에 부여된 속도 패널티 GE를 종료 시 무결하게 걷어내기 위해 백업해두는 액티브 핸들입니다. */
+    FActiveGameplayEffectHandle MovementPenaltyActiveHandle;
 };
