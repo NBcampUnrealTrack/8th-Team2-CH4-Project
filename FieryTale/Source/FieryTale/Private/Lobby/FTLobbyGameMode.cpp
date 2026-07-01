@@ -14,12 +14,12 @@
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
 #include "Online/OnlineSessionNames.h" // NAME_GameSession 사용을 위함
+#include "Misc/PackageName.h"
 
 AFTLobbyGameMode::AFTLobbyGameMode()
 {
-	bUseSeamlessTravel = true;
-
-	// 코드 기본값. 에디터에서 BP GameMode 로 덮어써도 된다.
+	bUseSeamlessTravel = true; 
+	
 	PlayerStateClass = AFTLobbyPlayerState::StaticClass();
 	PlayerControllerClass = AFTLobbyPlayerController::StaticClass();
 }
@@ -55,6 +55,10 @@ void AFTLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 		if (GameState)
 		{
 			PS->PlayerIndex = GameState->PlayerArray.Num() - 1;
+			
+			FString NewName = FString::Printf(TEXT("Player %d"), PS->PlayerIndex + 1);
+			PS->SetPlayerName(NewName);
+			
 			UE_LOG(LogFTSession, Log, TEXT("[Lobby] %s 님에게 %d번 진열대 자리가 배정되었습니다."), *NewPlayer->GetName(), PS->PlayerIndex);
 		}
 	}
@@ -146,6 +150,9 @@ void AFTLobbyGameMode::RequestStartMatch(APlayerController* Requester)
 
 void AFTLobbyGameMode::TravelToMatch()
 {
+	UE_LOG(LogFTSession, Warning, TEXT("==== SEAMLESS TRAVEL CHECK ===="));
+	UE_LOG(LogFTSession, Warning, TEXT("현재 LobbyGameMode의 bUseSeamlessTravel 값은: %s"), bUseSeamlessTravel ? TEXT("TRUE") : TEXT("FALSE"));
+	
 	if (bMatchStarting)
 	{
 		UE_LOG(LogFTSession, Log, TEXT("[Lobby] TravelToMatch 중복 호출 무시 (이미 시작 중)"));
@@ -155,9 +162,19 @@ void AFTLobbyGameMode::TravelToMatch()
 
 	if (UWorld* World = GetWorld())
 	{
-		const FString TravelUrl = GameMapPath + TEXT("?listen");
-		UE_LOG(LogFTSession, Log, TEXT("[Lobby] 매치 맵 ServerTravel → %s"), *TravelUrl);
-		World->ServerTravel(TravelUrl);
+		const FString TravelUrl = GameMapPath;
+		
+		UE_LOG(LogFTSession, Log, TEXT("[Lobby] 매치 맵 ServerTravel 시도 → %s"), *TravelUrl);
+		
+		// 🌟 2. ServerTravel이 성공적으로 명령을 접수했는지 확인하는 코드 추가
+		bool bIsSuccess = World->ServerTravel(TravelUrl);
+		
+		if (!bIsSuccess)
+		{
+			// 만약 이 로그가 뜬다면 GameMapPath 변수 자체의 텍스트가 틀렸다는 뜻입니다.
+			UE_LOG(LogFTSession, Error, TEXT("[Lobby] 🚨 ServerTravel 실패! 유효하지 않은 맵 경로입니다."));
+			bMatchStarting = false; // 실패했으니 플래그 초기화
+		}
 	}
 	else
 	{

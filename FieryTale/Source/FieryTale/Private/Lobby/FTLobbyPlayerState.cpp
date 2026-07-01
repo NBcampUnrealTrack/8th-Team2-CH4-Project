@@ -6,6 +6,8 @@
 #include "FieryTaleLog.h"
 #include "Net/UnrealNetwork.h"
 #include "EngineUtils.h" // TActorIterator를 사용하기 위해 추가
+#include "Core/Game/FTGameMode.h"
+#include "Core/Player/FTArenaPlayerState.h"
 #include "Lobby/FTCharacterDisplayStand.h" //진열대 헤더 추가
 
 AFTLobbyPlayerState::AFTLobbyPlayerState()
@@ -52,9 +54,32 @@ void AFTLobbyPlayerState::SetCharacterType(EFTCharacterType InCharacterType)
 		if (SelectedCharacter != InCharacterType)
 		{
 			SelectedCharacter = InCharacterType;
+			
+			// 🌟 [추가]: 서버에서 진짜 값이 몇 번으로 바뀌었는지 찍어봅니다.
+			UE_LOG(LogFTSession, Log, TEXT("[CharacterDebug] 서버 권한으로 %s의 캐릭터를 %d번으로 변경 완료!"), 
+				*GetPlayerName(), (int32)SelectedCharacter);
+			
 			// 🌟 서버는 스스로 호출, 클라이언트는 OnRep이 자동 호출됨
 			OnRep_SelectedCharacter(); 
 		}
+	}
+}
+
+void AFTLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
+{
+	if (PlayerState)
+	{
+		PlayerState->SetPlayerName(GetPlayerName());
+	}
+	
+	Super::CopyProperties(PlayerState);
+	
+	if (AFTArenaPlayerState* ArenaPS = Cast<AFTArenaPlayerState>(PlayerState))
+	{
+		ArenaPS->SelectedCharacter = this->SelectedCharacter;
+		
+		UE_LOG(LogFTSession, Log, TEXT("[SeamlessTravel] %s 님의 데이터 복사 성공! 캐릭터: %d"), 
+			*GetPlayerName(), (int32)ArenaPS->SelectedCharacter);
 	}
 }
 

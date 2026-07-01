@@ -54,6 +54,9 @@ public:
 	void SetCharacterType(EFTCharacterType InCharacterType);
 	EFTCharacterType GetCharacterType() const { return SelectedCharacter; }
 	
+	// 트래블 시 다른 PlayerState로 데이터를 넘겨주는 엔진 내장 함수
+	virtual void CopyProperties(APlayerState* PlayerState) override;
+	
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, BlueprintReadOnly, Category = "FieryTale|Lobby")
 	bool bIsReady = false;

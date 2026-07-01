@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
+#include "Lobby/FTLobbyPlayerState.h" // 캐릭터 타입 Enum 및 PlayerState 참조
 #include "FTGameMode.generated.h"
 
 class AFTTurret;
@@ -13,16 +14,42 @@ class FIERYTALE_API AFTGameMode : public AGameMode
 	GENERATED_BODY()
 	
 public:
-	// 임시로 캐릭터 Spawn하는 코드 작성해두었습니다.
-	virtual void PostLogin(APlayerController* NewPlayer) override;
+	AFTGameMode();
+
+	virtual void BeginPlay() override;
+	
+	// 심리스 트래블을 통해 플레이어가 새 레벨에 완전히 정착했을 때 호출되는 핵심 함수
+	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
+	
+	// 심리스 트래블로 넘어온 플레이어를 처리하는 함수 오버라이드
+	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
+	
+	void InitializeAndSpawnPlayer(APlayerController* NewPlayer);
+
+protected:
+	
+	// 세션에서 받아올 필수 시작 인원수
+	UPROPERTY(BlueprintReadOnly, Category = "Game Settings")
+	int32 MinPlayersToStart = 2;
+
+	// 🌟 추가: 인원이 모두 차면 전장 전투를 시작하는 함수
+	void StartArenaMatch();
+	
+	// 에디터에서 각 캐릭터 타입(Enum)에 매핑할 실제 캐릭터(Pawn) 블루프린트 클래스들
+	UPROPERTY(EditDefaultsOnly, Category = "Game Settings|Characters")
+	TMap<EFTCharacterType, TSubclassOf<APawn>> CharacterClasses;
+
+
+public:
+	// 플레이어가 선택한 캐릭터에 맞춰 폰을 스폰하는 내부 함수
+	APawn* SpawnCharacterForPlayer(APlayerController* PC, EFTCharacterType CharacterType);
 
 	// 포탑이 파괴되었을 때 진영과 위치 정보를 받아 로그를 출력하는 함수
 	void TurretDestroyed(AFTTurret* DestroyedTurret);
 
 	// 넥서스가 파괴되었을 때 게임 종료 절차를 트리거하는 함수
 	void NexusDestroyed(AFTNexus* DestroyedNexus);
-
-protected:
+	
 	// 연산된 승리 팀 정보를 기반으로 최종 처리를 수행하는 함수
 	void HandleGameOver(uint8 WinningTeam);
 };
