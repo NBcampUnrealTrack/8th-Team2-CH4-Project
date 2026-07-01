@@ -26,34 +26,49 @@ AFTPlayerController::AFTPlayerController(const FObjectInitializer& Initializer)
 	RespawnDelay = 3.0f;
 }
 
-// TODO:: 삭제 예정
-void AFTPlayerController::SpawnCharacter(const FVector& LocationSpawn, const FRotator& SpawnRotation = FRotator::ZeroRotator)
+void AFTPlayerController::SpawnCharacter(const FVector& LocationSpawn, const FRotator& SpawnRotation)
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	if (!SelectedCharacterClass)
+	AFTPlayerState* PS = GetPlayerState<AFTPlayerState>();
+	if (!PS)
 	{
-		UE_LOG(FTPlayerController, Error, TEXT("SelectedCharacterClass가 설정되지 않음"));
 		return;
 	}
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-	APawn* NewPawn = GetWorld()->SpawnActor<APawn>(SelectedCharacterClass, LocationSpawn, SpawnRotation, SpawnParams);
-	if (NewPawn)
+	const TSoftObjectPtr<UFT_CharacterData>* SoftData = CharacterDataMap.Find(PS->GetSelectedCharacterType());
+	if (!SoftData)
 	{
-		Possess(NewPawn);
+		UE_LOG(FTPlayerController, Error, TEXT("CharacterDataMap에 등록되지 않은 타입: %d"), static_cast<int32>(PS->GetSelectedCharacterType()));
+		return;
 	}
-}
 
-void AFTPlayerController::SetSelectedCharacterClass(TSubclassOf<AFTPlayerCharacterBase> InCharacterClass)
-{
-	SelectedCharacterClass = InCharacterClass;
+	UFT_CharacterData* CharData = SoftData->LoadSynchronous();
+	if (!CharData)
+	{
+		UE_LOG(FTPlayerController, Error, TEXT("CharacterData 로드 실패"));
+		return;
+	}
+
+	// Deferred Spawn: BeginPlay 이전에 CharacterData 주입
+	const FTransform SpawnTransform(SpawnRotation, LocationSpawn);
+	AFTPlayerCharacterBase* NewChar = GetWorld()->SpawnActorDeferred<AFTPlayerCharacterBase>(
+		AFTPlayerCharacterBase::StaticClass(),
+		SpawnTransform,
+		this,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn
+	);
+
+	if (NewChar)
+	{
+		NewChar->CharacterData = CharData;
+		NewChar->FinishSpawning(SpawnTransform);
+		Possess(NewChar);
+	}
 }
 
 void AFTPlayerController::AssignTeam(EFTTeam InTeam)
@@ -124,20 +139,13 @@ void AFTPlayerController::ExecuteRespawn()
 	{
 		return;
 	}
-	
-	if (DeathOverlayWidgetInstance)                                                                                                                                                                                                           
-	{                                                                                                                                                                                                                                 
-		DeathOverlayWidgetInstance->RemoveFromParent();                                                                                                                                                                                       
-		DeathOverlayWidgetInstance = nullptr;                                                                                                                                                                                                 
-	}
-	
+
 	AFTPlayerCharacterBase* CurrentCharacter = Cast<AFTPlayerCharacterBase>(GetPawn());
 	if (CurrentCharacter)
 	{
 		CurrentCharacter->TeleportTo(RespawnLocation, RespawnRotation);
 		CurrentCharacter->Revive();
 	}
-	
 }
 
 void AFTPlayerController::BeginPlay()
@@ -179,6 +187,12 @@ void AFTPlayerController::OnPossess(APawn* InPawn)
 	{
 		// 캐릭터의 사망 델리게이트에 컨트롤러의 기능을 바인딩
 		TargetCharacter->OnCharacterDied.AddDynamic(this, &AFTPlayerController::HandleCharacterDeath);
+	}
+
+	if (UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent())
+	{
+		DeadTagEventHandle = ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
+			.AddUObject(this, &AFTPlayerController::OnDeadTagChanged);
 	}
 }
 
@@ -260,6 +274,11 @@ void AFTPlayerController::OnShift()
 
 void AFTPlayerController::DebugDie()
 {
+	Server_DebugDie();
+}
+
+void AFTPlayerController::Server_DebugDie_Implementation()
+{
 	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
 	{
 		Char->DebugDie();
@@ -282,18 +301,13 @@ void AFTPlayerController::ToggleHUDEditMode()
 
 void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter)
 {
-	// 내가 현재 조종하고 있던 메인 캐릭터가 죽은 게 맞는지 검증
 	if (DiedCharacter == GetPawn())
 	{
-		// 내 메인 캐릭터가 죽었을 때의 UI/입력 처리 실행
-		OnPlayerDeath(); 
+		OnPlayerDeath();
 		RequestRespawn();
 	}
-	else
-	{
-		// 죽은 게 메인캐릭터가 아닌 경우?
-	}
 }
+
 void AFTPlayerController::OnScoreboardPressed()
 {
 	
@@ -313,5 +327,33 @@ void AFTPlayerController::OnAltReleased()
 
 void AFTPlayerController::OnChatPressed()
 {
-	
+
+}
+
+void AFTPlayerController::OnDeadTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (NewCount > 0)
+	{
+		if (DeathOverlayClass)
+		{
+			DeathOverlayWidgetInstance = CreateWidget<UUserWidget>(this, DeathOverlayClass);
+			if (DeathOverlayWidgetInstance)
+			{
+				DeathOverlayWidgetInstance->AddToViewport();
+			}
+		}
+	}
+	else
+	{
+		if (DeathOverlayWidgetInstance)
+		{
+			DeathOverlayWidgetInstance->RemoveFromParent();
+			DeathOverlayWidgetInstance = nullptr;
+		}
+	}
 }

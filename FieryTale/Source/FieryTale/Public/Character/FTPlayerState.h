@@ -17,16 +17,26 @@ enum class EFTTeam : uint8
 	Red  UMETA(DisplayName = "Red Team"),
 };
 
+UENUM(BlueprintType)
+enum class EFTGameCharacterType : uint8
+{
+	RedHood UMETA(DisplayName = "RedHood"),
+	Aladdin UMETA(DisplayName = "Aladdin"),
+	Kaguya UMETA(DisplayName = "Kaguya"),
+	Alice UMETA(DisplayName = "Alice")
+};
+
+
 UCLASS()
-class FIERYTALE_API AFTPlayerState  : public APlayerState, public IAbilitySystemInterface 
+class FIERYTALE_API AFTPlayerState  : public APlayerState, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
 public:
 	AFTPlayerState();
-	
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	
+
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 	UFT_AttributeSet* GetAttributeSet() const { return AttributeSet; }
@@ -34,11 +44,18 @@ public:
 	// GameMode → PlayerController → 여기로 전달되는 팀 태그 바인딩 함수
 	void AssignTeamTag(EFTTeam InTeam);
 
+	void SetSelectedCharacterType(EFTGameCharacterType InType) { SelectedCharacterType = InType; }
+	EFTGameCharacterType GetSelectedCharacterType() const { return SelectedCharacterType; }
+
 	// 실제로 스폰된 캐릭터 인스턴스
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Character")
 	TObjectPtr<APawn> SpawnedCharacter;
 
 private:
+	// 에디터 Detail에서 현재 선택된 캐릭터 타입 확인용 (읽기 전용)
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
+	EFTGameCharacterType SelectedCharacterType;
+
 	// 복제되어 클라이언트에서 OnRep_Team을 트리거함
 	UPROPERTY(ReplicatedUsing = OnRep_Team)
 	EFTTeam Team = EFTTeam::Blue;
@@ -46,13 +63,13 @@ private:
 	UFUNCTION()
 	void OnRep_Team();
 
-	void ApplyTeamTag();
+	void ApplyTeamTag() const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UFT_AbilitySystemComponent> AbilitySystemComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UFT_AttributeSet> AttributeSet;
-	
+
 
 };

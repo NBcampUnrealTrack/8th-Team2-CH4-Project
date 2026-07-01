@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Character/FTPlayerCharacterBase.h"
+#include "Net/UnrealNetwork.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -16,18 +17,35 @@
 
 DEFINE_LOG_CATEGORY(FTPlayerCharacter);
 
+void AFTPlayerCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AFTPlayerCharacterBase, CharacterData);
+}
+
 void AFTPlayerCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
+	ApplyCharacterVisuals();
+}
 
-	if (CharacterData)
+void AFTPlayerCharacterBase::OnRep_CharacterData()
+{
+	ApplyCharacterVisuals();
+}
+
+void AFTPlayerCharacterBase::ApplyCharacterVisuals()
+{
+	if (!CharacterData)
 	{
-		GetCharacterMovement()->MaxWalkSpeed = CharacterData->GetDefaultMoveSpeed();
-		
-		if (USkeletalMesh* CharacterMesh = CharacterData->GetCharacterMesh())
-		{
-			GetMesh()->SetSkeletalMesh(CharacterMesh);
-		}
+		return;
+	}
+
+	GetCharacterMovement()->MaxWalkSpeed = CharacterData->GetDefaultMoveSpeed();
+
+	if (USkeletalMesh* CharacterMesh = CharacterData->GetCharacterMesh())
+	{
+		GetMesh()->SetSkeletalMesh(CharacterMesh);
 	}
 }
 
@@ -226,6 +244,8 @@ void AFTPlayerCharacterBase::InitializeCharacterAttribute() const
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetAttackPowerAttribute(),      CharacterData->GetDefaultAttackPower());
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxUltimateGaugeAttribute(), CharacterData->GetDefaultMaxUltimateGauge());
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetUltimateGaugeAttribute(),    0.0f);
+
+	ASC->RemoveLooseGameplayTag(FTTags::FTStates::Core::Dead);
 }
 
 void AFTPlayerCharacterBase::ActivateAbilityByInputTag(const FGameplayTag& InputTag, bool bIsPressed) const

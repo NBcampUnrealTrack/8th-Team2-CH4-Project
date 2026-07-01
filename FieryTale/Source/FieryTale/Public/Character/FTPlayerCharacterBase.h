@@ -37,15 +37,19 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 public:
 	AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
 	virtual void NotifyControllerChanged() override;
-	
+
 	// ASC는 PlayerState에서 가져옴
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale | Character")
+	UPROPERTY(ReplicatedUsing = OnRep_CharacterData, EditAnywhere, BlueprintReadWrite, Category = "FieryTale | Character")
 	TObjectPtr<UFT_CharacterData> CharacterData;
+
+	UFUNCTION()
+	void OnRep_CharacterData();
 	
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Weapon")
 	UFT_WeaponData* GetWeaponData() const 
@@ -78,7 +82,10 @@ public:
 protected:
 
 	void ActivateAbilityByInputTag(const FGameplayTag& InputTag, bool bIsPressed) const;
-	
+
+	// CharacterData 기반으로 메시·이동속도 적용 — BeginPlay 및 OnRep_CharacterData에서 호출
+	void ApplyCharacterVisuals();
+
 	// 초기 혹은 Respawn 단계에서 CharacterData에 의거하여 Attribute 값 초기화
 	void InitializeCharacterAttribute() const;
 };

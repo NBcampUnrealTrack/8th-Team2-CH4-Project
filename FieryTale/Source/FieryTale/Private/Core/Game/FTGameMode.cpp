@@ -2,6 +2,44 @@
 #include "Level/FTTurret.h"
 #include "Level/FTNexus.h"
 #include "FieryTaleLog.h"
+#include "Character/FTPlayerController.h"
+#include "Character/FTPlayerState.h"
+
+void AFTGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+	
+	// 접속시 캐릭터 랜덤으로 Spawn,
+	
+	AFTPlayerController* PC = Cast<AFTPlayerController>(NewPlayer);
+	if (!PC)
+	{
+		return;
+	}
+
+	// 등록된 캐릭터 타입 중 랜덤 선택
+	TArray<EFTGameCharacterType> Keys;
+	PC->CharacterDataMap.GetKeys(Keys);
+	if (Keys.IsEmpty())
+	{
+		// CharacterDataMap은 PlayerController에 등록되어 있음
+		UE_LOG(LogTemp, Error, TEXT("CharacterDataMap이 비어있음 — BP_FTPlayerController에서 등록 필요"));
+		return;
+	}
+
+	const EFTGameCharacterType RandomType = Keys[FMath::RandRange(0, Keys.Num() - 1)];
+
+	if (AFTPlayerState* PS = PC->GetPlayerState<AFTPlayerState>())
+	{
+		PS->SetSelectedCharacterType(RandomType);
+	}
+
+	AActor* StartSpot = FindPlayerStart(NewPlayer);
+	const FVector SpawnLocation = StartSpot ? StartSpot->GetActorLocation() : FVector::ZeroVector;
+	const FRotator SpawnRotation = StartSpot ? StartSpot->GetActorRotation() : FRotator::ZeroRotator;
+
+	PC->SpawnCharacter(SpawnLocation, SpawnRotation);
+}
 
 void AFTGameMode::TurretDestroyed(AFTTurret* DestroyedTurret)	// 포탑 파괴 이벤트 처리 로직 구현
 {

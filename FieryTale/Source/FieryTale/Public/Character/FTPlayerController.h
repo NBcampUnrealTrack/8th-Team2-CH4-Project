@@ -6,6 +6,8 @@
 #include "FTCharacterBase.h"
 #include "GameFramework/PlayerController.h"
 #include "Character/FTPlayerState.h"
+#include "GameplayTagContainer.h"
+#include "AbilitySystem/Abilities/Player/Character/FT_CharacterData.h"
 #include "FTPlayerController.generated.h"
 
 class AFTPlayerCharacterBase;
@@ -22,14 +24,10 @@ class FIERYTALE_API AFTPlayerController : public APlayerController
 
 public:
 	AFTPlayerController(const FObjectInitializer& Initializer);
-	
-	// GameMode에서 스폰 위치를 전달받아 PlayerState의 SelectedCharacterClass를 기반으로 캐릭터를 스폰 후 Possess
+
+	// GameMode에서 스폰 위치를 전달받아 PlayerState의 SelectedCharacterType 기반으로 캐릭터를 스폰 후 Possess
 	void SpawnCharacter(const FVector& SpawnLocation, const FRotator& SpawnRotation);
 
-	// 사용할 캐릭터 넘겨주는 Setter
-	// Controller에서 Spawn을 한다는 가정하에 만듬
-	void SetSelectedCharacterClass(TSubclassOf<AFTPlayerCharacterBase> InCharacterClass);
-	
 	// 캐릭터의 Die()에서 서버 권한일 때 호출하는 리스폰 요청 함수
 	void RequestRespawn();
 
@@ -38,12 +36,16 @@ public:
 
 	// 캐릭터 사망 시 UI를 끄거나 입력 모드를 변경하기 위해 호출되는 함수
 	void OnPlayerDeath();
-	
-	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 클래스. 정식에는 삭제 예정                                                                                                                                                                                                           
-	UPROPERTY(EditDefaultsOnly, Category = "UI")                                                                                                                                                                                      
+
+	// 에디터에서 EFTCharacterType별 CharacterData 에셋을 등록 — 스폰 시 타입 기반으로 하나만 로드
+	UPROPERTY(EditDefaultsOnly, Category = "Character")
+	TMap<EFTGameCharacterType, TSoftObjectPtr<UFT_CharacterData>> CharacterDataMap;
+
+	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 클래스. 정식에는 삭제 예정
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> DeathOverlayClass;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "UI")                                                                                                                                                                                      
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> ArenaHUDWidget;
 
 	UPROPERTY(EditAnywhere, Category = "Setting")
@@ -85,26 +87,26 @@ public:
 	TObjectPtr<UInputAction> ChatAction;
 
 protected:
-	
+
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
 
 	// 리스폰 타이머 핸들
 	FTimerHandle RespawnTimerHandle;
-	
+
 	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 인스턴스. 정식에는 삭제 예정
-	UPROPERTY()                                                                                                                                                                                                                       
+	UPROPERTY()
 	TObjectPtr<UUserWidget> DeathOverlayWidgetInstance;
-	
-	UPROPERTY()                                                                                                                                                                                                                       
+
+	UPROPERTY()
 	TObjectPtr<UUserWidget> ArenaHUDWidgetInstance;
 
 	// 타이머 만료 후 실제 리스폰을 실행할 함수
 	void ExecuteRespawn();
 
 private:
-	
+
 	// ASC가 PlayerState에 고정되므로 중복 등록 방지용 핸들 보관
 	FDelegateHandle DeadTagEventHandle;
 
@@ -117,7 +119,11 @@ private:
 	void OnLeftClick();
 	void OnRightClick();
 	void OnShift();
-	void DebugDie(); // TODO:: 삭제 예정
+	// TODO:: Debugging 용, 추후 삭제 예정
+	void DebugDie();
+
+	UFUNCTION(Server, Reliable)
+	void Server_DebugDie();
 
 	// HUD 편집 모드 토글 (F11) — Movable 위젯 위치 조정
 	void ToggleHUDEditMode();
@@ -126,10 +132,8 @@ private:
 	void OnAltPressed();
 	void OnAltReleased();
 	void OnChatPressed();
-	
+
 	UFUNCTION()
 	void HandleCharacterDeath(AFTCharacterBase* DiedCharacter);
-
-	UPROPERTY()
-	TSubclassOf<AFTPlayerCharacterBase> SelectedCharacterClass;
+	void OnDeadTagChanged(const FGameplayTag Tag, int32 NewCount);
 };
