@@ -10,7 +10,7 @@ class UFT_WeaponData;
 class AFTPlayerCharacterBase;
 
 /**
- * 알라딘 RMB 보조 공격 - 지니의 압착 어빌리티 시스템
+ * 알라딘 RMB 보조 공격 - 지니의 압착 어빌리티 시스템 (차징 샷)
  */
 UCLASS()
 class FIERYTALE_API UFT_ChargedShotSkill : public UFT_GameplayAbility
@@ -23,19 +23,26 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+	// ◄◄◄ [인풋 릴리즈 배관 완착] 마우스 우클릭 버튼을 떼는 순간 캐릭터 제어 허브에서 직통 격발할 핵심 사출 인터페이스
+	/** 1초 차징 여부를 판단하여 지니의 폭발 주먹 투사체를 사출하고 쿨다운을 적용시키는 핵심 함수 */
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Aladdin Spec")
+	void FireChargedShot();
+
 protected:
-	// 원형 범위를 지정하거나 격발 시점 차징 연산을 처리하기 위한 타임스탬프
+	/** 차징이 시작된 절대 타임스탬프 기록 보관소 */
 	float ChargeStartTime;
 
-	// 기획 스펙: 지니의 주먹 적중 고정 피해량 (50.0f)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Combat")
+	// --- 알라딘 우클릭 고유 스펙 ---
+	/** 기획 스펙: 지니의 주먹 폭발 적중 시 사출할 고정 피해량 (기본값 50.0f) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin Spec")
 	float BaseDamage;
 
-	// 중심부에서 외곽으로 적들을 밀어내기 위한 강도 계수
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Combat")
+	/** 기획 스펙: 폭발 중심부에서 바깥쪽으로 적들을 밀어내기 위한 넉백 물리 강도 (기본값 800.0f) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin Spec")
 	float KnockbackForce;
 
-	// 대미지 주입 및 가감을 처리할 GameplayEffect 클래스
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effect")
-	TSubclassOf<UGameplayEffect> DamageEffectClass;
+	// --- 연동할 GameplayEffect(GE) 라인업 ---
+	/** 대미지 주입 및 원형 폭발 계산기(GEEC_Damage)를 가동할 확정 피해 이펙트 클래스 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
+	TSubclassOf<class UGameplayEffect> DamageEffectClass;
 };

@@ -12,25 +12,29 @@
 #include "GameplayTags/FTTags.h"
 
 UFT_CounterShieldSkill::UFT_CounterShieldSkill()
-    : MovementPenaltyMultiplier(0.6f) // 기획 스펙: 이동 속도 40% 감소 페널티 (원래 속도의 60%로 조정)
-    , MaxDuration(4.0f)              // 기획 스펙: 최대 4초 유지
+    : MovementPenaltyMultiplier(0.6f) // 기획 데이터 락인: 방벽 전개 중 이동 속도 40퍼센트 감소 페널티 (기본 속도의 60퍼센트 유지)
+    , MaxDuration(4.0f)              // 기획 데이터 락인: 마우스 우클릭을 계속 유지할 수 있는 최대 지속 한계 시간 4초 명세
+    , OriginalMaxWalkSpeed(0.0f)
 {
-    // 인스턴싱 정책 캐릭터마다 이 스킬 객체를 독립적으로 생성해서 관리합니다
+    // 인스턴싱 정책: 캐릭터마다 방벽 유지 시간 및 백업 이속 수치를 개별 제어하기 위해 인스턴스화 모드로 작동합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     
-    // 네트워크 실행 정책 선입력 예측 발동
+    // 네트워크 실행 정책: 키 입력 즉시 로컬에서 방벽 모션을 띄우도록 클라이언트 선입력 예측 시스템을 가동합니다.
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    // 우클릭 스킬 태그를 에셋 태그에 주입하여 식별 가능하도록 설정합니다
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::AttackSkill);
     SetAssetTags(AssetTags);
     
-    // 강공격(우클릭) 공용 재사용 대기시간 태그 매핑 (데이터 에셋 설정상 가구야는 6초 쿨타임 작동)
+    // 에셋 바인딩 가이드: 가구야 전용 우클릭 보조 공격의 재사용 대기시간 태그 매핑입니다.
+    // 에디터 세팅: 이 태그는 이후 제작될 우클릭 공용 쿨타임 이펙트 에셋의 Cooldown Tag 슬롯과 결합됩니다.
+    // 가구야는 방벽을 켜자마자 쿨이 도는 것이 아니라 방벽을 해제하여 내리는 시점에 수동으로 격발시킵니다.
     CooldownTag = FTTags::FTStates::Cooldown::RightClick;
 
-    // 가구야가 반격 가드 태세에 진입했음을 알리는 상태 태그를 부여합니다 (GEEC_Damage에서 이 태그를 읽어 대미지를 무효화합니다)
-    ActivationOwnedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("State.Buff.CounterReady")));
+    // 보정 완료: 시스템 자동 부여 태그 슬롯에 가구야 전용 반격 가드 태세 버프 태그를 상시 락인합니다.
+    // 런타임 흐름 요약: 이 스킬이 활성화되어 유지되는 동안 시전자의 몸에 이 태그가 부착되어 있습니다.
+    // 피해 연산기(GEEC_Damage)는 공격을 연산하기 직전 피격자 몸에 이 태그가 발견되면 피해량을 0으로 지우고 튕겨냅니다.
+    ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::CounterReady);
 }
 
 void UFT_CounterShieldSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -38,26 +42,36 @@ void UFT_CounterShieldSkill::ActivateAbility(const FGameplayAbilitySpecHandle Ha
     const FGameplayEventData* TriggerEventData)
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-    AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get());
-    UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
-
-    if (!Character || !Character->GetWeaponData() || !SourceASC)
+    
+    // 쿨타임 검증: 쿨다운 중이거나 침묵 등 군중제어에 걸려 있다면 방벽 시전 관문에서 즉시 차단합니다.
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
 
-    // 기획 스펙 반영: 방벽 전개 즉시 시전 중 상태 태그를 루즈 태그로 부여 (다른 스킬 입력 시 취소 인터럽트 연동용)
-    SourceASC->AddLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
-
-    // 기획 스펙 반영: 방벽 전개 중 가구야 공주의 이동 속도 40% 감산
-    if (UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement())
+    AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get());
+    UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
+    
+    if (!Character || !SourceASC)
     {
-        MoveComp->MaxWalkSpeed *= MovementPenaltyMultiplier;
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
     }
 
-    // 가드 돌입 시점에 무기 데이터 또는 전용 채널링 애니메이션 몽타주가 있다면 비동기 태스크로 가동합니다
+    // 채널링 상태 태그를 루즈 태그로 주입하여 다른 행동 컴포넌트에 현재 방벽 유지 중임을 실시간 전파합니다.
+    SourceASC->AddLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
+
+    // 이속 버그 방어선 1단계: 런타임 역연산 왜곡을 막기 위해 방벽 전개 전 캐릭터의 순정 최대 속도를 보관소에 안전 백업합니다.
+    // 백업 완료 후 기획 스펙에 맞추어 현재 최고 속도를 40퍼센트 깎아 묵직한 방벽 이동 상태를 물리 구현합니다.
+    if (UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement())
+    {
+        OriginalMaxWalkSpeed = MoveComp->MaxWalkSpeed;
+        MoveComp->MaxWalkSpeed = OriginalMaxWalkSpeed * MovementPenaltyMultiplier;
+    }
+
+    // 몽타주 비동기 태스크 구동 구역
+    // 에디터 세팅: 가구야 무기 데이터 에셋(DA_WeaponData_Kaguya)의 AttackMontage 슬롯에 방벽 유지 루프 애니메이션을 등록해야 합니다.
     UFT_WeaponData* WeaponData = Character->GetWeaponData();
     if (WeaponData && WeaponData->AttackMontage)
     {
@@ -65,59 +79,70 @@ void UFT_CounterShieldSkill::ActivateAbility(const FGameplayAbilitySpecHandle Ha
             this, FName("CounterGuardTask"), WeaponData->AttackMontage, 1.0f);
 
         if (MontageTask)
-         {
-            // 애니메이션이 자연스럽게 끝나거나 다른 제어 명령으로 취소되었을 때 가드를 풀도록 예약합니다
-            MontageTask->OnCompleted.AddDynamic(this, &UFT_CounterShieldSkill::K2_EndAbility);
-            MontageTask->OnInterrupted.AddDynamic(this, &UFT_CounterShieldSkill::K2_EndAbility);
+        {
+            // 애니메이션이 무사히 끝나거나 외부 인풋 릴리즈 신호로 중단 시 해제 파이프라인으로 연결합니다.
+            MontageTask->OnCompleted.AddDynamic(this, &UFT_CounterShieldSkill::OnGuardMontageFinished);
+            MontageTask->OnInterrupted.AddDynamic(this, &UFT_CounterShieldSkill::OnGuardMontageFinished);
             MontageTask->ReadyForActivation();
         }
     }
 
-    // 기획 스펙 반영: 최대 4초 유지 제한 지속 타이머 가동 (4초 도달 시 자동 종료 파이프라인)
-    GetWorld()->GetTimerManager().SetTimer(
-        BulwarkDurationTimerHandle, 
-        FTimerDelegate::CreateUObject(this, &UFT_CounterShieldSkill::EndAbility, Handle, ActorInfo, ActivationInfo, true, false),
-        MaxDuration, 
-        false
-    );
+    // 최대 4초 유지 제한 지속 타이머 가동: 마우스를 떼지 않고 영구 버티는 치트를 막기 위해 4초 도달 시 자동으로 닫히도록 안전 밸브를 엽니다.
+    if (GetWorld())
+    {
+        GetWorld()->GetTimerManager().SetTimer(
+            BulwarkDurationTimerHandle, 
+            FTimerDelegate::CreateUObject(this, &UFT_CounterShieldSkill::EndAbility, Handle, ActorInfo, ActivationInfo, true, false),
+            MaxDuration, 
+            false
+        );
+    }
+}
+
+void UFT_CounterShieldSkill::OnGuardMontageFinished()
+{
+    // 애니메이션 몽타주가 끝나거나 중단 신호를 수신하면 표준 어빌리티 종료 관문으로 안전하게 상태를 이관합니다.
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_CounterShieldSkill::EndAbility(const FGameplayAbilitySpecHandle Handle,
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머가 중복 가동되지 않도록 안전하게 제거합니다
+    // 타이머 누수 완전 소멸: 능력이 닫히기 시작하면 가동 중이던 4초 한계선 타이머 핸들을 즉시 청소합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(BulwarkDurationTimerHandle);
     }
 
-    AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get());
-    UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
-
-    // 채널링 루즈 태그 제거 및 상태 해제
+    // 시전자 몸에 부착해 두었던 채널링 상태 표식 태그를 안전하게 수거합니다.
+    UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
     }
 
-    // 감소했던 가구야의 이동 속도(40%)를 원래 수치로 다시 안전하게 복구합니다
-    if (Character)
+    // 이속 원상복구 확정: 복사 나눗셈 계산 오차 없이 처음에 안전 백업해 두었던 순정 속도 수치 그대로 물리 컴포넌트에 즉시 환원시킵니다.
+    if (ActorInfo && ActorInfo->AvatarActor.IsValid())
     {
-        if (UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement())
+        if (AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get()))
         {
-            if (MovementPenaltyMultiplier > 0.0f)
+            if (UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement())
             {
-                MoveComp->MaxWalkSpeed /= MovementPenaltyMultiplier;
+                if (OriginalMaxWalkSpeed > 0.0f)
+                {
+                    MoveComp->MaxWalkSpeed = OriginalMaxWalkSpeed;
+                }
             }
         }
     }
 
-    // 가드 태세를 해제하는 시점에 6초 쿨타임을 돌려 무한 방어를 막습니다
+    // 기획 스펙 공식 반영: 적의 강제 CC기로 캔슬당한 하차 상태가 아니라, 가구를 정상적으로 내리는 해제 시점부터 우클릭 6초 쿨타임을 가동합니다.
     if (!bWasCancelled)
     {
-        (void)CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
+        CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
     }
     
+    // 최종 정리 수명주기 관문 작동
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

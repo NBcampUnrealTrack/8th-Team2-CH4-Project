@@ -22,16 +22,22 @@ public:
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
-	// 1초 장전 메커니즘을 제어할 타이머 핸들
-	FTimerHandle ChannellingTimerHandle;
-
-	// 1초 장전이 끝난 후 실제로 탄환을 발사하는 함수
+	// [보정 완료] 타이머 매니저의 정상적인 시퀀스 호출을 위해 리플렉션 UFUNCTION을 완착합니다.
+	/** 1초 장전 채널링이 정상 만료되었을 때 탄환 사출 시퀀스를 격발할 콜백 함수 */
+	UFUNCTION()
 	void FireSilverBullet();
 
-	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|Combat")
+protected:
+	/** 1초 장전 메커니즘 안전 제어용 순정 타이머 핸들 */
+	FTimerHandle ChannellingTimerHandle;
+
+	// --- 빨간 망토 은탄 고유 스펙 ---
+	/** 관통 은탄 적중 시 사출할 기본 피해량 (기본값 50.0f) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|RedRidingHood Spec")
 	float BaseDamage;
 
-	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|Combat")
+	/** 은탄 발사 전 유지해야 하는 선행 장전 채널링 시간 (기본값 1.0초) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|RedRidingHood Spec")
 	float ChannellingDuration;
-	
+    
 };

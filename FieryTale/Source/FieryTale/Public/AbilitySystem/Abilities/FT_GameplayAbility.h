@@ -26,6 +26,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Debug")
 	bool bDrawDebugs = false;
     
+private:
+	UPROPERTY()
+	FGameplayTagContainer RuntimeCooldownTags;
 protected:
 
 	// ◄◄◄ GAS 내부 규칙: 쿨타임 연산을 위해 아래 두 함수를 오버라이드합니다.

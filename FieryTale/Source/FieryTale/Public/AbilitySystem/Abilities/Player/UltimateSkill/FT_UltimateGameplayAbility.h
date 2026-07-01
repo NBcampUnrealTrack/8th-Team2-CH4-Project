@@ -23,4 +23,5 @@ public:
 protected:
 	// 궁극기 격발 성공 시 게이지를 완전히 소모시킵니다
 	virtual void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+	
 };

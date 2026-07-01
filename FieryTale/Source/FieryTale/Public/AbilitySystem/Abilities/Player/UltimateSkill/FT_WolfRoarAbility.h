@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "FT_UltimateGameplayAbility.h"
+#include "AbilitySystem/Abilities/Player/UltimateSkill/FT_UltimateGameplayAbility.h"
 #include "FT_WolfRoarAbility.generated.h"
 
 /**
@@ -20,19 +20,25 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 protected:
+	// --- 늑대 포효 물리 판정 스펙 ---
 	/** 늑대 포효 부채꼴 중심 사거리 수치 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Wolf Spec")
-	float HuntRadius = 800.f;
+	float HuntRadius;
 
 	/** 부채꼴 유효 각도 (내각 기준, 기본 90도 전방 스캔) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Wolf Spec")
-	float ConeAngle = 90.f;
+	float ConeAngle;
 
-	/** 피격자들에게 주입할 고정 대미지 이펙트 (GEEC_Damage 연동용) */
+	/** 기획서 반영: 늑대 포효 적중 시 사출할 기본 피해량 수치 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Wolf Spec")
-	TSubclassOf<UGameplayEffect> DamageGameplayEffectClass;
+	float BaseDamageValue;
+
+	// --- 연동할 GameplayEffect(GE) 라인업 ---
+	/** 피격자들에게 주입할 대미지 이펙트 (GEEC_Damage 연동용) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
+	TSubclassOf<class UGameplayEffect> DamageGameplayEffectClass;
 
 	/** 2초간 속박 상태 이상을 부여할 디버프 이펙트 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Wolf Spec")
-	TSubclassOf<UGameplayEffect> RootGameplayEffectClass;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
+	TSubclassOf<class UGameplayEffect> RootGameplayEffectClass;
 };

@@ -5,11 +5,11 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
-#include "Abilities/GameplayAbility.h"
-#include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h" 
 #include "FT_CharacterData.generated.h"
 
+class UGameplayAbility;
 class USkeletalMesh;
+class UFT_WeaponData;
 
 /**
  * FieryTale 영웅의 스켈레탈 메쉬, 스킬셋, 그리고 태생 초기 스탯을 규정하는 마스터 데이터 에셋입니다.
@@ -23,9 +23,9 @@ public:
     UFT_CharacterData();
 
     // --- 인라인 Getter 함수 파이프라인 ---
-    FORCEINLINE USkeletalMesh* GetCharacterMesh() const { return CharacterMesh; }
-    FORCEINLINE const TMap<FGameplayTag, TSubclassOf<UGameplayAbility>>& GetHeroAbilities() const { return CharacterAbilities; }
-    FORCEINLINE UFT_WeaponData* GetWeaponData() const { return WeaponData; }
+    FORCEINLINE class USkeletalMesh* GetCharacterMesh() const { return CharacterMesh; }
+    FORCEINLINE const TMap<FGameplayTag, TSubclassOf<class UGameplayAbility>>& GetHeroAbilities() const { return CharacterAbilities; }
+    FORCEINLINE class UFT_WeaponData* GetWeaponData() const { return WeaponData; }
 
     // 기본 스탯 자동화 주입을 위한 속성별 안전 Getter
     FORCEINLINE float GetDefaultMaxHealth() const { return DefaultMaxHealth; }
@@ -37,16 +37,17 @@ public:
 protected:
     // --- 외형 비주얼 데이터 ---
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Visual")
-    TObjectPtr<USkeletalMesh> CharacterMesh;
+    TObjectPtr<class USkeletalMesh> CharacterMesh;
 
     // --- 인풋 태그 기반 어빌리티 매핑 테이블 ---
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Abilities")
-    TMap<FGameplayTag, TSubclassOf<UGameplayAbility>> CharacterAbilities;
+    TMap<FGameplayTag, TSubclassOf<class UGameplayAbility>> CharacterAbilities;
 
     // --- 무기 메커니즘 데이터 에셋 연동 구역 ---
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon")
-    TObjectPtr<UFT_WeaponData> WeaponData;
+    TObjectPtr<class UFT_WeaponData> WeaponData;
     
+    // --- AttributeSet 초기화용 순정 초기 스탯 라인업 ---
     /** 캐릭터 최초 스폰 시 주입할 기본 최대 체력 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Default Attributes", meta = (ClampMin = "1.0"))
     float DefaultMaxHealth;

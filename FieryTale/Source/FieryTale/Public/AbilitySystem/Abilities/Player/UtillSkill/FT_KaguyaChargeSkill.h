@@ -30,15 +30,17 @@ protected:
 	// 4초 유지 스펙을 정확하게 제어할 순정 타이머 핸들 변수
 	FTimerHandle BambooGroveDurationTimerHandle;
 
-	// 기획 스펙: 전술 연막 안개 영역 생성 반경 (450.0f)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Area")
+	// --- 가구야 연막 고유 스펙 ---
+	/** 전술 연막 안개 영역 생성 반경 (기본 450.0f / 4.5m) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
 	float BambooGroveRadius;
 
-	// 기획 스펙: 연막 영역 총 유지 시간 (4.0초)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Area")
+	/** 연막 영역 총 유지 시간 (기본 4.0초) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
 	float BambooGroveDuration;
 
-	// 연막 내부 아군에게 주입할 은신(Invisibility) 관련 GameplayEffect 에셋 클래스
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effect")
-	TSubclassOf<UGameplayEffect> ConcealmentEffectClass;
+	// --- 연동할 GameplayEffect(GE) 라인업 ---
+	/** 연막 내부 영역 진입 시 아군들에게 주입할 은신(Invisibility) 버프 이펙트 클래스 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
+	TSubclassOf<class UGameplayEffect> ConcealmentEffectClass;
 };

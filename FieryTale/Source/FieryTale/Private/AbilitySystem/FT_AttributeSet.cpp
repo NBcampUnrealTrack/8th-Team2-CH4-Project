@@ -4,6 +4,8 @@
 #include "AbilitySystem/FT_AttributeSet.h"
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 UFT_AttributeSet::UFT_AttributeSet()
 {
@@ -13,7 +15,8 @@ void UFT_AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    // 모든 핵심 속성을 데디케이트 서버 환경에서 유실 없이 동기화하도록 셋팅합니다
+    // 네트워크 직렬화 전파: 모든 핵심 속성을 데디케이트 서버 환경에서 클라이언트로 유실 없이 동기화하도록 마스터 세팅합니다.
+    // REPNOTIFY_Always 규칙을 사용하여 수치가 동일하더라도 패킷 갱신 신호가 오면 상시 리플리케이션 통지를 발생시킵니다.
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, Health, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, MaxHealth, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, Shield, COND_None, REPNOTIFY_Always);
@@ -25,14 +28,13 @@ void UFT_AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, MaxUltimateGauge, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, WeaponSpread, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, MaxWeaponSpread, COND_None, REPNOTIFY_Always);
-    // 메타 속성인 Damage는 동기화(Replicate)하지 않고 로컬 연산 후 즉시 소모하므로 제외합니다
 }
 
 void UFT_AttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
     Super::PreAttributeChange(Attribute, NewValue);
 
-    // 내부 수치가 직접 변경되기 전, UI나 예측 연산에서 비정상적인 수치로 튀는 것을 선제적으로 방지합니다
+    // 수치 튐 선제 방어선: 내부 수치가 실질적으로 변경되기 직전 가상 함수 게이트를 열어, UI 표현이나 예측 연산에서 비정상적인 최소, 최대 범위를 벗어나지 않도록 클램핑 가둠 제어를 수행합니다.
     if (Attribute == GetHealthAttribute())
     {
         NewValue = FMath::Clamp<float>(NewValue, 0.0f, GetMaxHealth());
@@ -59,111 +61,123 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
 {
     Super::PostGameplayEffectExecute(Data);
     
-    // 게임플레이 이펙트(대미지, 힐, 버프 등) 연산이 완전히 완료되어 어트리뷰트에 반영된 직후의 관문입니다
     const FGameplayAttribute ModifiedAttribute = Data.EvaluatedData.Attribute;
 
-    // GEEC_Damage를 통해 최종 계산된 대미지 메타 속성이 배달되었을 때의 실제 차감 파이프라인입니다
+    // 기획 사양 공식 안착: GEEC_Damage 연산기를 통해 가공이 완료된 마스터 대미지 메타 속성이 최종 배달되었을 때 작동하는 실질 체력 감산 파이프라인입니다.
     if (ModifiedAttribute == GetDamageAttribute())
     {
-        // 배달된 대미지 수치를 확보하고 우체통은 다음 연산을 위해 즉시 비웁니다
+        // 보관소에 가공된 임시 대미지 총량을 기록한 뒤 다음 타격 연산을 위해 원시 대미지 슬롯을 즉시 0으로 비워줍니다.
         const float LocalDamageDone = GetDamage();
         SetDamage(0.0f);
 
         if (LocalDamageDone > 0.0f)
         {
-            // GEEC 내부에서 보호막 선차감 처리가 되었으나, 안전장치 차원에서 속성 반영 연산을 동기화합니다
+            // 보호막 선제 차단 연산: 현재 영웅이 보유한 보호막 통장에서 대미지를 먼저 감산합니다.
             const float NewShield = GetShield() - LocalDamageDone;
             if (NewShield >= 0.0f)
             {
+                // 보호막 잔여량이 존재한다면 체력 차단 없이 보호막 수치만 갱신 복사합니다.
                 SetShield(FMath::Clamp<float>(NewShield, 0.0f, GetMaxShield()));
             }
             else
             {
-                // 보호막을 뚫고 남은 대미지가 있다면 실제 체력에서 차감 연산합니다
+                // 보호막이 대미지보다 작아 뚫려버린 경우 보호막을 0으로 소멸시키고 남은 음수 피해량을 체력 통장에 더해 최종 차감합니다.
                 SetShield(0.0f);
-                const float NewHealth = GetHealth() + NewShield; // NewShield는 음수 상태입니다
+                const float NewHealth = GetHealth() + NewShield;
                 SetHealth(FMath::Clamp<float>(NewHealth, 0.0f, GetMaxHealth()));
             }
         }
     }
     else if (ModifiedAttribute == GetHealthAttribute())
     {
-        // 체력이 0 미만으로 떨어지거나 최대 체력을 초과하지 못하도록 칼같이 제한합니다
         SetHealth(FMath::Clamp<float>(GetHealth(), 0.0f, GetMaxHealth()));
     }
     else if (ModifiedAttribute == GetShieldAttribute())
     {
-        // 보호막이 0 미만으로 떨어지거나 최대 보호막을 초과하지 못하도록 차단합니다
         SetShield(FMath::Clamp<float>(GetShield(), 0.0f, GetMaxShield()));
     }
     else if (ModifiedAttribute == GetMoveSpeedAttribute())
     {
-        // 이동 속도가 한계치를 넘지 않도록 제한합니다
+        // 이동 속도 연동 배관 공사구역
+        // 1단계: 속도 수치 오염을 막기 위해 최소 0에서 최대 지정 속도 범위로 데이터를 강제 가둡니다.
         SetMoveSpeed(FMath::Clamp<float>(GetMoveSpeed(), 0.0f, GetMaxMoveSpeed()));
+        
+        // 2단계: 변경된 속도 수치를 언리얼 순정 물리 무브먼트 컴포넌트의 MaxWalkSpeed 배관에 즉시 동기화 주입합니다.
+        if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
+        {
+            // 피격 상태가 된 대상 영웅의 아바타 액터 포인터를 안전하게 견인합니다.
+            if (ACharacter* TargetChar = Cast<ACharacter>(Data.Target.AbilityActorInfo->AvatarActor.Get()))
+            {
+                if (UCharacterMovementComponent* MoveComp = TargetChar->GetCharacterMovement())
+                {
+                    // GAS 속성 지표와 컴포넌트 속도를 1대1 일치시켜 슬로우 디버프나 가속 유틸기가 물리적으로 즉각 공명하도록 연동합니다.
+                    MoveComp->MaxWalkSpeed = GetMoveSpeed();
+                }
+            }
+        }
     }
     else if (ModifiedAttribute == GetUltimateGaugeAttribute())
     {
-        // 궁극기 게이지가 가득 차거나 소모되었을 때의 한계 한도를 가둡니다
         SetUltimateGauge(FMath::Clamp<float>(GetUltimateGauge(), 0.0f, GetMaxUltimateGauge()));
     }
     else if (ModifiedAttribute == GetWeaponSpreadAttribute())
     {
-        // 사격 중 탄퍼짐 수치가 비정상적으로 치솟거나 0 미만으로 내려가지 않게 제어합니다
         SetWeaponSpread(FMath::Clamp<float>(GetWeaponSpread(), 0.0f, GetMaxWeaponSpread()));
     }
 }
 
-void UFT_AttributeSet::OnRep_Health(const FGameplayAttributeData& OldHealth)
+// 보정 완료: 구버전 헤더 파일과의 1대1 싱크로율을 완벽하게 맞추기 위해 언리얼 매크로와 충돌하는 원시 레퍼런스 참조 기호들을 전량 제거하고 순정 수명 객체로 프리패스 개통을 마쳤습니다.
+void UFT_AttributeSet::OnRep_Health(const FGameplayAttributeData OldHealth)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, Health, OldHealth);
 }
 
-void UFT_AttributeSet::OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth)
+void UFT_AttributeSet::OnRep_MaxHealth(const FGameplayAttributeData OldMaxHealth)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, MaxHealth, OldMaxHealth);
 }
 
-void UFT_AttributeSet::OnRep_Shield(const FGameplayAttributeData& OldShield)
+void UFT_AttributeSet::OnRep_Shield(const FGameplayAttributeData OldShield)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, Shield, OldShield);
 }
 
-void UFT_AttributeSet::OnRep_MaxShield(const FGameplayAttributeData& OldMaxShield)
+void UFT_AttributeSet::OnRep_MaxShield(const FGameplayAttributeData OldMaxShield)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, MaxShield, OldMaxShield);
 } 
 
-void UFT_AttributeSet::OnRep_MoveSpeed(const FGameplayAttributeData& OldMoveSpeed)
+void UFT_AttributeSet::OnRep_MoveSpeed(const FGameplayAttributeData OldMoveSpeed)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, MoveSpeed, OldMoveSpeed);
 }
 
-void UFT_AttributeSet::OnRep_MaxMoveSpeed(const FGameplayAttributeData& OldMaxMoveSpeed)
+void UFT_AttributeSet::OnRep_MaxMoveSpeed(const FGameplayAttributeData OldMaxMoveSpeed)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, MaxMoveSpeed, OldMaxMoveSpeed);
 }
 
-void UFT_AttributeSet::OnRep_AttackPower(const FGameplayAttributeData& OldAttackPower)
+void UFT_AttributeSet::OnRep_AttackPower(const FGameplayAttributeData OldAttackPower)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, AttackPower, OldAttackPower);
 }
 
-void UFT_AttributeSet::OnRep_UltimateGauge(const FGameplayAttributeData& OldUltimateGauge)
+void UFT_AttributeSet::OnRep_UltimateGauge(const FGameplayAttributeData OldUltimateGauge)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, UltimateGauge, OldUltimateGauge);
 }
 
-void UFT_AttributeSet::OnRep_MaxUltimateGauge(const FGameplayAttributeData& OldMaxUltimateGauge)
+void UFT_AttributeSet::OnRep_MaxUltimateGauge(const FGameplayAttributeData OldMaxUltimateGauge)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, MaxUltimateGauge, OldMaxUltimateGauge);
 }
 
-void UFT_AttributeSet::OnRep_WeaponSpread(const FGameplayAttributeData& OldWeaponSpread)
+void UFT_AttributeSet::OnRep_WeaponSpread(const FGameplayAttributeData OldWeaponSpread)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, WeaponSpread, OldWeaponSpread);
 }
 
-void UFT_AttributeSet::OnRep_MaxWeaponSpread(const FGameplayAttributeData& OldMaxWeaponSpread)
+void UFT_AttributeSet::OnRep_MaxWeaponSpread(const FGameplayAttributeData OldMaxWeaponSpread)
 {
     GAMEPLAYATTRIBUTE_REPNOTIFY(UFT_AttributeSet, MaxWeaponSpread, OldMaxWeaponSpread);
 }

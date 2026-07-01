@@ -2,12 +2,11 @@
 
 
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
-#include "Animation/AnimMontage.h"
 
 UFT_WeaponData::UFT_WeaponData()
 	: FireType(EWeaponFireType::LineTrace) // 기본 무기 타입은 즉시 발사(빨간 망토 스펙)로 세팅
-	, BaseDamage(30.f)                      // 기획 스펙: 기본 평타 대미지 30
-	, AttackRange(3000.f)                  // 기본 사거리 30m
+	, BaseDamage(30.f)                     // 기획 스펙: 기본 평타 대미지 30
+	, AttackRange(3000.f)                  // 기본 사거리 30m (3000 Unreal Unit)
 	, bRootOwnerDuringAttack(false)
 	, MovementSpeedMultiplier(1.0f)        // 공격 중 이동 속도 패널티 없음(100% 속도)을 기본값으로 지정
 	, bAllowHeadshot(false)
