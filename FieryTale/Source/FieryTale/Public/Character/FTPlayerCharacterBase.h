@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Character/FTCharacterBase.h"
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
+#include "AbilitySystem/Abilities/Player/Character/FT_CharacterData.h"
 #include "GameplayTagContainer.h"
 #include "FTPlayerCharacterBase.generated.h"
 
@@ -26,7 +27,8 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera;
-
+	
+	// TODO:: GetWeaponData시 CharacterData->GetWeaponData(); 따로 필드에 이 값을 갖고 있을 필요성이 있는가?
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Weapon", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UFT_WeaponData> CurrentWeaponData;
 
@@ -35,11 +37,26 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 public:
 	AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void OnRep_PlayerState() override;
+	virtual void NotifyControllerChanged() override;
+	
 	// ASC는 PlayerState에서 가져옴
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale | Character")
+	TObjectPtr<UFT_CharacterData> CharacterData;
+	
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Weapon")
-	UFT_WeaponData* GetWeaponData() const { return CurrentWeaponData; }
+	UFT_WeaponData* GetWeaponData() const 
+	{  
+		if (CharacterData)
+		{
+			return CharacterData->GetWeaponData();	
+		}
+		
+		return CurrentWeaponData;
+	}
 
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
@@ -48,18 +65,20 @@ public:
 
 	virtual void Revive();
 
-	// FTPlayerController에서 호출 — 추후 NormalAttack/SpecialAttack 등으로 확장 예정
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
+
+	// FTPlayerController에서 호출 — TODO:: 함수명이 부적절하여, 기능 단위로 이름을 고쳐야함
 	virtual void OnLeftClick();
 	virtual void OnRightClick();
 	virtual void OnShift();
+	
 	void DebugDie(); // TODO:: 삭제 예정
 
 protected:
-	virtual void PossessedBy(AController* NewController) override;
-	virtual void OnRep_PlayerState() override;
-	virtual void NotifyControllerChanged() override;
 
 	void ActivateAbilityByInputTag(const FGameplayTag& InputTag, bool bIsPressed) const;
+	
+	// 초기 혹은 Respawn 단계에서 CharacterData에 의거하여 Attribute 값 초기화
+	void InitializeCharacterAttribute() const;
 };

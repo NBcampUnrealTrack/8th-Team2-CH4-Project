@@ -56,17 +56,37 @@ void AFTPlayerController::SetSelectedCharacterClass(TSubclassOf<AFTPlayerCharact
 	SelectedCharacterClass = InCharacterClass;
 }
 
+void AFTPlayerController::AssignTeam(EFTTeam InTeam)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	AFTPlayerState* PS = GetPlayerState<AFTPlayerState>();
+	if (!PS)
+	{
+		return;
+	}
+
+	PS->AssignTeamTag(InTeam);
+}
+
 void AFTPlayerController::OnPlayerDeath()
 {
-	// TODO:: DeadScreen 등 처리
-	if (DeathOverlayClass)                                                                                                                                                                                                            
-	{                                                                                                                                                                                                                                 
-		DeathOverlayWidgetInstance = CreateWidget<UUserWidget>(this, DeathOverlayClass);                                                                                                                                                      
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (DeathOverlayClass)
+	{
+		DeathOverlayWidgetInstance = CreateWidget<UUserWidget>(this, DeathOverlayClass);
 		if (DeathOverlayWidgetInstance)
 		{
 			DeathOverlayWidgetInstance->AddToViewport();
 		}
-	} 
+	}
 }
 
 
@@ -123,15 +143,20 @@ void AFTPlayerController::ExecuteRespawn()
 void AFTPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	if (ArenaHUDWidget)                                                                                                                            
-	{                                                                                                                                                                                                                                 
-		ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);                                                                                                                                                      
+
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (ArenaHUDWidget)
+	{
+		ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);
 		if (ArenaHUDWidgetInstance)
 		{
 			ArenaHUDWidgetInstance->AddToViewport();
 		}
-	} 
+	}
 }
 
 void AFTPlayerController::OnPossess(APawn* InPawn)
@@ -190,10 +215,7 @@ void AFTPlayerController::SetupInputComponent()
 		EIC->BindAction(AltMouseAction,          ETriggerEvent::Completed, this, &AFTPlayerController::OnAltReleased);
 		EIC->BindAction(ChatAction,              ETriggerEvent::Started,   this, &AFTPlayerController::OnChatPressed);
 	}
-	
-	
-	
-	
+
 }
 
 void AFTPlayerController::Move(const FInputActionValue& Value)

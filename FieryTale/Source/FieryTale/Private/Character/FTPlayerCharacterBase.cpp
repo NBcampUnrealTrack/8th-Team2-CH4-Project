@@ -10,6 +10,8 @@
 #include "InputActionValue.h"
 #include "Character/FTPlayerState.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/FT_AttributeSet.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameplayTags/FTTags.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerCharacter);
@@ -17,6 +19,16 @@ DEFINE_LOG_CATEGORY(FTPlayerCharacter);
 void AFTPlayerCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (CharacterData)
+	{
+		GetCharacterMovement()->MaxWalkSpeed = CharacterData->GetDefaultMoveSpeed();
+		
+		if (USkeletalMesh* CharacterMesh = CharacterData->GetCharacterMesh())
+		{
+			GetMesh()->SetSkeletalMesh(CharacterMesh);
+		}
+	}
 }
 
 AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer)
@@ -32,11 +44,11 @@ AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectI
 
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 500.f, 0.f);
-	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
-	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
+	//GetCharacterMovement()->AirControl = 0.35f;
+	//GetCharacterMovement()->MaxWalkSpeed = 500.f;
+	//GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
+	//GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
+	//GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -106,7 +118,7 @@ void AFTPlayerCharacterBase::Revive()
 	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 
-	// TODO:: 사망이후 캐릭터 리셋시 상태 복구
+	InitializeCharacterAttribute();
 }
 
 // TODO:: 사망 확인을 위한 임시코드 삭제 예정
@@ -140,9 +152,12 @@ void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
 			// 1. GAS 액터 정보 등록 (Owner: PlayerState, Avatar: 캐릭터 본체)
 			ASC->InitAbilityActorInfo(PS, this);
             
-			// 2. 서버 권한 하에 기획자가 에디터에서 배치한 스킬 및 평타 목록을 엔진에 등록(Grant)
+			// 2. 서버 권한 하에 초기화 수행
 			if (HasAuthority())
 			{
+				InitializeCharacterAttribute();
+
+				// 기획자가 에디터에서 배치한 스킬 및 평타 목록을 엔진에 등록(Grant)
 				for (const TSubclassOf<UGameplayAbility>& AbilityClass : StartupAbilities)
 				{
 					if (AbilityClass)
@@ -187,6 +202,30 @@ void AFTPlayerCharacterBase::OnRep_PlayerState()
 			ASC->InitAbilityActorInfo(PS, this);
 		}		
 	}
+}
+
+void AFTPlayerCharacterBase::InitializeCharacterAttribute() const
+{
+	if (!CharacterData || !HasAuthority())
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!ASC)
+	{
+		return;
+	}
+
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxHealthAttribute(),        CharacterData->GetDefaultMaxHealth());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetHealthAttribute(),           CharacterData->GetDefaultMaxHealth());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxShieldAttribute(),        CharacterData->GetDefaultMaxShield());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetShieldAttribute(),           CharacterData->GetDefaultMaxShield());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxMoveSpeedAttribute(),     CharacterData->GetDefaultMoveSpeed());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMoveSpeedAttribute(),        CharacterData->GetDefaultMoveSpeed());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetAttackPowerAttribute(),      CharacterData->GetDefaultAttackPower());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxUltimateGaugeAttribute(), CharacterData->GetDefaultMaxUltimateGauge());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetUltimateGaugeAttribute(),    0.0f);
 }
 
 void AFTPlayerCharacterBase::ActivateAbilityByInputTag(const FGameplayTag& InputTag, bool bIsPressed) const

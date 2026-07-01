@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "FTCharacterBase.h"
 #include "GameFramework/PlayerController.h"
-#include "GameplayTagContainer.h"
+#include "Character/FTPlayerState.h"
 #include "FTPlayerController.generated.h"
 
 class AFTPlayerCharacterBase;
@@ -32,6 +32,9 @@ public:
 	
 	// 캐릭터의 Die()에서 서버 권한일 때 호출하는 리스폰 요청 함수
 	void RequestRespawn();
+
+	// GameMode에서 호출 — 팀을 PlayerState에 바인딩
+	void AssignTeam(EFTTeam InTeam);
 
 	// 캐릭터 사망 시 UI를 끄거나 입력 모드를 변경하기 위해 호출되는 함수
 	void OnPlayerDeath();
