@@ -20,8 +20,16 @@ namespace FTTags
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActivateOnGiven, "FTTags.Abilities.ActivateOnGiven", "부여 시 즉시 가동되는 패시브 능력 식별 태그");
     }
     
+    // --- 영웅 및 크리처들의 실시간 상태 제어 마스터 대분류 ---
     namespace FTStates
     {
+        // [긴급 보정 완착] 헤더의 Core 계층 심볼들과 완벽하게 결합할 실시간 문자열 데이터를 개통합니다.
+        namespace Core
+        {
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dead, "FTTags.State.Core.Dead", "캐릭터 체력 고갈 사망 상태 레이어 태그 (모든 일반공격 및 스킬 연동 차단)");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Reloading, "FTTags.State.Core.Reloading", "무기 탄환 전량 소모 후 장전 중 상태 레이어 태그 (평타 사격 개입 차단)");
+        }
+
         // [해로운 제어 상태이상 / 하드 CC 디버프 계층]
         namespace Debuff
         {

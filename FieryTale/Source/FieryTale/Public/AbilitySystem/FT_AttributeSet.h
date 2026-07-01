@@ -9,6 +9,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FAttributeInitialized);
 
+// GAS 정석 아키텍처 매크로: 속성 집합의 Getter, Setter, Init 함수 배관을 한 방에 개통해 주는 표준 인프라입니다.
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
     GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
     GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
@@ -17,6 +18,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FAttributeInitialized);
 
 /**
  * FieryTale 게임 내 모든 액터(영웅, 미니언, 포탑)가 공유하는 마스터 속성 집합입니다.
+ * 체력, 보호막, 이동 속도, 궁극기 자원 및 무기 탄퍼짐까지 핵심 전장 연산 프로퍼티를 관리합니다.
  */
 UCLASS()
 class FIERYTALE_API UFT_AttributeSet : public UAttributeSet
@@ -51,7 +53,7 @@ public:
     FGameplayAttributeData MaxShield;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxShield)
 
-    /** 현재 TPS 실시간 이동 속도 */
+    /** 현재 TPS 실시간 이동 속도 수치 */
     UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MoveSpeed)
     FGameplayAttributeData MoveSpeed;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MoveSpeed)
@@ -66,17 +68,17 @@ public:
     FGameplayAttributeData AttackPower;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, AttackPower)
 
-    /** 현재 궁극기 자원 게이지 */
+    /** 현재 궁극기 자원 게이지 수치 */
     UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_UltimateGauge)
     FGameplayAttributeData UltimateGauge;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, UltimateGauge)
 
-    /** 궁극기 활성화를 위한 최대 요구 게이지 */
+    /** 궁극기 활성화를 위한 최대 요구 게이지 통장 수치 */
     UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_MaxUltimateGauge)
     FGameplayAttributeData MaxUltimateGauge;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxUltimateGauge)
 
-    /** 현재 무기 탄퍼짐 변동 레벨 */
+    /** 현재 무기 탄퍼짐 변동 레벨 (빨간 망토 전용 보정 기획 연동) */
     UPROPERTY(BlueprintReadOnly, Category = "FieryTale|Attributes", ReplicatedUsing = OnRep_WeaponSpread)
     FGameplayAttributeData WeaponSpread;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, WeaponSpread)
@@ -86,8 +88,7 @@ public:
     FGameplayAttributeData MaxWeaponSpread;
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, MaxWeaponSpread)
 
-    /** 
-     * 대미지 연산용 메타 속성 (임시 우체통)
+    /** * 대미지 연산용 메타 속성 (임시 우체통)
      * GEEC_Damage의 계산 수치를 받아 PostGameplayEffectExecute에서 체력 및 보호막 실시간 감산을 원격 처리합니다.
      * 서버-클라이언트 간 동기화(Replication)가 불필요한 일회성 속성입니다.
      */
@@ -96,7 +97,8 @@ public:
     ATTRIBUTE_ACCESSORS(UFT_AttributeSet, Damage)
 
 protected:
-    // ◄◄◄ [네트워크 규격 보정 완착] 패킷 복제 상태 추적을 위해 const 복사본 구조로 인자 타입을 대폭 혁신합니다.
+    // 네트워크 규격 보정 완착: 패킷 복제 상태 추적을 위해 구버전 참조자 오타를 밀어버리고 const 순정 구조 타입으로 통일합니다.
+    
     UFUNCTION() 
     virtual void OnRep_Health(const FGameplayAttributeData OldHealth);
     

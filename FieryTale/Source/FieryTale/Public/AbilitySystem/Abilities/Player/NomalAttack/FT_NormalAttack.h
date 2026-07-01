@@ -10,7 +10,8 @@ class UFT_WeaponData;
 class AFTPlayerCharacterBase;
 
 /**
- * FieryTale 영웅들의 공용 마스터 평타 어빌리티 시스템
+ * FieryTale 영웅들의 공용 마스터 평타 어빌리티 시스템 헤더입니다.
+ * 히트스캔, 투사체, 근접 무기 유형을 마스터 데이터 에셋 스펙에 맞춰 실시간 분기 처리합니다.
  */
 UCLASS()
 class FIERYTALE_API UFT_NormalAttack : public UFT_GameplayAbility
@@ -20,6 +21,10 @@ class FIERYTALE_API UFT_NormalAttack : public UFT_GameplayAbility
 public:
     UFT_NormalAttack();
     
+    // GAS 순정 최선행 검증 관문 오버라이드
+    // 이 함수가 true를 사출해야만 실질적인 ActivateAbility 배관이 개통되어 평타가 나갑니다.
+    virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
@@ -47,8 +52,7 @@ protected:
     TSubclassOf<class UGameplayEffect> BaseDamageEffectClass;
 
 private:
-    // ◄◄◄ [완벽 보정] .cpp 본문에서 메모리 폭산 및 영구 속도 유실을 청소하기 위한 실시간 안전장치 보관소
-    /** 평타 연사(점사) 도중 강제 인터럽트 캔슬 시 투사체 무한 유실을 차단하기 위한 멤버 타이머 핸들 변수 */
+    /** 평타 연사 도중 강제 인터럽트 캔슬 시 투사체 무한 유실을 차단하기 위한 멤버 타이머 핸들 변수 */
     FTimerHandle BurstTimerHandle;
 
     /** 평타 가감 배율 누적 오차로 인한 무브먼트 영구 왜곡을 방쇄하기 위한 순정 최대 속도 백업 보관소 */

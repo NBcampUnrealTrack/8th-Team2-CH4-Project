@@ -25,6 +25,13 @@ namespace FTTags
     // --- 영웅 및 크리처들의 실시간 상태 제어 마스터 대분류 ---
     namespace FTStates
     {
+        // [긴급 보정 완착] .cpp의 문자열 주소지와 자석처럼 바인딩될 마스터 EXTERN 주소선을 개통합니다.
+        namespace Core
+        {
+            UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dead);            // 캐릭터 사망 상태 레이어 (평타 및 스킬 연동 차단)
+            UE_DECLARE_GAMEPLAY_TAG_EXTERN(Reloading);       // 무기 장전 중 상태 레이어 (평타 사격 개입 차단)
+        }
+
         // [해로운 제어 상태이상 / 하드 CC 디버프 계층]
         namespace Debuff
         {
@@ -46,7 +53,7 @@ namespace FTTags
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(CounterReady);    // 가구야: GEEC 데미지를 0으로 분쇄하는 반격 가드 태세
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(BambooGroveDeploying); // 가구야: 대나무 숲 안개 영역 전개 중인 시전 상태
             
-            // ◄◄◄ [누락 보정 완착] 알라딘 3단 궁극기 콤보 연사 및 입력 락 차단을 위한 실시간 트래커 태그
+            // 알라딘 3단 궁극기 콤보 연사 및 입력 락 차단을 위한 실시간 트래커 태그
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(AladdinComboActive);
         }
        
