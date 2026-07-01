@@ -10,12 +10,13 @@
 #include "GameplayTags/FTTags.h"
 
 UFT_AliceStealthDashSkill::UFT_AliceStealthDashSkill()
-    : MovementSpeedMultiplier(1.5f) // 기획 데이터 락인: 스킬 전개 즉시 기본 이동 속도를 50퍼센트 증가시키는 배율 명세
-    , MaxDuration(2.0f)             // 기획 데이터 락인: 축소 가속 상태를 정확히 2초간 유지하는 한계 시간 명세
-    , TargetMeshScale(0.5f)         // 기획 데이터 락인: 피격 면적을 줄이기 위해 히트박스와 캐릭터 스케일을 절반 크기로 축소하는 수치 명세
-    , OriginalMaxWalkSpeed(0.0f)    // 이동 속도 복구 연산 왜곡을 차단하기 위한 기본 수치 보관소 초기화
-    , OriginalCapsuleRadius(0.0f)
-    , OriginalCapsuleHalfHeight(0.0f)
+    :OriginalMaxWalkSpeed(0.0f)    
+    ,OriginalCapsuleRadius(0.0f)
+    ,OriginalCapsuleHalfHeight(0.0f)
+    ,MovementSpeedMultiplier(1.5f) // 기획 데이터 락인: 스킬 전개 즉시 기본 이동 속도를 50퍼센트 증가시키는 배율 명세
+    ,MaxDuration(2.0f)             // 기획 데이터 락인: 축소 가속 상태를 정확히 2초간 유지하는 한계 시간 명세
+    ,TargetMeshScale(0.5f)         // 기획 데이터 락인: 피격 면적을 줄이기 위해 히트박스와 캐릭터 스케일을 절반 크기로 축소하는 수치 명세
+
 {
     // 인스턴싱 정책: 캐릭터마다 고유의 캡슐 크기 백업 정보와 타이머 핸들을 격리 제어하기 위해 인스턴스화합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
