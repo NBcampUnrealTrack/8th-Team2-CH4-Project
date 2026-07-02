@@ -30,6 +30,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Character")
 	virtual void FinishDying();
 
+	// 서버 권한 사망 진입점 — 체력 0 도달 시 AttributeSet에서 호출된다.
+	// Dead 태그 부여로 중복 호출을 차단하고, 입력/이동 차단과 사망 델리게이트(리스폰 예약)를 처리한다.
+	virtual void Die();
+
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FieryTale | Animation")
 	TObjectPtr<UAnimMontage> DeathMontage;
@@ -39,8 +43,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "FieryTale | GAS")
 	TArray<TSubclassOf<UGameplayEffect>> DefaultGameplayEffects;
-
-	virtual void Die();
 
 	// PossessedBy에서 ASC를 확보한 뒤 이 함수로 어빌리티/이펙트를 일괄 등록
 	// TODO:: 플레이어 캐릭터가 아닌 경우? GAS처리?

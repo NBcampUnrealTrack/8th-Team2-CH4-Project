@@ -139,9 +139,12 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
             // 피격 상태가 된 아바타 액터를 마스터 베이스 캐릭터 클래스로 캐스팅 견인합니다.
             if (AFTCharacterBase* BaseChar = Cast<AFTCharacterBase>(Data.Target.AbilityActorInfo->AvatarActor.Get()))
             {
-                // 본체 C++ 사망 함수에게 체력 고갈 시퀀스 발동 패킷을 직통 사출합니다.
-                // 호출을 받은 본체 클래스는 Dead 상태 태그를 부착하고, 채널링 스킬들을 강제 캔슬 및 래그돌 물리 연산으로 전환합니다.
-                BaseChar->FinishDying();
+                // 서버 권한에서만 사망 진입 — Die()가 Dead 태그 부여, 입력/이동 차단,
+                // 사망 델리게이트 브로드캐스트(컨트롤러의 리스폰 예약)까지 처리한다.
+                if (BaseChar->HasAuthority())
+                {
+                    BaseChar->Die();
+                }
             }
         }
     }
