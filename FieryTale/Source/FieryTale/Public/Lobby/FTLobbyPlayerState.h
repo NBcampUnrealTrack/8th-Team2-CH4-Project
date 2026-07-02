@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
+#include "Character/FTPlayerState.h"
 #include "Character/FTCharacterTypes.h" // 정본 EFTCharacterType 참조
 #include "FTLobbyPlayerState.generated.h"
 
@@ -43,12 +44,14 @@ public:
 	
 	// 캐릭터 변경 요청 및 조회
 	void SetCharacterType(EFTCharacterType InCharacterType);
-	EFTCharacterType GetCharacterType() const { return SelectedCharacter; }
+	
+	EFTCharacterType GetCharacterType() const { return SelectedCharacterType; }
+	
+protected:
 	
 	// 트래블 시 다른 PlayerState로 데이터를 넘겨주는 엔진 내장 함수
 	virtual void CopyProperties(APlayerState* PlayerState) override;
-	
-protected:
+
 	UPROPERTY(ReplicatedUsing = OnRep_IsReady, BlueprintReadOnly, Category = "FieryTale|Lobby")
 	bool bIsReady = false;
 
@@ -56,7 +59,7 @@ protected:
 	void OnRep_IsReady();
 	
 	UPROPERTY(ReplicatedUsing = OnRep_SelectedCharacter)
-	EFTCharacterType SelectedCharacter;
+	EFTCharacterType SelectedCharacterType;
 	
 	UFUNCTION()
 	void OnRep_SelectedCharacter();

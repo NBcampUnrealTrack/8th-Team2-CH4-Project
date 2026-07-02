@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
-#include "Character/FTCharacterTypes.h" // 정본 EFTCharacterType 참조
+#include "Character/FTCharacterTypes.h"
 #include "FTPlayerState.generated.h"
 
 class UFT_AbilitySystemComponent;
@@ -18,7 +18,6 @@ enum class EFTTeam : uint8
 	Red  UMETA(DisplayName = "Red Team"),
 };
 
-
 UCLASS()
 class FIERYTALE_API AFTPlayerState  : public APlayerState, public IAbilitySystemInterface
 {
@@ -30,6 +29,8 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	
+	virtual void CopyProperties(APlayerState* PlayerState) override;
 
 	UFT_AttributeSet* GetAttributeSet() const { return AttributeSet; }
 
@@ -46,7 +47,7 @@ public:
 private:
 	// 에디터 Detail에서 현재 선택된 캐릭터 타입 확인용 (읽기 전용)
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
-	EFTCharacterType SelectedCharacterType = EFTCharacterType::None;
+	EFTCharacterType SelectedCharacterType;
 
 	// 복제되어 클라이언트에서 OnRep_Team을 트리거함
 	UPROPERTY(ReplicatedUsing = OnRep_Team)

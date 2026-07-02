@@ -5,7 +5,6 @@
 
 #include "FieryTaleLog.h"
 #include "Lobby/FTLobbyPlayerState.h"
-#include "Lobby/FTLobbyPlayerController.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
@@ -13,6 +12,8 @@
 #include "OnlineSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
+#include "OnlineSubsystemUtils.h"
+#include "Character/FTPlayerController.h"
 #include "Online/OnlineSessionNames.h" // NAME_GameSession 사용을 위함
 #include "Misc/PackageName.h"
 
@@ -21,14 +22,14 @@ AFTLobbyGameMode::AFTLobbyGameMode()
 	bUseSeamlessTravel = true; 
 	
 	PlayerStateClass = AFTLobbyPlayerState::StaticClass();
-	PlayerControllerClass = AFTLobbyPlayerController::StaticClass();
+	PlayerControllerClass = AFTPlayerController::StaticClass();
 }
 
 void AFTLobbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
+	IOnlineSubsystem* OSS = Online::GetSubsystem(GetWorld());
 	if (OSS)
 	{
 		IOnlineSessionPtr SessionInterface = OSS->GetSessionInterface();

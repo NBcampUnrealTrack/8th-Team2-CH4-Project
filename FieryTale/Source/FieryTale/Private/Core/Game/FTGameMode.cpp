@@ -3,6 +3,7 @@
 
 #include "Core/Game/FTGameMode.h"
 #include "FieryTaleLog.h"
+#include "Character/FTPlayerState.h"
 #include "Core/Game/FTArenaGameState.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
@@ -15,6 +16,7 @@
 
 #include "Level/FTTurret.h"
 #include "Level/FTNexus.h"
+#include "FieryTaleLog.h"
 #include "Character/FTPlayerController.h"
 #include "Character/FTPlayerState.h"
 #include "Character/FTPlayerCharacterBase.h"
@@ -22,12 +24,14 @@
 AFTGameMode::AFTGameMode()
 {
 	bUseSeamlessTravel = true;
-
+	
 	// 매치 정본 PlayerState는 ASC/AttributeSet/팀을 보유한 AFTPlayerState로 통일한다.
 	// (구 AFTArenaPlayerState는 ASC가 없어 GAS 전투가 무효였음 — 통합으로 제거)
 	PlayerStateClass = AFTPlayerState::StaticClass();
+	
 	// 입력/HUD/리스폰이 동작하도록 매치 컨트롤러를 명시적으로 지정한다.
 	PlayerControllerClass = AFTPlayerController::StaticClass();
+	
 	GameStateClass = AFTArenaGameState::StaticClass();
 }
 
@@ -77,45 +81,52 @@ void AFTGameMode::HandleSeamlessTravelPlayer(AController*& C)
 void AFTGameMode::InitializeAndSpawnPlayer(APlayerController* NewPlayer)
 {
 	if (NewPlayer == nullptr) return;
+	
+	// 1. 컨트롤러 캐스팅 (통합된 FTPlayerController 사용)
+	AFTPlayerController* FTPlayerPC = Cast<AFTPlayerController>(NewPlayer);
+	if (!FTPlayerPC) return;
 
-	AFTPlayerController* FTPC = Cast<AFTPlayerController>(NewPlayer);
-	AFTPlayerState* PS = NewPlayer->GetPlayerState<AFTPlayerState>();
-	if (FTPC == nullptr || PS == nullptr)
+	AFTPlayerState* Ps = FTPlayerPC->GetPlayerState<AFTPlayerState>();
+	if (Ps)
 	{
-		// PlayerController/PlayerState 클래스가 BP GameMode에서 AFTPlayerController/AFTPlayerState로
-		// 지정되지 않았을 때 여기 걸린다. (에디터 설정 확인 필요)
-		UE_LOG(LogFTSession, Error, TEXT("[Arena] 🚨 스폰 실패 - FTPlayerController=%s, FTPlayerState=%s (BP GameMode 클래스 지정 확인)"),
-			FTPC ? TEXT("OK") : TEXT("NULL"), PS ? TEXT("OK") : TEXT("NULL"));
-		return;
-	}
-
-	// 로비에서 선택이 전달되지 않았으면(None) 유효한 기본값으로 보정해 None 스폰 시도를 막는다.
-	if (PS->GetSelectedCharacterType() == EFTCharacterType::None)
-	{
-		PS->SetSelectedCharacterType(EFTCharacterType::Alice);
-	}
-
-	// 중복 스폰 방지: 이미 FieryTale 캐릭터를 빙의 중이면 재스폰하지 않는다.
-	if (Cast<AFTPlayerCharacterBase>(NewPlayer->GetPawn()) != nullptr)
-	{
-		UE_LOG(LogFTSession, Log, TEXT("[Arena] [%s] 이미 캐릭터 빙의 중 → 중복 스폰 건너뜀"), *NewPlayer->GetName());
-	}
-	else
-	{
-		// 심리스 트래블 후 붙어있던 기본 폰이 있으면 제거한다.
-		if (APawn* OldPawn = NewPlayer->GetPawn())
+		EFTCharacterType ChosenCharacter = Ps->GetSelectedCharacterType();
+       
+		if (ChosenCharacter == EFTCharacterType::None)
 		{
-			OldPawn->Destroy();
+			ChosenCharacter = EFTCharacterType::Alice;
+			Ps->SetSelectedCharacterType(ChosenCharacter); // State에도 기본값 덮어쓰기
 		}
 
-		// 팀 스폰 지점을 계산한 뒤, GAS 인지 스폰 경로(CharacterData 주입)로 컨트롤러에 위임한다.
-		AActor* StartSpot = FindPlayerStart(NewPlayer);
-		const FVector SpawnLocation = StartSpot ? StartSpot->GetActorLocation() : FVector::ZeroVector;
-		const FRotator SpawnRotation = StartSpot ? StartSpot->GetActorRotation() : FRotator::ZeroRotator;
+		bool bAlreadySpawned = false;
 
-		UE_LOG(LogFTSession, Log, TEXT("[Arena] [%s] 캐릭터 스폰 위임 (타입=%d)"),
-			*NewPlayer->GetName(), (int32)PS->GetSelectedCharacterType());
-		FTPC->SpawnCharacter(SpawnLocation, SpawnRotation);
+		// 현재 폰이 진짜 '우리 게임의 캐릭터'인지 클래스 타입으로 검사
+		if (APawn* CurrentPawn = FTPlayerPC->GetPawn())
+		{
+			if (CurrentPawn->IsA(AFTPlayerCharacterBase::StaticClass()))
+			{
+				bAlreadySpawned = true;
+				UE_LOG(LogFTSession, Log, TEXT("[ArenaDebug] [%s] 님은 이미 진짜 캐릭터가 세팅되어 있습니다. 중복 스폰을 건너뜁니다."), *NewPlayer->GetName());
+			}
+		}
+
+		if (!bAlreadySpawned)
+		{
+			// 기존에 빙의하고 있던 쓸모없는 기본 폰(SpectatorPawn 등) 파괴
+			if (APawn* OldPawn = NewPlayer->GetPawn())
+			{
+				OldPawn->Destroy(); 
+			}
+
+			// PlayerStart 위치 찾기
+			AActor* StartSpot = FindPlayerStart(NewPlayer);
+			FVector SpawnLocation = StartSpot ? StartSpot->GetActorLocation() : FVector::ZeroVector;
+			FRotator SpawnRotation = StartSpot ? StartSpot->GetActorRotation() : FRotator::ZeroRotator;
+
+			// 컨트롤러에게 데이터 주입 및 스폰 명령
+			FTPlayerPC->SpawnCharacter(SpawnLocation, SpawnRotation);
+    
+			UE_LOG(LogFTSession, Log, TEXT("[ArenaDebug] 플레이어 [%s] 캐릭터 스폰 요청 완료!"), *NewPlayer->GetName());
+		}
 	}
 
 	// 인원수 체크 및 매치 시작 검사

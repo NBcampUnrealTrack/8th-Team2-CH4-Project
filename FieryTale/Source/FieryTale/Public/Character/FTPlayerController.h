@@ -7,12 +7,14 @@
 #include "GameFramework/PlayerController.h"
 #include "Character/FTPlayerState.h"
 #include "GameplayTagContainer.h"
+#include "Character/FTCharacterTypes.h"
 #include "AbilitySystem/Abilities/Player/Character/FT_CharacterData.h"
 #include "FTPlayerController.generated.h"
 
 class AFTPlayerCharacterBase;
 class UInputMappingContext;
 class UInputAction;
+class UFTLobbyWidget;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(FTPlayerController, Log, All);
@@ -30,6 +32,8 @@ public:
 	
 	// GameMode에서 호출 — 팀을 PlayerState에 바인딩
 	void AssignTeam(EFTTeam InTeam);
+	void OnPlayerDeath();
+	void RequestRespawn();
 
 	// 에디터에서 EFTCharacterType별 CharacterData 에셋을 등록 — 스폰 시 타입 기반으로 하나만 로드
 	UPROPERTY(EditDefaultsOnly, Category = "Character")
@@ -131,4 +135,33 @@ private:
 	UFUNCTION()
 	void HandleCharacterDeath(AFTCharacterBase* DiedCharacter);
 	void OnDeadTagChanged(const FGameplayTag Tag, int32 NewCount);
+	
+public:
+	// --- 로비 UI & 시스템 통합 ---
+	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|UI|Lobby")
+	TSubclassOf<class UUserWidget> LobbyWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UFTLobbyWidget> LobbyWidgetInstance;
+
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Lobby")
+	void RequestSetReady(bool bReady);
+
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Lobby")
+	void RequestStartMatch();
+
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Lobby")
+	void RequestSetCharacter(EFTCharacterType NewCharacter); // Enum 통일
+
+	virtual void OnRep_PlayerState() override;
+
+protected:
+	UFUNCTION(Server, Reliable)
+	void ServerSetReady(bool bReady);
+
+	UFUNCTION(Server, Reliable)
+	void ServerStartMatch();
+	
+	UFUNCTION(Server, Reliable)
+	void ServerSetCharacter(EFTCharacterType NewCharacter);
 };

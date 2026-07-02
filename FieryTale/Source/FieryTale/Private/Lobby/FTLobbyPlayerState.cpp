@@ -7,12 +7,12 @@
 #include "Net/UnrealNetwork.h"
 #include "EngineUtils.h" // TActorIterator를 사용하기 위해 추가
 #include "Core/Game/FTGameMode.h"
-#include "Character/FTPlayerState.h" // 매치 정본 PlayerState (ASC 보유)
+#include "Character/FTPlayerState.h"
 #include "Lobby/FTCharacterDisplayStand.h" //진열대 헤더 추가
 
 AFTLobbyPlayerState::AFTLobbyPlayerState()
 {
-	SelectedCharacter = EFTCharacterType::None;
+	SelectedCharacterType = EFTCharacterType::None;
 	bReplicates = true;
 }
 
@@ -23,7 +23,7 @@ void AFTLobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	DOREPLIFETIME(AFTLobbyPlayerState, bIsReady);
 	
 	DOREPLIFETIME(AFTLobbyPlayerState, PlayerIndex);
-	DOREPLIFETIME(AFTLobbyPlayerState, SelectedCharacter);
+	DOREPLIFETIME(AFTLobbyPlayerState, SelectedCharacterType);
 }
 
 void AFTLobbyPlayerState::SetReady(bool bInReady)
@@ -51,13 +51,13 @@ void AFTLobbyPlayerState::SetCharacterType(EFTCharacterType InCharacterType)
 {
 	if (HasAuthority())
 	{
-		if (SelectedCharacter != InCharacterType)
+		if (SelectedCharacterType != InCharacterType)
 		{
-			SelectedCharacter = InCharacterType;
+			SelectedCharacterType = InCharacterType;
 			
 			// 🌟 [추가]: 서버에서 진짜 값이 몇 번으로 바뀌었는지 찍어봅니다.
 			UE_LOG(LogFTSession, Log, TEXT("[CharacterDebug] 서버 권한으로 %s의 캐릭터를 %d번으로 변경 완료!"), 
-				*GetPlayerName(), (int32)SelectedCharacter);
+				*GetPlayerName(), (int32)SelectedCharacterType);
 			
 			// 🌟 서버는 스스로 호출, 클라이언트는 OnRep이 자동 호출됨
 			OnRep_SelectedCharacter(); 
@@ -73,14 +73,13 @@ void AFTLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 	}
 	
 	Super::CopyProperties(PlayerState);
-
-	// 심리스 트래블 시 로비에서 고른 캐릭터를 매치 PlayerState로 넘긴다.
-	if (AFTPlayerState* ArenaPS = Cast<AFTPlayerState>(PlayerState))
+	
+	if (AFTPlayerState* PS = Cast<AFTPlayerState>(PlayerState))
 	{
-		ArenaPS->SetSelectedCharacterType(this->SelectedCharacter);
-
-		UE_LOG(LogFTSession, Log, TEXT("[SeamlessTravel] %s 님의 데이터 복사 성공! 캐릭터: %d"),
-			*GetPlayerName(), (int32)this->SelectedCharacter);
+		PS->SetSelectedCharacterType(this->SelectedCharacterType);
+		
+		UE_LOG(LogFTSession, Log, TEXT("[SeamlessTravel] %s 님의 데이터 복사 성공! 캐릭터: %d"), 
+			*GetPlayerName(), (int32)PS->GetSelectedCharacterType());
 	}
 }
 
@@ -98,7 +97,7 @@ void AFTLobbyPlayerState::OnRep_SelectedCharacter()
             
 			if (Stand && Stand->StandIndex == PlayerIndex)
 			{
-				Stand->UpdateCharacter(SelectedCharacter);
+				Stand->UpdateCharacter(SelectedCharacterType);
 				return; // 찾았으면 종료
 			}
 		}

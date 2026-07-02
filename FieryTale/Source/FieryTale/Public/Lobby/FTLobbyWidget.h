@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Character/FTPlayerController.h"
+#include "Character/FTCharacterTypes.h"
 #include "FTLobbyWidget.generated.h"
 
 /**
@@ -12,7 +14,7 @@
 
 class UButton;
 class UTextBlock;
-class AFTLobbyPlayerController;
+class AFTPlayerController;
 class AFTLobbyPlayerState;
 
 UCLASS()
@@ -34,7 +36,7 @@ protected:
 	UTextBlock* Text_ReadyStatus;
 	
 public:
-	void InitWidget(AFTLobbyPlayerController* InPC, AFTLobbyPlayerState* InPS);
+	void InitWidget(AFTPlayerController* InPC, AFTLobbyPlayerState* InPS);
 
 private:
 	
@@ -50,7 +52,7 @@ private:
 
 	// 플레이어 컨트톨러, 플레이어 스테이트 캐싱용 포인터
 	UPROPERTY()
-	AFTLobbyPlayerController* LobbyPC;
+	AFTPlayerController* LobbyPC;
 
 	UPROPERTY()
 	AFTLobbyPlayerState* LobbyPS;

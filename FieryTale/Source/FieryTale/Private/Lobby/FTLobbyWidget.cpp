@@ -6,7 +6,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 
-#include "Lobby/FTLobbyPlayerController.h"
+#include "Character/FTPlayerController.h"
 #include "Lobby/FTLobbyPlayerState.h"
 
 void UFTLobbyWidget::NativeConstruct()
@@ -24,7 +24,7 @@ void UFTLobbyWidget::NativeConstruct()
 	}
 }
 
-void UFTLobbyWidget::InitWidget(AFTLobbyPlayerController* InPC, AFTLobbyPlayerState* InPS)
+void UFTLobbyWidget::InitWidget(AFTPlayerController* InPC, AFTLobbyPlayerState* InPS)
 {
 	LobbyPC = InPC;
 	LobbyPS = InPS;

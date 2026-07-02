@@ -2,6 +2,8 @@
 
 
 #include "Lobby/FTCharacterDisplayStand.h"
+#include "Character/FTCharacterTypes.h"
+#include "Engine/World.h"
 
 // Sets default values
 AFTCharacterDisplayStand::AFTCharacterDisplayStand()

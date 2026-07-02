@@ -4,7 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "FTLobbyPlayerState.h"
+#include "Character/FTPlayerState.h"
+#include "Character/FTCharacterTypes.h"
 #include "FTCharacterDisplayStand.generated.h"
 
 UCLASS()

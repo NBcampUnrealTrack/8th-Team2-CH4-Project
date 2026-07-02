@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
+#include "Character/FTPlayerState.h" // 캐릭터 타입 Enum 및 PlayerState 참조
 #include "FTGameMode.generated.h"
 
 class AFTTurret;
@@ -34,10 +35,9 @@ protected:
 	// 🌟 추가: 인원이 모두 차면 전장 전투를 시작하는 함수
 	void StartArenaMatch();
 
-	// 캐릭터 스폰은 AFTPlayerController::SpawnCharacter(CharacterData 기반, GAS 연동)로 위임한다.
-	// 폰 BP 직접 스폰(구 CharacterClasses / SpawnCharacterForPlayer) 경로는 제거됨.
 
 public:
+
 	// 포탑이 파괴되었을 때 진영과 위치 정보를 받아 로그를 출력하는 함수
 	void TurretDestroyed(AFTTurret* DestroyedTurret);
 

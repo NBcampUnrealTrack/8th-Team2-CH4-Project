@@ -23,6 +23,12 @@ UAbilitySystemComponent* AFTPlayerState::GetAbilitySystemComponent() const
 	return AbilitySystemComponent;
 }
 
+void AFTPlayerState::CopyProperties(APlayerState* PlayerState)
+{
+	// FTLobbyPlayerState로 부터 정보를 받아오는 함수
+	Super::CopyProperties(PlayerState);
+}
+
 void AFTPlayerState::AssignTeamTag(EFTTeam InTeam)
 {
 	Team = InTeam;

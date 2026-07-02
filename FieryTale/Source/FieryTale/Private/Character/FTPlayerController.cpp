@@ -16,7 +16,12 @@
 #include "Blueprint/UserWidget.h"
 #include "GameplayTags/FTTags.h"
 #include "GameFramework/GameModeBase.h"
-   
+#include "Character/FTCharacterTypes.h"
+
+#include "Lobby/FTLobbyPlayerState.h"
+#include "Lobby/FTLobbyWidget.h"
+#include "FieryTaleLog.h"
+#include "Lobby/FTLobbyGameMode.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerController);
 
@@ -87,6 +92,46 @@ void AFTPlayerController::AssignTeam(EFTTeam InTeam)
 	PS->AssignTeamTag(InTeam);
 }
 
+void AFTPlayerController::OnPlayerDeath()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (DeathOverlayClass)
+	{
+		DeathOverlayWidgetInstance = CreateWidget<UUserWidget>(this, DeathOverlayClass);
+		if (DeathOverlayWidgetInstance)
+		{
+			DeathOverlayWidgetInstance->AddToViewport();
+		}
+	}
+}
+
+void AFTPlayerController::RequestRespawn()
+{
+	// 서버권한에서만 동작함
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	// 이미 작동중인 리스폰 타이머가 있는 경우 중복 실행 방지
+	if (GetWorld()->GetTimerManager().IsTimerActive(RespawnTimerHandle))
+	{
+		return;
+	}
+	
+	GetWorldTimerManager().SetTimer(
+		RespawnTimerHandle, 
+		this, 
+		&AFTPlayerController::ExecuteRespawn, 
+		RespawnDelay, 
+		false
+	);
+}
+
 void AFTPlayerController::ExecuteRespawn()
 {
 	// 서버에서만 처리
@@ -112,18 +157,26 @@ void AFTPlayerController::BeginPlay()
 		return;
 	}
 
-	// 메인메뉴/로비 컨트롤러가 설정한 FInputModeUIOnly는 GameViewportClient에 남아
-	// 트래블 후에도 게임 입력을 차단하므로, 매치 진입 시 게임 입력 모드로 복구한다.
-	FInputModeGameOnly InputMode;
-	SetInputMode(InputMode);
-	bShowMouseCursor = false;
-
-	if (ArenaHUDWidget)
+	/** 이제 플레이어 컨트롤러는 SeamlessTravel에 의해 로비맵과 아레나 맵에서 변경없이 그대로 이어집니다 그렇기 때문에 맵에 따른 로직의 분기 처리 **/
+	FString MapName = GetWorld()->GetMapName();
+	if (MapName.Contains(TEXT("Lobby")) && LobbyWidgetClass)
 	{
-		ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);
-		if (ArenaHUDWidgetInstance)
+		// 로비 UI 생성 로직
+		UFTLobbyWidget* LobbyUI = CreateWidget<UFTLobbyWidget>(this, LobbyWidgetClass);
+		if (LobbyUI)
 		{
-			ArenaHUDWidgetInstance->AddToViewport();
+			LobbyWidgetInstance = LobbyUI;
+			LobbyWidgetInstance->AddToViewport();
+			
+			bShowMouseCursor = true;
+			FInputModeUIOnly InputModeData;
+			InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			SetInputMode(InputModeData);
+
+			if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
+			{
+				LobbyUI->InitWidget(this, LobbyPS);
+			}
 		}
 	}
 	
@@ -138,6 +191,20 @@ void AFTPlayerController::OnPossess(APawn* InPawn)
 	if (!PS)
 	{
 		return;
+	}
+
+	// 🌟 [추가]: 방장(호스트)의 아레나 세팅
+	if (IsLocalController())
+	{
+		bShowMouseCursor = false;
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+
+		if (ArenaHUDWidget && !ArenaHUDWidgetInstance)
+		{
+			ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);
+			if (ArenaHUDWidgetInstance) ArenaHUDWidgetInstance->AddToViewport();
+		}
 	}
 
 	PS->SpawnedCharacter = InPawn;
@@ -358,5 +425,86 @@ void AFTPlayerController::OnDeadTagChanged(const FGameplayTag Tag, int32 NewCoun
 			DeathOverlayWidgetInstance->RemoveFromParent();
 			DeathOverlayWidgetInstance = nullptr;
 		}
+	}
+}
+
+
+// FTPlayerController에 기존 로비에서 사용하던 기능을 모두 병합
+void AFTPlayerController::RequestSetReady(bool bReady)
+{
+	UE_LOG(LogFTSession, Log, TEXT("[Ready] 1) 클라 요청 RequestSetReady(%s) → ServerRPC (%s)"),
+		bReady ? TEXT("true") : TEXT("false"), *GetName());
+	ServerSetReady(bReady);
+}
+
+void AFTPlayerController::RequestStartMatch()
+{
+	UE_LOG(LogFTSession, Log, TEXT("[Ready] 호스트 시작 버튼 RequestStartMatch → ServerRPC (%s)"), *GetName());
+	ServerStartMatch();
+}
+
+void AFTPlayerController::RequestSetCharacter(EFTCharacterType NewCharacter)
+{
+	ServerSetCharacter(NewCharacter);
+}
+
+void AFTPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	
+	// 1. 로비 맵인 경우: FTLobbyPlayerState로 캐스팅이 성공합니다.
+	if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
+	{
+		if (LobbyWidgetInstance) 
+		{
+			LobbyWidgetInstance->InitWidget(this, LobbyPS);
+		}
+	}
+	else if (AFTPlayerState* PS = GetPlayerState<AFTPlayerState>())
+	{
+		// 🌟 [추가]: 클라이언트(접속자)의 아레나 세팅
+		if (IsLocalController())
+		{
+			bShowMouseCursor = false;
+			FInputModeGameOnly InputMode;
+			SetInputMode(InputMode);
+
+			if (ArenaHUDWidget && !ArenaHUDWidgetInstance)
+			{
+				ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);
+				if (ArenaHUDWidgetInstance) ArenaHUDWidgetInstance->AddToViewport();
+			}
+		}
+		
+		UE_LOG(LogTemp, Log, TEXT("[PlayerController] 전장 클라이언트 UI 및 입력 모드 복구 완료!"));
+	}
+}
+
+void AFTPlayerController::ServerSetReady_Implementation(bool bReady)
+{
+	// 서버에 있는 플레이어 스테이트와 게임모드에 보내는 RPC
+	if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
+	{
+		LobbyPS->SetReady(bReady);
+	}
+	if (AFTLobbyGameMode* GameMode = GetWorld()->GetAuthGameMode<AFTLobbyGameMode>())
+	{
+		GameMode->NotifyReadyStateChanged();
+	}
+}
+
+void AFTPlayerController::ServerStartMatch_Implementation()
+{
+	if (AFTLobbyGameMode* GameMode = GetWorld()->GetAuthGameMode<AFTLobbyGameMode>())
+	{
+		GameMode->RequestStartMatch(this);
+	}
+}
+
+void AFTPlayerController::ServerSetCharacter_Implementation(EFTCharacterType NewCharacter)
+{
+	if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
+	{
+		LobbyPS->SetCharacterType(NewCharacter);
 	}
 }
