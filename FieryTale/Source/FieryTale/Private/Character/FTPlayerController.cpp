@@ -157,6 +157,12 @@ void AFTPlayerController::BeginPlay()
 		return;
 	}
 
+	// 메인메뉴/로비 컨트롤러가 설정한 FInputModeUIOnly는 GameViewportClient에 남아
+	// 트래블 후에도 게임 입력을 차단하므로, 매치 진입 시 게임 입력 모드로 복구한다.
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = false;
+
 	if (ArenaHUDWidget)
 	{
 		ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);
