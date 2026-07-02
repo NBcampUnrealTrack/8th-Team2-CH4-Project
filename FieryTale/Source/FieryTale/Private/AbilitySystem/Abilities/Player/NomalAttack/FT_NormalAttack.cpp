@@ -136,9 +136,7 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 {
     if (!InWeaponData || !InCharacter || !GetWorld()) return;
 
-    // [하늘 사격 예외 테스트 회로] 지형 충돌 릭 간섭을 완전히 배제하기 위해 시선의 평면 방위 대신 정수리 머리 위 방향으로 레이저를 강제 쏘아올립니다.
-    FVector UpVector = InCharacter->GetActorUpVector();
-    FVector End = Start + (UpVector * InWeaponData->AttackRange); 
+    FVector End = Start + (Forward * InWeaponData->AttackRange);
     
     FHitResult HitResult;
     FCollisionQueryParams QueryParams;

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
+#include "Character/FTCharacterTypes.h" // 정본 EFTCharacterType 참조
 #include "FTPlayerState.generated.h"
 
 class UFT_AbilitySystemComponent;
@@ -15,15 +16,6 @@ enum class EFTTeam : uint8
 {
 	Blue UMETA(DisplayName = "Blue Team"),
 	Red  UMETA(DisplayName = "Red Team"),
-};
-
-UENUM(BlueprintType)
-enum class EFTGameCharacterType : uint8
-{
-	RedHood UMETA(DisplayName = "RedHood"),
-	Aladdin UMETA(DisplayName = "Aladdin"),
-	Kaguya UMETA(DisplayName = "Kaguya"),
-	Alice UMETA(DisplayName = "Alice")
 };
 
 
@@ -44,8 +36,8 @@ public:
 	// GameMode → PlayerController → 여기로 전달되는 팀 태그 바인딩 함수
 	void AssignTeamTag(EFTTeam InTeam);
 
-	void SetSelectedCharacterType(EFTGameCharacterType InType) { SelectedCharacterType = InType; }
-	EFTGameCharacterType GetSelectedCharacterType() const { return SelectedCharacterType; }
+	void SetSelectedCharacterType(EFTCharacterType InType) { SelectedCharacterType = InType; }
+	EFTCharacterType GetSelectedCharacterType() const { return SelectedCharacterType; }
 
 	// 실제로 스폰된 캐릭터 인스턴스
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Character")
@@ -54,7 +46,7 @@ public:
 private:
 	// 에디터 Detail에서 현재 선택된 캐릭터 타입 확인용 (읽기 전용)
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
-	EFTGameCharacterType SelectedCharacterType;
+	EFTCharacterType SelectedCharacterType = EFTCharacterType::None;
 
 	// 복제되어 클라이언트에서 OnRep_Team을 트리거함
 	UPROPERTY(ReplicatedUsing = OnRep_Team)

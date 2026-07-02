@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
-#include "Lobby/FTLobbyPlayerState.h" // 캐릭터 타입 Enum 및 PlayerState 참조
 #include "FTGameMode.generated.h"
 
 class AFTTurret;
@@ -34,16 +33,11 @@ protected:
 
 	// 🌟 추가: 인원이 모두 차면 전장 전투를 시작하는 함수
 	void StartArenaMatch();
-	
-	// 에디터에서 각 캐릭터 타입(Enum)에 매핑할 실제 캐릭터(Pawn) 블루프린트 클래스들
-	UPROPERTY(EditDefaultsOnly, Category = "Game Settings|Characters")
-	TMap<EFTCharacterType, TSubclassOf<APawn>> CharacterClasses;
 
+	// 캐릭터 스폰은 AFTPlayerController::SpawnCharacter(CharacterData 기반, GAS 연동)로 위임한다.
+	// 폰 BP 직접 스폰(구 CharacterClasses / SpawnCharacterForPlayer) 경로는 제거됨.
 
 public:
-	// 플레이어가 선택한 캐릭터에 맞춰 폰을 스폰하는 내부 함수
-	APawn* SpawnCharacterForPlayer(APlayerController* PC, EFTCharacterType CharacterType);
-
 	// 포탑이 파괴되었을 때 진영과 위치 정보를 받아 로그를 출력하는 함수
 	void TurretDestroyed(AFTTurret* DestroyedTurret);
 

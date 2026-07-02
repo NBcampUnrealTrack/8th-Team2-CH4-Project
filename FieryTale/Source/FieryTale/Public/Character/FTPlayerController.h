@@ -39,7 +39,7 @@ public:
 
 	// 에디터에서 EFTCharacterType별 CharacterData 에셋을 등록 — 스폰 시 타입 기반으로 하나만 로드
 	UPROPERTY(EditDefaultsOnly, Category = "Character")
-	TMap<EFTGameCharacterType, TSoftObjectPtr<UFT_CharacterData>> CharacterDataMap;
+	TMap<EFTCharacterType, TSoftObjectPtr<UFT_CharacterData>> CharacterDataMap;
 
 	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 클래스. 정식에는 삭제 예정
 	UPROPERTY(EditDefaultsOnly, Category = "UI")

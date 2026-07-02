@@ -184,6 +184,20 @@ void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
 					}
 				}
 
+				// CharacterData의 인풋 태그별 어빌리티 맵(CharacterAbilities)을 부여.
+				// C++ 클래스 직접 스폰 경로에서는 StartupAbilities가 비어 있으므로,
+				// 데이터 에셋(DA_*)에 채운 스킬셋이 실제 부여 경로가 된다.
+				if (CharacterData)
+				{
+					for (const TPair<FGameplayTag, TSubclassOf<UGameplayAbility>>& AbilityPair : CharacterData->GetHeroAbilities())
+					{
+						if (AbilityPair.Value)
+						{
+							ASC->GiveAbility(FGameplayAbilitySpec(AbilityPair.Value, 1, -1, this));
+						}
+					}
+				}
+
 				// [변경 지점] 지저분한 태그 수동 주입을 제거하고, 
 				// 레퍼런스 스타일의 정석대로 디테일 창의 기본 이펙트(GE)를 순회하며 일괄 발동(Apply)시킵니다.
 				for (const TSubclassOf<UGameplayEffect>& EffectClass : DefaultGameplayEffects)
@@ -245,7 +259,8 @@ void AFTPlayerCharacterBase::InitializeCharacterAttribute() const
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxUltimateGaugeAttribute(), CharacterData->GetDefaultMaxUltimateGauge());
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetUltimateGaugeAttribute(),    0.0f);
 
-	ASC->RemoveLooseGameplayTag(FTTags::FTStates::Core::Dead);
+	// Die()에서 부여한 Dead 태그를 해제한다 (부여 시와 동일한 복제 상태로 대칭 호출).
+	ASC->RemoveLooseGameplayTag(FTTags::FTStates::Core::Dead, 1, EGameplayTagReplicationState::TagAndCountToAll);
 }
 
 void AFTPlayerCharacterBase::ActivateAbilityByInputTag(const FGameplayTag& InputTag, bool bIsPressed) const
