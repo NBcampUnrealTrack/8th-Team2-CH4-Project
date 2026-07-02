@@ -15,11 +15,12 @@ namespace FTTags
 
     namespace FTAbilities
     {
-       UE_DECLARE_GAMEPLAY_TAG_EXTERN(NormalAttack);  // LMB 일반 평타 공격
-       UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackSkill);   // RMB 보조 공격 기술
-       UE_DECLARE_GAMEPLAY_TAG_EXTERN(UtilSkill);    // Shift 이동 및 생존 유틸 기술
-       UE_DECLARE_GAMEPLAY_TAG_EXTERN(UltimateSkill); // Q 궁극기 기술
-       UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivateOnGiven);
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(NormalAttack);  // LMB 일반 평타 공격
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackSkill);   // RMB 보조 공격 기술
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(UtilSkill);    // Shift 이동 및 생존 유틸 기술
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(UltimateSkill); // Q 궁극기 기술
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivateOnGiven);
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Minion_Attack);
     }
     
     // --- 영웅 및 크리처들의 실시간 상태 제어 마스터 대분류 ---
@@ -80,6 +81,13 @@ namespace FTTags
     {
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Structure_Turret);   // 적 포탑 구조물 판정 오브젝트
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Structure_Nexus);    // 적 넥서스 본진 구조물 판정 오브젝트
+    }
+	
+    namespace FTMinionRole
+    {
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(Melee);              // 전방 돌격 및 어그로 확보용 근접 미니언 태그
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ranged);             // 후방 투사체 점사 지원용 원거리 미니언 태그
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(Healer);             // 동일 진영 아군 체력 치유용 힐러 미니언 태그
     }
     
     namespace FTAugments

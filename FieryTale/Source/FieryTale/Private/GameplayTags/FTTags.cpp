@@ -18,6 +18,7 @@ namespace FTTags
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(UtilSkill, "FTTags.Abilities.UtilSkill", "Shift 이동 및 생존 유틸 기술 매핑 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(UltimateSkill, "FTTags.Abilities.UltimateSkill", "Q 궁극기 활성화 입력 매핑 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActivateOnGiven, "FTTags.Abilities.ActivateOnGiven", "부여 시 즉시 가동되는 패시브 능력 식별 태그");
+    	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_Attack, "FTTags.Abilities.Minion.Attack", "미니언 공격 태그");
     }
     
     // --- 영웅 및 크리처들의 실시간 상태 제어 마스터 대분류 ---
@@ -75,6 +76,13 @@ namespace FTTags
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Turret, "FTTags.ObjectType.Structure.Turret", "AOS 피아식별 및 군중제어기 필터링을 위한 방어 포탑 구조물 식별 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Nexus, "FTTags.ObjectType.Structure.Nexus", "AOS 승패 판정 및 예외 처리를 위한 본진 넥서스 구조물 식별 태그");
+    }
+	
+    namespace FTMinionRole
+    {
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Melee, "FTTags.MinionRole.Melee", "전방 돌격 및 적 영웅 우선 어그로 타겟팅을 가동하는 근접 미니언 역할군 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Ranged, "FTTags.MinionRole.Ranged", "후방에서 물리/마법 투사체 장부를 사출하여 지원하는 원거리 미니언 역할군 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Healer, "FTTags.MinionRole.Healer", "동일 진영 내부에서 체력 백분율이 가장 낮은 아군을 우선 치유하는 힐러 미니언 역할군 태그");
     }
     
     namespace FTAugments
