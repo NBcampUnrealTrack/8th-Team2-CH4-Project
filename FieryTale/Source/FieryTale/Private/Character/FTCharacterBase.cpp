@@ -41,12 +41,17 @@ void AFTCharacterBase::Die()
 	}
 
 	if (DeathMontage)
-	{
-		const float Duration = PlayAnimMontage(DeathMontage);
-		if (Duration <= 0.0f)
+	{	
+		// TODO:: Die가 서버에서 실행되는 코드 -> 
+		// 현재 방식으로는 DeathMontage가 클라이언트에 복제 / Multicast되지 않는 문제가 있음. 따라서 이 방식으로 쓰기엔 부적절함
+		// const float Duration = PlayAnimMontage(DeathMontage);
+		
+		/*if (Duration <= 0.0f)
 		{
 			FinishDying();
-		}
+		}*/
+		
+		FinishDying();
 	}
 	else
 	{

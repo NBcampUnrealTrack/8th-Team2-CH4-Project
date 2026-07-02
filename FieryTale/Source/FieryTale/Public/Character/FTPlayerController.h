@@ -27,15 +27,9 @@ public:
 
 	// GameMode에서 스폰 위치를 전달받아 PlayerState의 SelectedCharacterType 기반으로 캐릭터를 스폰 후 Possess
 	void SpawnCharacter(const FVector& SpawnLocation, const FRotator& SpawnRotation);
-
-	// 캐릭터의 Die()에서 서버 권한일 때 호출하는 리스폰 요청 함수
-	void RequestRespawn();
-
+	
 	// GameMode에서 호출 — 팀을 PlayerState에 바인딩
 	void AssignTeam(EFTTeam InTeam);
-
-	// 캐릭터 사망 시 UI를 끄거나 입력 모드를 변경하기 위해 호출되는 함수
-	void OnPlayerDeath();
 
 	// 에디터에서 EFTCharacterType별 CharacterData 에셋을 등록 — 스폰 시 타입 기반으로 하나만 로드
 	UPROPERTY(EditDefaultsOnly, Category = "Character")
@@ -90,6 +84,7 @@ protected:
 
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnRep_Pawn() override;
 	virtual void SetupInputComponent() override;
 
 	// 리스폰 타이머 핸들

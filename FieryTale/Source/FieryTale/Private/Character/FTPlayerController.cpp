@@ -87,51 +87,6 @@ void AFTPlayerController::AssignTeam(EFTTeam InTeam)
 	PS->AssignTeamTag(InTeam);
 }
 
-void AFTPlayerController::OnPlayerDeath()
-{
-	if (!IsLocalController())
-	{
-		return;
-	}
-
-	if (DeathOverlayClass)
-	{
-		DeathOverlayWidgetInstance = CreateWidget<UUserWidget>(this, DeathOverlayClass);
-		if (DeathOverlayWidgetInstance)
-		{
-			DeathOverlayWidgetInstance->AddToViewport();
-		}
-	}
-}
-
-
-void AFTPlayerController::RequestRespawn()
-{
-	// 서버권한에서만 동작함
-	if (!HasAuthority())
-	{
-		return;
-	}
-	
-	// 이미 작동중인 리스폰 타이머가 있는 경우 중복 실행 방지
-	if (GetWorld()->GetTimerManager().IsTimerActive(RespawnTimerHandle))
-	{
-		return;
-	}
-	
-	GetWorldTimerManager().SetTimer(
-		RespawnTimerHandle, 
-		this, 
-		&AFTPlayerController::ExecuteRespawn, 
-		RespawnDelay, 
-		false
-	);
-	
-	
-	
-}
-
-
 void AFTPlayerController::ExecuteRespawn()
 {
 	// 서버에서만 처리
@@ -171,6 +126,8 @@ void AFTPlayerController::BeginPlay()
 			ArenaHUDWidgetInstance->AddToViewport();
 		}
 	}
+	
+	
 }
 
 void AFTPlayerController::OnPossess(APawn* InPawn)
@@ -193,6 +150,26 @@ void AFTPlayerController::OnPossess(APawn* InPawn)
 	{
 		// 캐릭터의 사망 델리게이트에 컨트롤러의 기능을 바인딩
 		TargetCharacter->OnCharacterDied.AddDynamic(this, &AFTPlayerController::HandleCharacterDeath);
+	}
+
+	// OnPossess는 서버 권한 인스턴스에서만 실행되므로(호스트는 이걸로 충분),
+	// 원격 클라이언트 로컬 인스턴스 몫은 OnRep_Pawn()에서 별도로 등록한다.
+	if (UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent())
+	{
+		DeadTagEventHandle = ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
+			.AddUObject(this, &AFTPlayerController::OnDeadTagChanged);
+	}
+}
+
+// ──► [클라이언트 인프라 동기화] 원격 클라이언트 로컬 인스턴스에서 자기 Pawn 정보가 복제 수신될 때 실행된다.
+void AFTPlayerController::OnRep_Pawn()
+{
+	Super::OnRep_Pawn();
+
+	AFTPlayerState* PS = GetPlayerState<AFTPlayerState>();
+	if (!PS)
+	{
+		return;
 	}
 
 	if (UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent())
@@ -307,10 +284,30 @@ void AFTPlayerController::ToggleHUDEditMode()
 
 void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter)
 {
+	// 서버권한에서만 동작함
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
 	if (DiedCharacter == GetPawn())
 	{
-		OnPlayerDeath();
-		RequestRespawn();
+		// 일정시간 후에 Respawn되도록 핸들러를 추가함
+		
+		// 이미 작동중인 리스폰 타이머가 있는 경우 중복 실행 방지
+		if (GetWorld()->GetTimerManager().IsTimerActive(RespawnTimerHandle))
+		{
+			return;
+		}
+	
+		GetWorldTimerManager().SetTimer(
+			RespawnTimerHandle, 
+			this, 
+			&AFTPlayerController::ExecuteRespawn, 
+			RespawnDelay, 
+			false
+		);
+	
 	}
 }
 

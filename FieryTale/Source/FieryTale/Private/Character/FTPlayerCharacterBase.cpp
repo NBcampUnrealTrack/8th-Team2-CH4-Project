@@ -193,7 +193,11 @@ void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
 					{
 						if (AbilityPair.Value)
 						{
-							ASC->GiveAbility(FGameplayAbilitySpec(AbilityPair.Value, 1, -1, this));
+							FGameplayAbilitySpec Spec(AbilityPair.Value, 1, -1, this);
+							// CharacterData 맵의 키(입력 태그)를 스펙에 실어, 어빌리티 자체의 AssetTags 세팅 여부와 무관하게
+							// ActivateAbilityByInputTag에서 이 태그로 매칭할 수 있게 한다.
+							Spec.GetDynamicSpecSourceTags().AddTag(AbilityPair.Key);
+							ASC->GiveAbility(Spec);
 						}
 					}
 				}
@@ -232,7 +236,7 @@ void AFTPlayerCharacterBase::OnRep_PlayerState()
 		if (ASC)
 		{
 			ASC->InitAbilityActorInfo(PS, this);
-		}		
+		}
 	}
 }
 
@@ -273,21 +277,31 @@ void AFTPlayerCharacterBase::ActivateAbilityByInputTag(const FGameplayTag& Input
 
 	if (bIsPressed)
 	{
-		bool bFoundMatch = false;
+		// AssetTags(에셋에 고정 박힌 태그)뿐 아니라, CharacterData 맵에서 Grant 시점에 실어준
+		// DynamicSpecSourceTags(입력 태그)도 함께 검사해야 매칭된다.
+		FGameplayAbilitySpecHandle MatchedHandle;
 		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
 		{
-			if (Spec.Ability && Spec.Ability->GetAssetTags().HasTagExact(InputTag))
+			if (Spec.Ability &&
+				(Spec.Ability->GetAssetTags().HasTagExact(InputTag) || Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag)))
 			{
-				bFoundMatch = true;
+				MatchedHandle = Spec.Handle;
 				UE_LOG(FTPlayerCharacter, Display, TEXT("[ActivateAbilityByInputTag] Matched GA: %s"), *Spec.Ability->GetName());
+				break;
 			}
 		}
-		if (!bFoundMatch)
+
+		bool bActivated = false;
+		if (MatchedHandle.IsValid())
+		{
+			// TryActivateAbilitiesByTag는 AssetTags만 검사하므로 DynamicSpecSourceTags로 찾은 매칭은
+			// 놓치게 된다. 위에서 찾은 핸들로 직접 활성화한다.
+			bActivated = ASC->TryActivateAbility(MatchedHandle);
+		}
+		else
 		{
 			UE_LOG(FTPlayerCharacter, Warning, TEXT("[ActivateAbilityByInputTag] No GA found with Tag=%s. GrantedAbilities=%d"), *InputTag.ToString(), ASC->GetActivatableAbilities().Num());
 		}
-
-		bool bActivated = ASC->TryActivateAbilitiesByTag(FGameplayTagContainer(InputTag));
 		UE_LOG(FTPlayerCharacter, Display, TEXT("[ActivateAbilityByInputTag] Tag=%s | Result=%s"), *InputTag.ToString(), bActivated ? TEXT("Success") : TEXT("Failed"));
 	}
 	else
