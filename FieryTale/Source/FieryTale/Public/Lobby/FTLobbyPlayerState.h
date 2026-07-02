@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
+#include "Character/FTCharacterTypes.h" // 정본 EFTCharacterType 참조
 #include "FTLobbyPlayerState.generated.h"
 
 // 대기방 목록 UI가 바인딩해서 다시 그리도록 알리는 이벤트.
@@ -15,16 +16,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFTOnLobbyReadyStateChanged);
  * bIsReady 는 서버 권한으로만 바뀌고, 모든 클라이언트에 복제되어
  * 대기방 위젯이 "누가 준비됐는지"를 표시할 수 있게 한다.
  */
-
-UENUM(BlueprintType)
-enum class EFTCharacterType : uint8
-{
-	None UMETA(DisplayName = "None"),
-	RedHood UMETA(DisplayName = "RedHood"),
-	Aladdin UMETA(DisplayName = "Aladdin"),
-	Kaguya UMETA(DisplayName = "Kaguya"),
-	Alice UMETA(DisplayName = "Alice")
-};
 
 UCLASS()
 class FIERYTALE_API AFTLobbyPlayerState : public APlayerState

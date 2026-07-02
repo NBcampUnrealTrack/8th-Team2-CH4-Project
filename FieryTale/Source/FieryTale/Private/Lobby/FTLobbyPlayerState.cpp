@@ -7,7 +7,7 @@
 #include "Net/UnrealNetwork.h"
 #include "EngineUtils.h" // TActorIterator를 사용하기 위해 추가
 #include "Core/Game/FTGameMode.h"
-#include "Core/Player/FTArenaPlayerState.h"
+#include "Character/FTPlayerState.h" // 매치 정본 PlayerState (ASC 보유)
 #include "Lobby/FTCharacterDisplayStand.h" //진열대 헤더 추가
 
 AFTLobbyPlayerState::AFTLobbyPlayerState()
@@ -73,13 +73,14 @@ void AFTLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 	}
 	
 	Super::CopyProperties(PlayerState);
-	
-	if (AFTArenaPlayerState* ArenaPS = Cast<AFTArenaPlayerState>(PlayerState))
+
+	// 심리스 트래블 시 로비에서 고른 캐릭터를 매치 PlayerState로 넘긴다.
+	if (AFTPlayerState* ArenaPS = Cast<AFTPlayerState>(PlayerState))
 	{
-		ArenaPS->SelectedCharacter = this->SelectedCharacter;
-		
-		UE_LOG(LogFTSession, Log, TEXT("[SeamlessTravel] %s 님의 데이터 복사 성공! 캐릭터: %d"), 
-			*GetPlayerName(), (int32)ArenaPS->SelectedCharacter);
+		ArenaPS->SetSelectedCharacterType(this->SelectedCharacter);
+
+		UE_LOG(LogFTSession, Log, TEXT("[SeamlessTravel] %s 님의 데이터 복사 성공! 캐릭터: %d"),
+			*GetPlayerName(), (int32)this->SelectedCharacter);
 	}
 }
 

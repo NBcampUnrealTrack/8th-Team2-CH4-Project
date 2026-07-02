@@ -3,7 +3,6 @@
 
 #include "Core/Game/FTGameMode.h"
 #include "FieryTaleLog.h"
-#include "Lobby/FTLobbyPlayerState.h"
 #include "Core/Game/FTArenaGameState.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
@@ -12,20 +11,23 @@
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystemUtils.h"
-#include "Core/Player/FTArenaPlayerState.h"
 #include "Online/OnlineSessionNames.h"
 
 #include "Level/FTTurret.h"
 #include "Level/FTNexus.h"
-#include "FieryTaleLog.h"
 #include "Character/FTPlayerController.h"
 #include "Character/FTPlayerState.h"
+#include "Character/FTPlayerCharacterBase.h"
 
 AFTGameMode::AFTGameMode()
 {
 	bUseSeamlessTravel = true;
-	
-	PlayerStateClass = AFTArenaPlayerState::StaticClass();
+
+	// 매치 정본 PlayerState는 ASC/AttributeSet/팀을 보유한 AFTPlayerState로 통일한다.
+	// (구 AFTArenaPlayerState는 ASC가 없어 GAS 전투가 무효였음 — 통합으로 제거)
+	PlayerStateClass = AFTPlayerState::StaticClass();
+	// 입력/HUD/리스폰이 동작하도록 매치 컨트롤러를 명시적으로 지정한다.
+	PlayerControllerClass = AFTPlayerController::StaticClass();
 	GameStateClass = AFTArenaGameState::StaticClass();
 }
 
@@ -75,66 +77,51 @@ void AFTGameMode::HandleSeamlessTravelPlayer(AController*& C)
 void AFTGameMode::InitializeAndSpawnPlayer(APlayerController* NewPlayer)
 {
 	if (NewPlayer == nullptr) return;
-	
-	AFTArenaPlayerState* ArenaPS = NewPlayer->GetPlayerState<AFTArenaPlayerState>();
-	if (ArenaPS)
+
+	AFTPlayerController* FTPC = Cast<AFTPlayerController>(NewPlayer);
+	AFTPlayerState* PS = NewPlayer->GetPlayerState<AFTPlayerState>();
+	if (FTPC == nullptr || PS == nullptr)
 	{
-		EFTCharacterType ChosenCharacter = ArenaPS->SelectedCharacter;
-       
-		// 🌟 주의: None일 때 다시 None을 주면 절대 안 됩니다! 존재하는 캐릭터(예: Warrior)로 할당해 주세요.
-		if (ChosenCharacter == EFTCharacterType::None)
-		{
-			ChosenCharacter = EFTCharacterType::Alice; // 유효한 기본 Enum 값으로 변경 필수!
-		}
+		// PlayerController/PlayerState 클래스가 BP GameMode에서 AFTPlayerController/AFTPlayerState로
+		// 지정되지 않았을 때 여기 걸린다. (에디터 설정 확인 필요)
+		UE_LOG(LogFTSession, Error, TEXT("[Arena] 🚨 스폰 실패 - FTPlayerController=%s, FTPlayerState=%s (BP GameMode 클래스 지정 확인)"),
+			FTPC ? TEXT("OK") : TEXT("NULL"), PS ? TEXT("OK") : TEXT("NULL"));
+		return;
+	}
 
-		// 🌟 [핵심 추가]: 중복 소환 방지 로직
-		bool bAlreadySpawned = false;
-		UClass* TargetClass = CharacterClasses.Contains(ChosenCharacter) ? CharacterClasses[ChosenCharacter] : nullptr;
-        
-		// 현재 플레이어가 가진 폰이, 우리가 스폰하려던 바로 그 클래스(TargetClass)라면 이미 성공한 것입니다.
-		if (TargetClass && NewPlayer->GetPawn() && NewPlayer->GetPawn()->IsA(TargetClass))
-		{
-			UE_LOG(LogFTSession, Log, TEXT("[ArenaDebug] [%s] 님은 이미 캐릭터가 세팅되어 있습니다. 중복 스폰을 건너뜁니다."), *NewPlayer->GetName());
-			bAlreadySpawned = true;
-		}
+	// 로비에서 선택이 전달되지 않았으면(None) 유효한 기본값으로 보정해 None 스폰 시도를 막는다.
+	if (PS->GetSelectedCharacterType() == EFTCharacterType::None)
+	{
+		PS->SetSelectedCharacterType(EFTCharacterType::Alice);
+	}
 
-		// 아직 스폰되지 않았을 때(첫 번째 호출일 때)만 폰을 소환합니다.
-		if (!bAlreadySpawned)
-		{
-			UE_LOG(LogFTSession, Log, TEXT("[ArenaDebug] 복사 완료된 캐릭터 타입 확인: %d"), (int32)ChosenCharacter);
-
-			APawn* SpawnedPawn = SpawnCharacterForPlayer(NewPlayer, ChosenCharacter);
-			if (SpawnedPawn)
-			{
-				if (APawn* OldPawn = NewPlayer->GetPawn())
-				{
-					OldPawn->Destroy(); // 기존에 빙의하던 기본 구체 폰 파괴
-				}
-				
-				SpawnedPawn->SetOwner(NewPlayer);
-				NewPlayer->Possess(SpawnedPawn);
-				NewPlayer->ClientSetViewTarget(SpawnedPawn);
-                
-				UE_LOG(LogFTSession, Log, TEXT("[ArenaDebug] 플레이어 [%s] 캐릭터 스폰 및 빙의 성공!"), *NewPlayer->GetName());
-			}
-			else
-			{
-				UE_LOG(LogFTSession, Error, TEXT("[ArenaDebug] 🚨 캐릭터 스폰 실패. 타입 번호: %d"), (int32)ChosenCharacter);
-			}
-		}
+	// 중복 스폰 방지: 이미 FieryTale 캐릭터를 빙의 중이면 재스폰하지 않는다.
+	if (Cast<AFTPlayerCharacterBase>(NewPlayer->GetPawn()) != nullptr)
+	{
+		UE_LOG(LogFTSession, Log, TEXT("[Arena] [%s] 이미 캐릭터 빙의 중 → 중복 스폰 건너뜀"), *NewPlayer->GetName());
 	}
 	else
 	{
-		UE_LOG(LogFTSession, Error, TEXT("[ArenaDebug] 🚨 여전히 AFTArenaPlayerState를 찾지 못했습니다."));
+		// 심리스 트래블 후 붙어있던 기본 폰이 있으면 제거한다.
+		if (APawn* OldPawn = NewPlayer->GetPawn())
+		{
+			OldPawn->Destroy();
+		}
+
+		// 팀 스폰 지점을 계산한 뒤, GAS 인지 스폰 경로(CharacterData 주입)로 컨트롤러에 위임한다.
+		AActor* StartSpot = FindPlayerStart(NewPlayer);
+		const FVector SpawnLocation = StartSpot ? StartSpot->GetActorLocation() : FVector::ZeroVector;
+		const FRotator SpawnRotation = StartSpot ? StartSpot->GetActorRotation() : FRotator::ZeroRotator;
+
+		UE_LOG(LogFTSession, Log, TEXT("[Arena] [%s] 캐릭터 스폰 위임 (타입=%d)"),
+			*NewPlayer->GetName(), (int32)PS->GetSelectedCharacterType());
+		FTPC->SpawnCharacter(SpawnLocation, SpawnRotation);
 	}
 
 	// 인원수 체크 및 매치 시작 검사
-	if (GameState)
+	if (GameState && GameState->PlayerArray.Num() >= MinPlayersToStart)
 	{
-		if (GameState->PlayerArray.Num() >= MinPlayersToStart)
-		{
-			StartArenaMatch();
-		}
+		StartArenaMatch();
 	}
 }
 
@@ -152,31 +139,6 @@ void AFTGameMode::StartArenaMatch()
 			// TODO: 여기에 각 플레이어들의 움직임을 허용하거나 카운트다운 UI를 띄우는 신호를 넣으면 됩니다.
 		}
 	}
-}
-
-APawn* AFTGameMode::SpawnCharacterForPlayer(APlayerController* PC, EFTCharacterType CharacterType)
-{
-	if (!CharacterClasses.Contains(CharacterType) || CharacterClasses[CharacterType] == nullptr)
-	{
-		UE_LOG(LogFTSession, Warning, TEXT("[Arena] CharacterClasses 맵에 BP가 등록되지 않았습니다."));
-		return nullptr;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World) return nullptr;
-
-	// 맵에 배치된 PlayerStart 위치 찾기
-	AActor* StartSpot = FindPlayerStart(PC);
-	FVector SpawnLocation = StartSpot ? StartSpot->GetActorLocation() : FVector::ZeroVector;
-	FRotator SpawnRotation = StartSpot ? StartSpot->GetActorRotation() : FRotator::ZeroRotator;
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = PC;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-	// 매핑해둔 블루프린트 클래스로 실제 캐릭터 스폰
-	TSubclassOf<APawn> ClassToSpawn = CharacterClasses[CharacterType];
-	return World->SpawnActor<APawn>(ClassToSpawn, SpawnLocation, SpawnRotation, SpawnParams);
 }
 
 void AFTGameMode::TurretDestroyed(AFTTurret* DestroyedTurret)	// 포탑 파괴 이벤트 처리 로직 구현
