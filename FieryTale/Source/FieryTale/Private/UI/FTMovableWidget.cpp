@@ -18,6 +18,12 @@ void UFTMovableWidget::NativeConstruct()
 	{
 		Subsystem->RegisterMovableWidget(this);
 	}
+
+	//	항상 편집 옵션이 켜진 인스턴스는 서브시스템(또는 LocalPlayer) 유무와 무관하게 핸들을 노출한다.
+	if (bAlwaysEditMode)
+	{
+		SetHandleVisible(true);
+	}
 }
 
 void UFTMovableWidget::NativeDestruct()
@@ -32,9 +38,10 @@ void UFTMovableWidget::NativeDestruct()
 
 FReply UFTMovableWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	//	편집 모드가 아니면 드래그하지 않는다.
+	//	편집 모드가 아니면 드래그하지 않는다. (bAlwaysEditMode 인스턴스는 전역 편집 모드와 무관하게 허용)
 	UFTHUDLayoutSubsystem* Subsystem = GetLayoutSubsystem();
-	if (!Subsystem || !Subsystem->IsEditMode())
+	const bool bCanEdit = bAlwaysEditMode || (Subsystem && Subsystem->IsEditMode());
+	if (!bCanEdit)
 	{
 		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 	}
@@ -107,7 +114,9 @@ void UFTMovableWidget::SetHandleVisible(bool bVisible)
 	}
 
 	//	편집 OFF 시 Collapsed로 두어 입력을 가로채지 않게 한다.
-	DragHandleArea->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	//	단, 항상 편집 인스턴스는 전역 편집 모드가 꺼져도 핸들을 유지한다.
+	const bool bFinalVisible = bVisible || bAlwaysEditMode;
+	DragHandleArea->SetVisibility(bFinalVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 }
 
 UFTHUDLayoutSubsystem* UFTMovableWidget::GetLayoutSubsystem() const
