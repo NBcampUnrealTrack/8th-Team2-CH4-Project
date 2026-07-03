@@ -7,6 +7,7 @@
 #include "Components/EditableTextBox.h"
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
+#include "Components/ScrollBoxSlot.h"
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
 
@@ -109,20 +110,36 @@ void UFTChatWidget::AddMessageRow(const FFTChatMessage& Message)
 	}
 
 	FString Composed;
+	FLinearColor RowColor;
 	switch (Message.Channel)
 	{
 	case EFTChatChannel::System:
-		Composed = FString::Printf(TEXT("[System] %s %s"),*Message.SenderName, *Message.Message);
+		Composed = FString::Printf(TEXT("[System] %s %s"), *Message.SenderName, *Message.Message);
+		RowColor = SystemChannelColor;
 		break;
 	case EFTChatChannel::Team:
 		Composed = FString::Printf(TEXT("[Team] %s: %s"), *Message.SenderName, *Message.Message);
+		RowColor = TeamChannelColor;
 		break;
 	default:
 		Composed = FString::Printf(TEXT("%s: %s"), *Message.SenderName, *Message.Message);
+		RowColor = AllChannelColor;
 		break;
 	}
 
 	Line->SetText(FText::FromString(Composed));
-	Scroll_Messages->AddChild(Line);
+	// 채널별로 지정된 색상을 적용한다.
+	Line->SetColorAndOpacity(FSlateColor(RowColor));
+	// 채팅창 폭을 넘는 긴 메시지를 잘라내지 않고 다음 줄로 넘긴다.
+	Line->SetAutoWrapText(true);
+	
+	UPanelSlot* AddedSlot = Scroll_Messages->AddChild(Line);
+	if (UScrollBoxSlot* ScrollSlot = Cast<UScrollBoxSlot>(AddedSlot))
+	{
+		// 행이 스크롤박스 폭을 가득 채워야 자동 줄바꿈의 기준 폭이 생긴다.
+		ScrollSlot->SetHorizontalAlignment(HAlign_Fill);
+		ScrollSlot->SetPadding(FMargin(4.f, 2.f));
+	}
+
 	Scroll_Messages->ScrollToEnd();
 }

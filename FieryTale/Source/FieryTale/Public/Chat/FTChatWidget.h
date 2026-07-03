@@ -42,6 +42,18 @@ protected:
 	/** 이 위젯이 보낼 채널. BP에서 채널 탭을 만들면 바꿔 끼운다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Chat")
 	EFTChatChannel SendChannel = EFTChatChannel::All;
+
+	/** All(전체) 채널 메시지 텍스트 색. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Chat|Color")
+	FLinearColor AllChannelColor = FLinearColor::White;
+
+	/** Team(팀) 채널 메시지 텍스트 색. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Chat|Color")
+	FLinearColor TeamChannelColor = FLinearColor(0.35f, 0.7f, 1.0f, 1.0f);
+
+	/** System(시스템) 채널 메시지 텍스트 색. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Chat|Color")
+	FLinearColor SystemChannelColor = FLinearColor(1.0f, 0.85f, 0.3f, 1.0f);
 	
 	//	채팅 UI 탭에서 메세지를 보낼 채널을 선택할 경우 호출
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Chat")
