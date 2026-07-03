@@ -89,4 +89,8 @@ protected:
 
 	// 초기 혹은 Respawn 단계에서 CharacterData에 의거하여 Attribute 값 초기화
 	void InitializeCharacterAttribute() const;
+
+private:
+	// 이동 방향과 무관하게 항상 컨트롤러(카메라) 방향을 바라보도록 회전 적용 (사이퍼즈 식 이동)
+	void UpdateFacingRotation();
 };
