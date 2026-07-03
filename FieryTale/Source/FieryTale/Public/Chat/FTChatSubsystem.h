@@ -50,6 +50,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "FieryTale|Chat")
 	FFTOnChatMessageReceived OnMessageReceived;
 
+	/** 로컬 System 메시지를 채팅창에 직접 표시한다(네트워크 전송 없음). 로그 서브시스템 등이 사용. */
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Chat")
+	void PushSystemMessage(const FString& Text);
+
+	/** 현재 채팅 위젯이 바인딩되어 있는지(= 채팅창이 떠 있는지). */
+	UFUNCTION(BlueprintPure, Category = "FieryTale|Chat")
+	bool HasActiveListener() const { return OnMessageReceived.IsBound(); }
+
 	// --- 채팅 컴포넌트 내부 연동용 (일반 호출용 아님) ---
 
 	/** 채팅 컴포넌트가 수신한 메시지를 서브시스템으로 올린다. */

@@ -7,6 +7,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
 
 DEFINE_LOG_CATEGORY(LogFTChat);
 
@@ -81,6 +82,20 @@ void UFTChatSubsystem::SendMessage(const FString& Text, EFTChatChannel Channel)
 	{
 		UE_LOG(LogFTChat, Warning, TEXT("[Chat] SendMessage 실패: 로컬 채팅 컴포넌트 없음 (아직 미부착/복제 대기 중)"));
 	}
+}
+
+void UFTChatSubsystem::PushSystemMessage(const FString& Text)
+{
+	// System 메시지는 발신자가 없고 네트워크로 나가지 않는다.
+	// 수신/표시 경로(HandleMessageReceived)를 그대로 재사용해 기록에 쌓고 UI에 뿌린다.
+	FFTChatMessage Message;
+	Message.Message = Text;
+	Message.Channel = EFTChatChannel::System;
+	Message.Timestamp = (GetGameInstance() && GetGameInstance()->GetWorld())
+		? GetGameInstance()->GetWorld()->GetTimeSeconds()
+		: 0.0;
+
+	HandleMessageReceived(Message);
 }
 
 void UFTChatSubsystem::HandleMessageReceived(const FFTChatMessage& Message)

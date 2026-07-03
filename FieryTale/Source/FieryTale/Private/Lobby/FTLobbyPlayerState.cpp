@@ -9,6 +9,7 @@
 #include "Core/Game/FTGameMode.h"
 #include "Character/FTPlayerState.h"
 #include "Lobby/FTCharacterDisplayStand.h" //진열대 헤더 추가
+#include "Log/FTLogSubsystem.h"
 
 AFTLobbyPlayerState::AFTLobbyPlayerState()
 {
@@ -42,9 +43,13 @@ void AFTLobbyPlayerState::SetReady(bool bInReady)
 
 void AFTLobbyPlayerState::OnRep_IsReady()
 {
+	/*
 	UE_LOG(LogFTSession, Log, TEXT("[Ready] 4) 복제 수신(클라) OnRep_IsReady: %s → %s"),
 		*GetPlayerName(), bIsReady ? TEXT("Ready") : TEXT("NotReady"));
 	OnReadyStateChanged.Broadcast();
+	//*/
+	FT_LOG(this, EFTLogLevel::Log, TEXT("[Ready] 4) 복제 수신(클라) OnRep_IsReady: %s → %s"),
+		*GetPlayerName(), bIsReady ? TEXT("Ready") : TEXT("NotReady"));
 }
 
 void AFTLobbyPlayerState::SetCharacterType(EFTCharacterType InCharacterType)
