@@ -82,9 +82,24 @@ void AFTGameMode::InitializeAndSpawnPlayer(APlayerController* NewPlayer)
 {
 	if (NewPlayer == nullptr) return;
 	
-	// 1. 컨트롤러 캐스팅 (통합된 FTPlayerController 사용)
+	// 컨트롤러 캐스팅 (통합된 FTPlayerController 사용)
 	AFTPlayerController* FTPlayerPC = Cast<AFTPlayerController>(NewPlayer);
 	if (!FTPlayerPC) return;
+	
+	if (GameState) // 게임 스테이트는 게임모드에서 관리
+	{
+		/** GameState의 PlayerArray에서 현재 접속한 플레이어의 인덱스를 찾습니다. PlayerController::AssignTeam 호출하면
+		PlayerState::AssignTeamTag 을 호출하게 되고 개별 플레어의 팀 태그를 지정할 수 있습니다. **/
+		
+		int32 PlayerIndex = GameState->PlayerArray.Find(FTPlayerPC->GetPlayerState<APlayerState>());
+		
+		EFTTeam AssignedTeam = (PlayerIndex % 2 == 0) ? EFTTeam::Blue : EFTTeam::Red;
+		
+		FTPlayerPC->AssignTeam(AssignedTeam);
+
+		UE_LOG(LogFTSession, Log, TEXT("[Team] 🛡️ 플레이어 [%s]님에게 %s 팀이 배정되었습니다! (Index: %d)"), 
+			*NewPlayer->GetName(), (AssignedTeam == EFTTeam::Blue) ? TEXT("Blue") : TEXT("Red"), PlayerIndex);
+	}
 
 	AFTPlayerState* Ps = FTPlayerPC->GetPlayerState<AFTPlayerState>();
 	if (Ps)
