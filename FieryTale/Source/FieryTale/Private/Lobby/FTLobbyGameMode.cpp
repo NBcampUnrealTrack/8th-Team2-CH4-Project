@@ -19,10 +19,13 @@
 
 AFTLobbyGameMode::AFTLobbyGameMode()
 {
-	bUseSeamlessTravel = true; 
-	
+	bUseSeamlessTravel = true;
+
 	PlayerStateClass = AFTLobbyPlayerState::StaticClass();
 	PlayerControllerClass = AFTPlayerController::StaticClass();
+
+	// 기본 매치 레벨. 에디터(BP_FTLobbyGameMode)에서 GameLevel 을 지정하면 그 값이 우선한다.
+	GameLevel = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Maps/L_Arena.L_Arena")));
 }
 
 void AFTLobbyGameMode::BeginPlay()
@@ -163,16 +166,19 @@ void AFTLobbyGameMode::TravelToMatch()
 
 	if (UWorld* World = GetWorld())
 	{
-		const FString TravelUrl = GameMapPath;
-		
+		// TSoftObjectPtr → 트래블용 롱 패키지 경로. 미지정 시 코드 폴백을 사용한다.
+		const FString TravelUrl = GameLevel.IsNull()
+			? TEXT("/Game/Maps/L_Arena")
+			: GameLevel.ToSoftObjectPath().GetLongPackageName();
+
 		UE_LOG(LogFTSession, Log, TEXT("[Lobby] 매치 맵 ServerTravel 시도 → %s"), *TravelUrl);
-		
+
 		// 🌟 2. ServerTravel이 성공적으로 명령을 접수했는지 확인하는 코드 추가
 		bool bIsSuccess = World->ServerTravel(TravelUrl);
-		
+
 		if (!bIsSuccess)
 		{
-			// 만약 이 로그가 뜬다면 GameMapPath 변수 자체의 텍스트가 틀렸다는 뜻입니다.
+			// 만약 이 로그가 뜬다면 GameLevel 에셋 지정이 잘못됐다는 뜻입니다.
 			UE_LOG(LogFTSession, Error, TEXT("[Lobby] 🚨 ServerTravel 실패! 유효하지 않은 맵 경로입니다."));
 			bMatchStarting = false; // 실패했으니 플래그 초기화
 		}

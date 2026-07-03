@@ -44,6 +44,8 @@ namespace
 
 UFTSessionSubsystem::UFTSessionSubsystem()
 {
+	// 기본 대기방 레벨. 에디터/BP에서 LobbyLevel 을 지정하면 그 값이 우선한다.
+	LobbyLevel = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Maps/L_Lobby.L_Lobby")));
 }
 
 void UFTSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -170,7 +172,11 @@ void UFTSessionSubsystem::HandleCreateSessionComplete(FName SessionName, bool bW
 	{
 		if (UWorld* World = GetWorld())
 		{
-			const FString TravelUrl = LobbyMapPath + TEXT("?listen");
+			// TSoftObjectPtr → 트래블용 롱 패키지 경로. 미지정 시 코드 폴백을 사용한다.
+			const FString LobbyPackage = LobbyLevel.IsNull()
+				? TEXT("/Game/Maps/L_Lobby")
+				: LobbyLevel.ToSoftObjectPath().GetLongPackageName();
+			const FString TravelUrl = LobbyPackage + TEXT("?listen");
 			UE_LOG(LogFTSession, Log, TEXT("[Create] 5) 호스트 ServerTravel → %s"), *TravelUrl);
 			World->ServerTravel(TravelUrl);
 		}

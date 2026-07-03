@@ -7,6 +7,8 @@
 #include "Interfaces/OnlineSessionInterface.h"
 #include "FTSessionSubsystem.generated.h"
 
+class UWorld;
+
 /**
  * 세션 검색 결과를 UMG(Blueprint)에서 다룰 수 있게 만든 표시용 구조체.
  * 엔진의 FOnlineSessionSearchResult는 BP에 노출되지 않으므로, 목록 UI에 필요한 값만 추려서 전달한다.
@@ -111,9 +113,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "FieryTale|Session")
 	FFTOnDestroySessionComplete OnDestroySessionCompleteEvent;
 
-	/** 호스트 성공 시 이동할 대기방 맵 경로. */
+	/** 호스트 성공 시 이동할 대기방 맵. 에디터/BP에서 레벨 에셋을 직접 지정한다.
+	 *  비어 있으면 코드 폴백(/Game/Maps/L_Lobby)을 사용한다. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Session")
-	FString LobbyMapPath = TEXT("/Game/Maps/L_Lobby");
+	TSoftObjectPtr<UWorld> LobbyLevel;
 
 	/** 세션 생성 성공 시 자동으로 대기방 맵으로 ServerTravel 할지 여부. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Session")

@@ -7,6 +7,8 @@
 #include "Character/FTCharacterTypes.h"
 #include "FTLobbyGameMode.generated.h"
 
+class UWorld;
+
 /**
  * 대기방(Lobby 맵) 전용 GameMode.
  *
@@ -34,9 +36,10 @@ public:
 	void RequestStartMatch(APlayerController* Requester);
 
 protected:
-	/** 매치(아레나) 맵 경로. 작업자 D의 2라인 블록아웃 맵으로 교체 예정. */
+	/** 매치(아레나) 맵. 에디터/BP에서 레벨 에셋을 직접 지정한다.
+	 *  비어 있으면 코드 폴백(/Game/Maps/L_Arena)을 사용한다. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "FieryTale|Lobby")
-	FString GameMapPath = TEXT("/Game/Maps/L_Arena");
+	TSoftObjectPtr<UWorld> GameLevel;
 
 	/** 시작에 필요한 최소 인원. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "FieryTale|Lobby")
