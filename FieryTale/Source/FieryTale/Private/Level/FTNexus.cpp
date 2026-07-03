@@ -13,16 +13,12 @@
 AFTNexus::AFTNexus()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
 	NexusMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("NexusMesh"));
 	RootComponent = NexusMesh;
-
 	AbilitySystemComponent = CreateDefaultSubobject<UFT_AbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
-
 	AttributeSet = CreateDefaultSubobject<UFT_AttributeSet>(TEXT("AttributeSet"));
-
 	NexusTeam = EFTNexusTeam::None;
 	bIsDying = false;
 	DyingTimer = 0.0f;
@@ -36,12 +32,9 @@ UAbilitySystemComponent* AFTNexus::GetAbilitySystemComponent() const
 
 void AFTNexus::BeginPlay()
 {
-	Super::BeginPlay();
-
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
-
 		FGameplayTag TeamTag = (NexusTeam == EFTNexusTeam::BlueTeam) ? FTTags::FTFaction::Team_Blue : FTTags::FTFaction::Team_Red;
 		AbilitySystemComponent->AddLooseGameplayTag(TeamTag);
 		AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTObjectType::Structure_Nexus);
@@ -55,14 +48,16 @@ void AFTNexus::BeginPlay()
 				TargetMaxHealth = RowData->MaxHealth;
 			}
 		}
-
 		AttributeSet->InitMaxHealth(TargetMaxHealth);
 		AttributeSet->InitHealth(TargetMaxHealth);
-
-		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AFTNexus::OnHealthChanged);
 	}
 
-	GetWorldTimerManager().SetTimer(AutoDestroyTimerHandle, this, &AFTNexus::DebugDestroyNexus, 30.0f, false);
+	Super::BeginPlay(); // 5000체력 바인딩 완결 후 부모 위젯 컴포넌트 로드
+
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AFTNexus::OnHealthChanged);
+	}
 }
 
 void AFTNexus::Tick(float DeltaTime)
@@ -102,22 +97,17 @@ void AFTNexus::OnHealthChanged(const FOnAttributeChangeData& Data)
 void AFTNexus::DebugDestroyNexus()
 {
 	if (bIsDying) return;
-
 	bIsDying = true;
 	InitialLocation = GetActorLocation();
-
-	GetWorldTimerManager().ClearTimer(AutoDestroyTimerHandle);
 
 	if (DestructionSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation());
 	}
-
 	if (DestructionEffect)
 	{
 		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation());
 	}
-
 	if (UWorld* World = GetWorld())
 	{
 		if (AFTGameMode* GameMode = World->GetAuthGameMode<AFTGameMode>())
