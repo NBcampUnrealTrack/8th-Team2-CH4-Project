@@ -67,6 +67,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|GamePlay", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> ShiftAction;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|GamePlay", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UInputAction> QAction;
+
 
 	// Input | UI
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|UI", meta = (AllowPrivateAccess = "true"))
@@ -117,6 +121,7 @@ private:
 	void Look(const FInputActionValue& Value);
 	void OnLeftClick();
 	void OnRightClick();
+	void OnPressQ();
 	void OnShift();
 	// TODO:: Debugging 용, 추후 삭제 예정
 	void DebugDie();

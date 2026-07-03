@@ -272,6 +272,7 @@ void AFTPlayerController::SetupInputComponent()
 		EIC->BindAction(LookAction,       ETriggerEvent::Triggered, this, &AFTPlayerController::Look);
 		EIC->BindAction(LeftClickAction,  ETriggerEvent::Started,   this, &AFTPlayerController::OnLeftClick);
 		EIC->BindAction(RightClickAction, ETriggerEvent::Started,   this, &AFTPlayerController::OnRightClick);
+		EIC->BindAction(QAction, ETriggerEvent::Started,   this, &AFTPlayerController::OnPressQ);
 		EIC->BindAction(ShiftAction,      ETriggerEvent::Started,   this, &AFTPlayerController::OnShift);
 		EIC->BindAction(ToggleHUDEditModeAction, ETriggerEvent::Started,   this, &AFTPlayerController::ToggleHUDEditMode);
 		EIC->BindAction(ScoreboardAction,        ETriggerEvent::Started,   this, &AFTPlayerController::OnScoreboardPressed);
@@ -307,6 +308,14 @@ void AFTPlayerController::OnLeftClick()
 }
 
 void AFTPlayerController::OnRightClick()
+{
+	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
+	{
+		Char->OnRightClick();
+	}
+}
+
+void AFTPlayerController::OnPressQ()
 {
 	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
 	{

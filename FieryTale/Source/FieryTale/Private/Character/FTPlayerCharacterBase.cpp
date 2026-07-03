@@ -123,10 +123,17 @@ void AFTPlayerCharacterBase::OnLeftClick()
 
 void AFTPlayerCharacterBase::OnRightClick()
 {
+	ActivateAbilityByInputTag(FTTags::FTAbilities::AttackSkill, true);
+}
+
+void AFTPlayerCharacterBase::OnPressQ()
+{
+	ActivateAbilityByInputTag(FTTags::FTAbilities::UltimateSkill, true);
 }
 
 void AFTPlayerCharacterBase::OnShift()
 {
+	ActivateAbilityByInputTag(FTTags::FTAbilities::UtilSkill, true);
 }
 
 void AFTPlayerCharacterBase::Revive()

@@ -75,6 +75,7 @@ public:
 	// FTPlayerController에서 호출 — TODO:: 함수명이 부적절하여, 기능 단위로 이름을 고쳐야함
 	virtual void OnLeftClick();
 	virtual void OnRightClick();
+	virtual void OnPressQ();
 	virtual void OnShift();
 	
 	void DebugDie(); // TODO:: 삭제 예정
