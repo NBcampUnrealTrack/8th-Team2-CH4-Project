@@ -3,19 +3,20 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "FTCharacterBase.h"
 #include "GameFramework/PlayerController.h"
-#include "Character/FTPlayerState.h"
 #include "GameplayTagContainer.h"
 #include "Character/FTCharacterTypes.h"
-#include "AbilitySystem/Abilities/Player/Character/FT_CharacterData.h"
 #include "FTPlayerController.generated.h"
 
+class AFTCharacterBase;
 class AFTPlayerCharacterBase;
+class AFTPlayerState;
 class UInputMappingContext;
 class UInputAction;
 class UFTLobbyWidget;
+class UFT_CharacterData;
 struct FInputActionValue;
+enum class EFTTeam : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(FTPlayerController, Log, All);
 
@@ -28,7 +29,7 @@ public:
 	AFTPlayerController(const FObjectInitializer& Initializer);
 
 	// GameMode에서 스폰 위치를 전달받아 PlayerState의 SelectedCharacterType 기반으로 캐릭터를 스폰 후 Possess
-	void SpawnCharacter(const FVector& SpawnLocation, const FRotator& SpawnRotation);
+	void SpawnCharacter(const FVector& InSpawnLocation, const FRotator& SpawnRotation);
 	
 	// GameMode에서 호출 — 팀을 PlayerState에 바인딩
 	void AssignTeam(EFTTeam InTeam);
@@ -124,7 +125,10 @@ private:
 	void OnPressQ();
 	void OnShift();
 	// TODO:: Debugging 용, 추후 삭제 예정
+	
+#if !UE_BUILD_SHIPPING
 	void DebugDie();
+#endif
 
 	UFUNCTION(Server, Reliable)
 	void Server_DebugDie();

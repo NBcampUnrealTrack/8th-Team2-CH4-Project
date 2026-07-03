@@ -2,9 +2,10 @@
 
 #include "Character/FTPlayerController.h"
 #include "Character/FTPlayerState.h"
-#include "Character/FTPlayerCharacterBase.h"
-#include "UI/FTHUDLayoutSubsystem.h"
 #include "Character/FTCharacterBase.h"
+#include "Character/FTPlayerCharacterBase.h"
+#include "AbilitySystem/Abilities/Player/Character/FT_CharacterData.h"
+#include "UI/FTHUDLayoutSubsystem.h"
 #include "AbilitySystemComponent.h"
 #include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
@@ -31,7 +32,7 @@ AFTPlayerController::AFTPlayerController(const FObjectInitializer& Initializer)
 	RespawnDelay = 3.0f;
 }
 
-void AFTPlayerController::SpawnCharacter(const FVector& LocationSpawn, const FRotator& SpawnRotation)
+void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const FRotator& SpawnRotation)
 {
 	if (!HasAuthority())
 	{
@@ -59,7 +60,7 @@ void AFTPlayerController::SpawnCharacter(const FVector& LocationSpawn, const FRo
 	}
 
 	// Deferred Spawn: BeginPlay 이전에 CharacterData 주입
-	const FTransform SpawnTransform(SpawnRotation, LocationSpawn);
+	const FTransform SpawnTransform(SpawnRotation, InSpawnLocation);
 	AFTPlayerCharacterBase* NewChar = GetWorld()->SpawnActorDeferred<AFTPlayerCharacterBase>(
 		AFTPlayerCharacterBase::StaticClass(),
 		SpawnTransform,
@@ -223,6 +224,13 @@ void AFTPlayerController::OnPossess(APawn* InPawn)
 	// 원격 클라이언트 로컬 인스턴스 몫은 OnRep_Pawn()에서 별도로 등록한다.
 	if (UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent())
 	{
+		if (DeadTagEventHandle.IsValid())
+		{
+			ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
+			   .Remove(DeadTagEventHandle);	
+		}
+		
+		
 		DeadTagEventHandle = ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
 			.AddUObject(this, &AFTPlayerController::OnDeadTagChanged);
 	}
@@ -241,6 +249,13 @@ void AFTPlayerController::OnRep_Pawn()
 
 	if (UAbilitySystemComponent* ASC = PS->GetAbilitySystemComponent())
 	{
+		if (DeadTagEventHandle.IsValid())
+		{
+			ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
+			   .Remove(DeadTagEventHandle);	
+		}
+		
+		
 		DeadTagEventHandle = ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
 			.AddUObject(this, &AFTPlayerController::OnDeadTagChanged);
 	}
@@ -331,10 +346,12 @@ void AFTPlayerController::OnShift()
 	}
 }
 
+#if !UE_BUILD_SHIPPING
 void AFTPlayerController::DebugDie()
 {
 	Server_DebugDie();
 }
+#endif
 
 void AFTPlayerController::Server_DebugDie_Implementation()
 {

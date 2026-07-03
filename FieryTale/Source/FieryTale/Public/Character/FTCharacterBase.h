@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
-#include "Character/FTCharacterTypes.h"
 #include "FTCharacterBase.generated.h"
 
 class UGameplayAbility;
