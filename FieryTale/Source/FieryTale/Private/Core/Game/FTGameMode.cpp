@@ -93,6 +93,11 @@ void AFTGameMode::InitializeAndSpawnPlayer(APlayerController* NewPlayer)
 		
 		int32 PlayerIndex = GameState->PlayerArray.Find(FTPlayerPC->GetPlayerState<APlayerState>());
 		
+		if (PlayerIndex == INDEX_NONE)
+		{
+			PlayerIndex = GameState->PlayerArray.Num();
+		}
+		
 		EFTTeam AssignedTeam = (PlayerIndex % 2 == 0) ? EFTTeam::Blue : EFTTeam::Red;
 		
 		FTPlayerPC->AssignTeam(AssignedTeam);
