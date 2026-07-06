@@ -7,8 +7,9 @@
 #include "AbilitySystemComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/ProjectileMovementComponent.h"
-
+#include "GameplayTags/FTTags.h"
 
 AFT_ProjectileBase::AFT_ProjectileBase()
 {
@@ -57,18 +58,52 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
        return;
     }
 
-    // [순정 GAS 타격 인프라 연동]
-    // 충돌한 타겟 대상이 GAS 아키텍처를 준수하여 내부에 ASC 컴포넌트를 소유하고 있는지 장부를 견인합니다.
-    if (UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor))
+    // 1. 시전자(나를 쏜 영웅 혹은 미니언)의 코어 GAS 장부 견인
+    AActor* MyInstigator = GetInstigator();
+    if (!MyInstigator) return;
+
+    UAbilitySystemComponent* InstigatorASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(MyInstigator);
+    UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor);
+
+    // =========================================================================
+    // [AOS 정석: 투사체 실시간 동적 피아식별 배관망]
+    // 시전자와 피격 타깃 양측의 진영 태그(Blue/Red)를 런타임 역산 비교하여 아군 오폭을 원천 차단합니다.
+    // =========================================================================
+    if (InstigatorASC && TargetASC)
     {
-       // 시전 스킬 단(앨리스, 빨간망토, 미니언 등)에서 지연 생성 체계를 통해 완벽하게 밀봉 토스해 준 대미지 계산서가 유효한지 검수
+        // 시전자가 블루팀인데 타깃도 블루팀이거나, 시전자가 레드팀인데 타깃도 레드팀인 경우 (아군 판정)
+        bool bIsSameTeam = false;
+
+        if (InstigatorASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && 
+            TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+        {
+            bIsSameTeam = true;
+        }
+        else if (InstigatorASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && 
+                 TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+        {
+            bIsSameTeam = true;
+        }
+
+        // 아군으로 판명되면 투사체가 뚫고 지나가도록 대미지 처리 및 소멸을 생략하고 즉시 리턴(Pass)시킵니다.
+        // 이를 통해 블루팀 아군 미니언이나 영웅이 앞을 가로막아도 투사체가 고스트처럼 관통하여 적에게 날아갑니다.
+        if (bIsSameTeam)
+        {
+            return;
+        }
+    }
+
+    // 2. 피아식별 검문소를 통과한 진짜 적군개체에게만 GAS 대미지 계산서 최종 확정 기입
+    if (TargetASC)
+    {
+       // 시전 스킬 단에서 지연 생성 체계를 통해 완벽하게 밀봉 토스해 준 대미지 계산서가 유효한지 검수
        if (DamageEffectSpecHandle.IsValid())
        {
-          // 타겟 대상의 ASC 코어 통장에 최종 조립 완료된 화력 수치 및 효과 스펙을 다이렉트로 확정 기입 처리합니다.
+          // 타겟 대상의 ASC 코어 장부에 최종 조립 완료된 화력 수치 및 효과 스펙을 다이렉트로 확정 기입 처리합니다.
           TargetASC->ApplyGameplayEffectSpecToSelf(*DamageEffectSpecHandle.Data.Get());
        }
 
-       // 대미지 배달 공정이 무사히 완결되었으므로 멀티플레이 리플리케이션 레이어 하에 서버 단에서 투사체 자산을 청정하게 소멸합니다.
+       // 적을 명중시켜 대미지 배달 공정이 완결되었으므로 서버 단에서 투사체 자산을 청정하게 소멸합니다.
        Destroy();
     }
 }
