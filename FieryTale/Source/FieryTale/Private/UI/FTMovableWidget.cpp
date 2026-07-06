@@ -13,16 +13,15 @@ void UFTMovableWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	//	기본 상태는 '숨김' — 편집 모드에 진입할 때만 핸들이 나타난다.
+	//	(서브시스템이 없어 등록되지 않는 경우에도 핸들이 입력을 가로채지 않도록 보장한다.)
+	SetHandleVisible(false);
+
 	//	NativeConstruct 시점에는 부모 패널에 추가되어 Slot이 유효하다.
+	//	등록되면 서브시스템이 현재 편집 모드 상태에 맞춰 다시 SetHandleVisible을 호출한다.
 	if (UFTHUDLayoutSubsystem* Subsystem = GetLayoutSubsystem())
 	{
 		Subsystem->RegisterMovableWidget(this);
-	}
-
-	//	항상 편집 옵션이 켜진 인스턴스는 서브시스템(또는 LocalPlayer) 유무와 무관하게 핸들을 노출한다.
-	if (bAlwaysEditMode)
-	{
-		SetHandleVisible(true);
 	}
 }
 
@@ -38,9 +37,9 @@ void UFTMovableWidget::NativeDestruct()
 
 FReply UFTMovableWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	//	편집 모드가 아니면 드래그하지 않는다. (bAlwaysEditMode 인스턴스는 전역 편집 모드와 무관하게 허용)
+	//	편집 모드가 아니면 드래그하지 않는다.
 	UFTHUDLayoutSubsystem* Subsystem = GetLayoutSubsystem();
-	const bool bCanEdit = bAlwaysEditMode || (Subsystem && Subsystem->IsEditMode());
+	const bool bCanEdit = (Subsystem && Subsystem->IsEditMode());
 	if (!bCanEdit)
 	{
 		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
@@ -113,10 +112,12 @@ void UFTMovableWidget::SetHandleVisible(bool bVisible)
 		return;
 	}
 
-	//	편집 OFF 시 Collapsed로 두어 입력을 가로채지 않게 한다.
-	//	단, 항상 편집 인스턴스는 전역 편집 모드가 꺼져도 핸들을 유지한다.
-	const bool bFinalVisible = bVisible || bAlwaysEditMode;
-	DragHandleArea->SetVisibility(bFinalVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	//	편집 모드일 때만 핸들을 노출한다. ContentSlot과 계층이 분리되어 있으므로
+	//	핸들을 숨겨도 내용(채팅 등)은 그대로 보인다.
+	//	- 표시: RenderOpacity 1 + Visible(드래그 입력 수신)
+	//	- 숨김: RenderOpacity 0(투명) + HitTestInvisible(내용 조작을 가로막지 않음)
+	DragHandleArea->SetRenderOpacity(bVisible ? 1.f : 0.f);
+	DragHandleArea->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::HitTestInvisible);
 }
 
 UFTHUDLayoutSubsystem* UFTMovableWidget::GetLayoutSubsystem() const

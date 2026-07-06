@@ -40,13 +40,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "FieryTale")
 	FName WidgetID;
 
-	//	true면 전역 편집 모드(F11)와 무관하게 이 위젯은 항상 핸들이 표시되고 드래그 이동이 가능하다.
-	//	상위 WBP 디자이너에서 배치된 인스턴스별로 지정한다.
-	//	(커서/입력 모드는 전환하지 않으므로 UI 입력이 가능한 화면에서 사용할 것)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FieryTale")
-	bool bAlwaysEditMode = false;
-
-	//	이 영역을 잡고 드래그한다. Visibility는 Visible 이어야 입력을 받는다.
+	//	이 영역을 잡고 드래그한다. 편집 모드일 때만 노출되며(RenderOpacity 1),
+	//	그 외에는 RenderOpacity 0 + HitTestInvisible로 숨겨져 내용 조작을 방해하지 않는다.
+	//	ContentSlot과 계층이 분리되어 있으므로 핸들을 숨겨도 내용은 그대로 표시된다.
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UBorder> DragHandleArea;
 

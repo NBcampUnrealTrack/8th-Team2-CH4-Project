@@ -127,6 +127,7 @@ void UFTChatWidget::AddMessageRow(const FFTChatMessage& Message)
 		break;
 	}
 
+	
 	Line->SetText(FText::FromString(Composed));
 	// 채널별로 지정된 색상을 적용한다.
 	Line->SetColorAndOpacity(FSlateColor(RowColor));
