@@ -8,22 +8,25 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
 #include "GameplayTags/FTTags.h"
+#include "Object/FT_ProjectileBase.h"
+#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 
 UFT_SilverBulletSkill::UFT_SilverBulletSkill()
-    : BaseDamage(50.0f)           // 기획 데이터 락인: 관통 은탄 적중 시 가동될 고정 피해량 수치 명세
-    , ChannellingDuration(1.0f)   // 기획 데이터 락인: 은탄을 총구에 장전하기 위해 유지해야 하는 1초 채널링 시간 명세
+    : BaseDamage(50.0f)           // 기획 명세: 관통 은탄 저격 기술의 강력한 고유 깡데미지
+    , ChannellingDuration(1.0f)   // 기획 명세: 탄환을 정조준 장전하는 강제 선딜레이 조작 잠금 시간 (1초)
 {
-    // 인스턴싱 정책: 영웅 캐릭터마다 고유의 장전 타이머 핸들을 독립 제어합니다.
+    // 인스턴싱 정책: 차징 상태 관리 및 독립적 타이머 가동을 위해 액터당 인스턴스 격리 생성
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     
-    // 네트워크 실행 정책: 클라이언트 선입력 예측 시스템을 가동합니다.
+    // 네트워크 실행 정책: 클라이언트 선예측 구동 후 서버 검증으로 저격 격발 조작 반응성 확보
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
     
+    // GAS 에셋 태그 등록: 스킬 분류 장부에 보조 공격 기술 태그 바인딩
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::AttackSkill);
     SetAssetTags(AssetTags);
 
-    // 에셋 바인딩 가이드: 빨간 망토 전용 우클릭 보조 공격의 재사용 대기시간 태그 매핑입니다.
+    // 쿨다운 태그 지정: 마우스 우클릭 스킬 공용 재사용 대기시간 파이프라인(9초)과 자석 연동
     CooldownTag = FTTags::FTStates::Cooldown::RightClick;
 }
 
@@ -33,27 +36,46 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // GAS 마스터 규격: 우클릭 스킬 쿨다운 상태를 선제 검사하고 비용을 서버와 클라이언트에서 동시 승인 및 소모합니다.
+    // [GAS 순정 시전 비용 검증]
+    // 마나와 자원이 부족하다면 즉시 능력을 종료하여 불필요한 조작 잠금 버그를 예방합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
-        // 쿨타임 중이거나 기절 상태라면 즉시 어빌리티 수명주기를 안전 종료하여 자원 누수를 차단합니다.
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
 
+    AFTPlayerCharacterBase* Character = ActorInfo ? Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+    
     if (SourceASC)
     {
-        // 1초 장전 시작 시 채널링 상태 태그를 루즈 태그로 시전자 몸에 주입합니다.
-        // 런타임 흐름 요약: 이 태그를 통해 캐릭터 이동 컴포넌트의 사격 감속 애니메이션이나 타 행동 차단 인터럽트가 연동됩니다.
+        // 채널링 상태 표식 주입 : 1초 저격 조준 동안 이동을 제한하거나 다른 평타 사격 개입을 완벽히 차단
         SourceASC->AddLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
     }
+    
+    if (Character && Character->GetWeaponData())
+    {
+        UFT_WeaponData* WeaponData = Character->GetWeaponData();
+        if (WeaponData && WeaponData->AttackMontage)
+        {
+            // 저격 장전 자세 애니메이션 비동기 태스크 구동
+            UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+                this, TEXT("SilverBulletChannellingTask"), WeaponData->AttackMontage, 1.0f);
 
-    // 안전 분기벽: 월드가 정상 작동할 때만 정확하게 1초 장전 타임아웃 타이머를 가동합니다.
+            if (MontageTask)
+            {
+                // 채널링 도중 적의 하드 CC기를 맞고 몽타주가 파쇄당하면 즉시 파이프라인을 토스하여 사출 없이 파쇄 취소
+                MontageTask->OnInterrupted.AddDynamic(this, &UFT_SilverBulletSkill::FireSilverBullet);
+                MontageTask->OnCancelled.AddDynamic(this, &UFT_SilverBulletSkill::FireSilverBullet);
+                MontageTask->ReadyForActivation();
+            }
+        }
+    }
+
     UWorld* World = GetWorld();
     if (World)
     {
-        // 1초 동안 방해받지 않고 장전에 성공하면 FireSilverBullet 함수를 격발하여 사출 파이프라인으로 이관합니다.
+        // 1초 동안 아무런 CC 방해 없이 정조준 장전에 완벽히 성공하면 격발 시퀀스(FireSilverBullet) 호출
         World->GetTimerManager().SetTimer(ChannellingTimerHandle, this, &UFT_SilverBulletSkill::FireSilverBullet, ChannellingDuration, false);
     }
     else
@@ -64,28 +86,27 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 void UFT_SilverBulletSkill::FireSilverBullet()
 {
-    // 1초 장전 타이머가 정상 만료되면 어빌리티 종료 단계로 진입하여 안전하게 투사체 격발을 개시합니다.
+    // 정식 장전 만료 타이머가 끝났거나 하드 CC기로 가드가 터졌을 때, 수명 주기의 핵심 관문인 EndAbility로 이관하여 사출 여부를 종합 제어합니다.
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 인터럽트 방어선 1단계: 장전 도중 적의 하드 CC기를 맞아 스킬이 중도 캔슬당했다면 타이머를 즉시 청소합니다.
-    // 이를 통해 장전이 끊겼는데도 1초 뒤에 은탄이 혼자 사출되는 유령 발사 버그를 완벽하게 차단합니다.
+    // 능력이 종결되는 시점에 예외적인 메모리 릭 방지를 위해 가동 중이던 1초 조준 만료 타이머를 청정하게 제거합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(ChannellingTimerHandle);
     }
 
-    // 시전자 몸에 부착해 두었던 채널링 상태 표식 태그를 안전하게 수거하여 조작 제한을 해제합니다.
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
+        // 채널링 상태 표식을 소거하여 빨간 망토의 모든 사격 및 조작 락을 정상 복구
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
     }
 
-    // 정상 발사 시퀀스 단독 격발: 스킬이 중간에 하드 CC기로 취소되지 않은 클린 상태일 때만 실제 은탄 투사체를 스폰합니다.
+    // CC기에 의해 강제 취소당하지 않고(bWasCancelled == false) 1초 집중 저격 장전선을 깔끔하게 성공 완수한 상태인지 판정
     if (!bWasCancelled && ActorInfo && ActorInfo->AvatarActor.IsValid())
     {
         AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get());
@@ -93,11 +114,10 @@ void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, 
         {
             UFT_WeaponData* WeaponData = Character->GetWeaponData();
             UWorld* World = GetWorld();
-
-            // 에셋 세팅 핵심 리뷰 포인트: 무기 데이터 에셋의 ProjectileClass 슬롯에 관통 은탄 블루프린트가 있는지 검증합니다.
-            if (World && WeaponData->ProjectileClass)
+            
+            if (World && WeaponData->ProjectileClass && SilverBulletImpactEffectClass)
             {
-                // 캐릭터 가슴 높이 좌표 및 전방 Forward 시선 정조준 방향으로 스폰 트랜스폼 동기화
+                // 사출 좌표 연산 : 캐릭터 허리 라인 높이 60cm 기준 정방향 락온 트랜스폼 산출
                 FVector SpawnLocation = Character->GetActorLocation() + FVector(0, 0, 60);
                 FVector LaunchDirection = Character->GetActorForwardVector();
                 FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
@@ -107,31 +127,30 @@ void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, 
                 SpawnParams.Instigator = Character;
                 SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-                // 지정 전방 방향으로 모든 적을 관통하는 거대한 은탄 오브젝트 액터를 월드에 사출합니다.
-                AActor* SpawnedProjectile = World->SpawnActor<AActor>(WeaponData->ProjectileClass, SpawnTransform, SpawnParams);
-                
-                if (SpawnedProjectile)
+                // [순정 GAS 관통 은탄 화력 계산서 발행]
+                FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(SilverBulletImpactEffectClass, GetAbilityLevel());
+                if (SpecHandle.IsValid())
                 {
-                    // 기획 데이터 및 블루프린트 연동 가이드라인
-                    // 
-                    // 1. 데이터 에셋 설정:
-                    //    에디터 내 빨간 망토 무기 데이터 에셋의 ProjectileClass 슬롯에
-                    //    은탄 전용 블루프린트인 BP_RedRidingHoodSilverBullet을 장착해야 사출 인프라가 굴러갑니다.
-                    // 
-                    // 2. 투사체 블루프린트 내부 로직 구현:
-                    //    이 투사체는 충돌 시 파괴되지 않고 모든 미니언과 적 영웅을 관통하는 궤적을 그립니다.
-                    //    Overlap 프로필 기반으로 적중 대상들의 무리 배열을 실시간 스캔합니다.
-                    // 
-                    // 3. 런타임 이펙트 연동 세팅:
-                    //    포착된 모든 대상의 ASC에 GE_MasterDamage를 주입하며 FTCombat_Damage 우체통에
-                    //    C++ 기획 수치인 BaseDamage 50을 담아 피해 연산기로 배달합니다.
-                    //    동시에 적들의 다리를 묶는 둔화 디버프 이펙트를 주입하여 2초간 50퍼센트 슬로우를 구현합니다.
+                    // SetByCaller 변조 우체통망을 경유하여 기획 고유 고화력 데미지 수치(50.0f)를 명시적 밀봉 주입
+                    SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
+                }
+
+                // 지연 생성(Deferred Spawn) 체계 가동 : 투사체가 월드 배치 전 계산서 장부를 안전하게 전수받을 대기 상태 유도
+                AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
+                    WeaponData->ProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+                
+                if (Projectile)
+                {
+                    // 완공된 은탄 피해 명세서 패킷을 투사체 내부 배관에 안전하게 토스 전송
+                    Projectile->DamageEffectSpecHandle = SpecHandle;
+                    
+                    // 데이터 결합이 완료되었으므로 전방 전선으로 무결하게 사출 마감
+                    Projectile->FinishSpawning(SpawnTransform);
                 }
             }
         }
     }
 
-    // 중복 쿨다운 제거: ActivateAbility 상단 관문인 CommitAbility에서 이미 쿨타임 처리가 완료되었습니다.
-    // 여기서는 추가 연산 없이 표준 가상 함수 수명주기 반환만 가동하여 능력을 온전히 종료합니다.
+    // 상위 부모의 공정을 격발하여 쿨다운 자원 확정 차감 및 스킬 수명 주기 영구 마감
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

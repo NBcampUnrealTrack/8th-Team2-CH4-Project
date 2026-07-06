@@ -12,27 +12,24 @@
 #include "GameplayTags/FTTags.h"
 
 UFT_KaguyaBulwarkAbility::UFT_KaguyaBulwarkAbility()
-    : MovementPenaltyMultiplier(0.6f) // 기획 데이터 락인: 방벽 전개 중 이동 속도 40퍼센트 감소 페널티 (기본 속도의 60퍼센트 유지)
-    , MaxDuration(4.0f)              // 기획 데이터 락인: 마우스 우클릭 강공격을 최대로 전개 유지할 수 있는 한계 시간 4초 명세
-    , OriginalMaxWalkSpeed(0.0f)
+    : MaxDuration(4.0f) // 기획 명세: 대나무 방벽 최대 유지 제한 시간 (4초)
 {
-    // 인스턴싱 정책: 캐릭터마다 방벽 전개 수명 주기 및 백업 이속 수치를 격리 통제하기 위해 인스턴스화 모드로 관리합니다.
+    // 인스턴싱 정책: 방벽 실시간 수명 주기 관리 및 데이터 격리를 위해 액터당 인스턴스 생성
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     
-    // 네트워크 실행 정책: 키 입력 즉시 지연 없이 방패를 내리찍도록 클라이언트 선입력 예측 시스템을 가동합니다.
+    // 네트워크 실행 정책: 클라이언트 선예측 구동 후 서버 검증으로 가드 입력 반응성 극대화
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    // 에셋 태그 주입: 우클릭 보조 공격 범주 식별을 위해 공용 AttackSkill 에셋 태그를 명확히 마킹합니다.
+    // GAS 에셋 태그 등록: 스킬 분류 장부에 보조 공격 기술 태그 바인딩
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::AttackSkill);
     SetAssetTags(AssetTags);
     
-    // 에셋 바인딩 가이드: 가구야 전용 보조 공격의 6초 재사용 대기시간 태그 매핑입니다.
-    // 기획 공식 반영: 방벽을 켜자마자 쿨이 도는 릭을 차단하고, 방벽을 정상 해제하여 내리는 시점부터 수동 쿨다운 연산기를 가동합니다.
+    // 쿨다운 태그 지정: 마우스 우클릭 스킬 공용 쿨다운 파이프라인과 연동
     CooldownTag = FTTags::FTStates::Cooldown::RightClick;
 
-    // 기획 스펙 반영: 방벽 전개 동안 가구야 본체에 반격 가드 태세 버프 태그를 상시 락인합니다.
-    // 런타임 흐름 요약: 이 태그가 유지되는 동안 글로벌 피해 연산기(GEEC_Damage) 내부의 전방 120도 판정 필터와 자석처럼 공명하여 피해를 전면 소멸시킵니다.
+    // 방벽 전개 동안 가구야 본체에 반격 가드 태세 버프 태그를 상시 락인 (피해 연산기 공명)
+    // ActivationOwnedTags에 등록된 태그는 스킬 시전 동안 자동으로 부여되고 종료 시 자동 수거됩니다.
     ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::CounterReady);
 }
 
@@ -40,14 +37,15 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     const FGameplayEventData* TriggerEventData)
 {
-    // GAS 마스터 규격: 부모 가상 함수 호출 및 실질 액션 전개 이전에 우클릭 6초 쿨다운 상태를 최선행 검증 처리합니다.
+    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+    // [쿨다운 및 비용 선제 검증 관문]
+    // 실패 시 아래의 이속 조작 단계를 거치지 않고 순정 상태로 클린 탈출하여 이속 마비 버그를 원천 차단합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
-
-    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
     AFTPlayerCharacterBase* Character = ActorInfo ? Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
@@ -58,18 +56,23 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
         return;
     }
 
-    // 채널링 상태 표식 주입: 방벽 전개 중임을 실시간 전파하여 기획 사양인 공격 및 다른 스킬 사용 시 방벽이 즉시 해제되도록 차단 파이프라인의 기준 태그를 세웁니다.
+    // 채널링 상태 표식 주입 : 방벽 유지 동안 다른 액티브 스킬이나 일반 평타 조작을 차단하는 파이프라인 연동
     SourceASC->AddLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
-
-    // 이속 버그 방어선 수술: 런타임 나누기 연산 오차로 기본 속도가 유실되는 릭을 원천 차단하기 위해
-    // 가속 페널티 적용 전 캐릭터의 순정 최대 걷기 속도 원본을 보관소에 안전하게 선제 백업한 뒤 40퍼센트 감산 수치를 연동 주입합니다.
-    if (UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement())
+    
+    // [이동 속도 감산 페널티 적용]
+    // 기획서 명세에 따라 방벽을 든 상태에서 느리게 걷도록 설계된 이속 저하 GameplayEffect를 주입합니다.
+    if (MovementPenaltyGameplayEffectClass)
     {
-        OriginalMaxWalkSpeed = MoveComp->MaxWalkSpeed;
-        MoveComp->MaxWalkSpeed = OriginalMaxWalkSpeed * MovementPenaltyMultiplier;
+        FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(MovementPenaltyGameplayEffectClass, GetAbilityLevel());
+        if (PenaltySpecHandle.IsValid())
+        {
+            // 종료 시점에 확정 수거하기 위해 활성화 핸들을 멤버 변수에 저장합니다.
+            MovementPenaltyActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*PenaltySpecHandle.Data.Get());
+        }
     }
 
-    // 몽타주 비동기 태스크 구동: 가구야 무기 데이터 에셋의 AttackMontage 슬롯에 등록된 황금 대나무 장벽 전개 애니메이션 루프를 격발합니다.
+    // [비동기 몽타주 재생 및 인터럽트 태스크 가동]
+    // 무기 데이터 에셋에 등록된 대나무 가드 전용 몽타주 애니메이션을 루프 구동합니다.
     UFT_WeaponData* WeaponData = Character->GetWeaponData();
     if (WeaponData && WeaponData->AttackMontage)
     {
@@ -78,14 +81,15 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
         if (MontageTask)
         {
-            // 애니메이션 몽타주가 정상 완결되거나 다른 인풋 인터럽트에 의해 중단 신호를 수신하면 안전 해제 파이프라인으로 연결합니다.
+            // 가드 모션이 정상 완료되었거나 피격 등으로 인터럽트되었을 때의 마감 콜백 바인딩
             MontageTask->OnCompleted.AddDynamic(this, &UFT_KaguyaBulwarkAbility::OnGuardMontageFinished);
             MontageTask->OnInterrupted.AddDynamic(this, &UFT_KaguyaBulwarkAbility::OnGuardMontageFinished);
             MontageTask->ReadyForActivation();
         }
     }
 
-    // 최대 4초 유지 제한 지속 타이머 가동: 마우스 우클릭을 떼지 않고 무한정 버티는 악용 치트를 막기 위해 4초 도달 시 자동으로 닫히도록 안전 벨브를 엽니다.
+    // [최대 유지 제한 지속 타이머 가동]
+    // 마우스를 계속 누르고 있어도 최대 4초가 지나면 무한 가드 악용을 차단하기 위해 강제로 능력을 닫는 안전장치입니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().SetTimer(
@@ -99,7 +103,7 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
 void UFT_KaguyaBulwarkAbility::OnGuardMontageFinished()
 {
-    // 애니메이션이 끝나거나 마우스 릴리즈 중단 신호를 수신하면 즉시 표준 어빌리티 종료 마감 관문으로 이관합니다.
+    // 애니메이션 제어가 끝난 시점에 즉시 안전 종료 단계로 수명 주기 토스
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
@@ -107,40 +111,33 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머 누수 안전 해제: 능력이 종료되기 시작하면 가동 중이던 4초 한계 지속시간 타이머 핸들을 즉시 청소 수거합니다.
+    // 능력이 완전히 닫히기 전 런타임 예외 방지를 위해 작동 중이던 4초 강제 차단 타이머를 클리어합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(BulwarkDurationTimerHandle);
     }
 
-    // 시전자 몸에 임시 부착해 두었던 채널링 상태 표식 태그를 깔끔하게 제거 수거합니다.
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
+        // 채널링 태그를 제거하여 다른 평타 및 스킬 조작 권한을 다시 플레이어에게 이관
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
-    }
-
-    // 이속 복구 확정 수술: 복사 나누기 연산 왜곡 없이 처음에 안전 백업해 두었던 순정 원본 속도 수치 그대로 최대 걷기 속도 배관에 1대1 환원 복구시킵니다.
-    if (ActorInfo && ActorInfo->AvatarActor.IsValid())
-    {
-        if (AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get()))
+        
+        // 시전 시 박아넣었던 캐릭터 이동 속도 감산 페널티 버퍼를 수거 복구
+        if (MovementPenaltyActiveHandle.IsValid())
         {
-            if (UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement())
-            {
-                if (OriginalMaxWalkSpeed > 0.0f)
-                {
-                    MoveComp->MaxWalkSpeed = OriginalMaxWalkSpeed;
-                }
-            }
+            SourceASC->RemoveActiveGameplayEffect(MovementPenaltyActiveHandle);
         }
     }
 
-    // 기획 스펙 공식 반영: 적의 강제 CC기로 캔슬당한 하차 상태가 아니라, 플레이어가 방벽을 정상적으로 내리는 해제 시점부터 우클릭 6초 쿨타임을 가동합니다.
+    // [AOS 쿨다운 정책 스위칭 가동]
+    // 가구야의 방벽은 스킬을 누른 시점이 아니라 방벽을 풀거나 터트린 완료 시점부터 보조 공격 고유 재사용 대기시간(6초)이 돌기 시작합니다.
+    // 만약 CC기에 의해 강제 캔슬당한 상황이 아니라면 정상적으로 쿨다운 자원을 차감 마킹합니다.
     if (!bWasCancelled)
     {
         CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
     }
     
-    // 최종 부모 소멸 시퀀스를 격발하여 가구야의 몸집에 부착되어 있던 CounterReady 반격 가드 버프 태그를 서버와 클라이언트에서 자동 수거합니다.
+    // 상위 부모의 일괄 종료 공정을 호출하여 CounterReady 반격 버프 태그 등 수명 주기를 전량 반환 마감
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

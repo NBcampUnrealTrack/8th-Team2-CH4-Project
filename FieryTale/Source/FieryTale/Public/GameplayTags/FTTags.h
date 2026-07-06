@@ -9,31 +9,29 @@ namespace FTTags
 {
     namespace FTFaction
     {
-       UE_DECLARE_GAMEPLAY_TAG_EXTERN(Team_Blue); // 블루 팀 피아식별
-       UE_DECLARE_GAMEPLAY_TAG_EXTERN(Team_Red);  // 레드 팀 피아식별
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(Team_Blue); // 블루 팀 피아식별 (스포너 아군 주입구)
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(Team_Red);  // 레드 팀 피아식별 (스포너 적군 주입구)
     }
 
     namespace FTAbilities
     {
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(NormalAttack);  // LMB 일반 평타 공격
-    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackSkill);   // RMB 보조 공격 기술
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackSkill);   // RMB 보조 공격 기술
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(UtilSkill);    // Shift 이동 및 생존 유틸 기술
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(UltimateSkill); // Q 궁극기 기술
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(ActivateOnGiven);
-    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Minion_Attack);
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Minion_Attack);
     }
     
     // --- 영웅 및 크리처들의 실시간 상태 제어 마스터 대분류 ---
     namespace FTStates
     {
-        // [긴급 보정 완착] .cpp의 문자열 주소지와 자석처럼 바인딩될 마스터 EXTERN 주소선을 개통합니다.
         namespace Core
         {
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(Dead);            // 캐릭터 사망 상태 레이어 (평타 및 스킬 연동 차단)
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(Reloading);       // 무기 장전 중 상태 레이어 (평타 사격 개입 차단)
         }
-
-        // [해로운 제어 상태이상 / 하드 CC 디버프 계층]
+    	
         namespace Debuff
         {
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(Stunned);         // 기절 (조작 불가 / 앨리스 궁극기 연동)
@@ -42,8 +40,7 @@ namespace FTTags
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(Slow);            // 이동 속도 감소 (가구야 궁극기 80% 슬로우 연동)
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(Bleeding);        // 출혈 지속 피해 디버프
         }
-
-        // [이로운 버프 / 능력치 제어 계층 - GE 및 스킬 연동 필수 구역]
+    	
         namespace Buff
         {
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(Invincible);      // 완전 무적 상태
@@ -53,7 +50,9 @@ namespace FTTags
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(ShrinkActive);    // 앨리스: 토끼의 약 신체 축소 버프 상태
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(CounterReady);    // 가구야: GEEC 데미지를 0으로 분쇄하는 반격 가드 태세
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(BambooGroveDeploying); // 가구야: 대나무 숲 안개 영역 전개 중인 시전 상태
-            
+            /** 앨리스 스킬 레이더 스캔에 탐지되어 해킹 락온 홀로그램이 표기될 적 식별 표식 태그 */
+            UE_DECLARE_GAMEPLAY_TAG_EXTERN(HackedMark);
+
             // 알라딘 3단 궁극기 콤보 연사 및 입력 락 차단을 위한 실시간 트래커 태그
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(AladdinComboActive);
         }
@@ -82,7 +81,7 @@ namespace FTTags
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Structure_Turret);   // 적 포탑 구조물 판정 오브젝트
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Structure_Nexus);    // 적 넥서스 본진 구조물 판정 오브젝트
     }
-	
+    
     namespace FTMinionRole
     {
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Melee);              // 전방 돌격 및 어그로 확보용 근접 미니언 태그

@@ -18,7 +18,7 @@ namespace FTTags
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(UtilSkill, "FTTags.Abilities.UtilSkill", "Shift 이동 및 생존 유틸 기술 매핑 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(UltimateSkill, "FTTags.Abilities.UltimateSkill", "Q 궁극기 활성화 입력 매핑 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActivateOnGiven, "FTTags.Abilities.ActivateOnGiven", "부여 시 즉시 가동되는 패시브 능력 식별 태그");
-    	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_Attack, "FTTags.Abilities.Minion.Attack", "미니언 공격 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_Attack, "FTTags.Abilities.Minion.Attack", "미니언 공격 태그");
     }
     
     // --- 영웅 및 크리처들의 실시간 상태 제어 마스터 대분류 ---
@@ -51,6 +51,7 @@ namespace FTTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(ShrinkActive, "FTTags.State.Buff.ShrinkActive", "2초 동안 앨리스의 히트박스를 축소하고 이동 속도를 50퍼센트 올리는 축소 버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(CounterReady, "FTTags.State.Buff.CounterReady", "GEEC 대미지 연산을 즉시 중단시키고 타격을 무효화하는 가구야 반격 가드 태세 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(BambooGroveDeploying, "FTTags.State.Buff.BambooGroveDeploying", "가구야 공주가 대나무 숲 전술 연막을 전개하고 있는 시전 버프 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(HackedMark, "FTTags.State.Buff.HackedMark", "앨리스의 레이더 스캔에 적발되어 해킹 락온 연출이 연동될 타깃 표식 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(AladdinComboActive, "FTTags.State.Buff.AladdinComboActive", "알라딘의 소원 성취 궁극기가 연속 격발(콤보 윈도우) 가능한 유효 버프 태그");
         }
        
@@ -77,7 +78,7 @@ namespace FTTags
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Turret, "FTTags.ObjectType.Structure.Turret", "AOS 피아식별 및 군중제어기 필터링을 위한 방어 포탑 구조물 식별 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Nexus, "FTTags.ObjectType.Structure.Nexus", "AOS 승패 판정 및 예외 처리를 위한 본진 넥서스 구조물 식별 태그");
     }
-	
+    
     namespace FTMinionRole
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Melee, "FTTags.MinionRole.Melee", "전방 돌격 및 적 영웅 우선 어그로 타겟팅을 가동하는 근접 미니언 역할군 태그");
@@ -98,6 +99,6 @@ namespace FTTags
     
     namespace Events
     {
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(KillScored, "FTTags.Event.KillScored", "적 영웅 혹은 크리처 처치 달성 시 배관망에 사출되는 마스터 이벤트 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(KeepScore, "FTTags.Event.KillScored", "적 영웅 혹은 크리처 처치 달성 시 배관망에 사출되는 마스터 이벤트 태그");
     }
 }
