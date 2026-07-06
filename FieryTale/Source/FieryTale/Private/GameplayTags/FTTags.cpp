@@ -21,17 +21,14 @@ namespace FTTags
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_Attack, "FTTags.Abilities.Minion.Attack", "미니언 공격 태그");
     }
     
-    // --- 영웅 및 크리처들의 실시간 상태 제어 마스터 대분류 ---
     namespace FTStates
     {
-        // [긴급 보정 완착] 헤더의 Core 계층 심볼들과 완벽하게 결합할 실시간 문자열 데이터를 개통합니다.
         namespace Core
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Dead, "FTTags.State.Core.Dead", "캐릭터 체력 고갈 사망 상태 레이어 태그 (모든 일반공격 및 스킬 연동 차단)");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Reloading, "FTTags.State.Core.Reloading", "무기 탄환 전량 소모 후 장전 중 상태 레이어 태그 (평타 사격 개입 차단)");
         }
 
-        // [해로운 제어 상태이상 / 하드 CC 디버프 계층]
         namespace Debuff
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Stunned, "FTTags.State.Debuff.Stunned", "모든 행동 및 스킬 입력이 잠기는 기절 상태이상 태그");
@@ -41,7 +38,6 @@ namespace FTTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Bleeding, "FTTags.State.Debuff.Bleeding", "늑대 발톱 공격에 노출되어 들어오는 실시간 지속 출혈 피해 태그");
         }
 
-        // [이로운 버프 / 능력치 제어 계층]
         namespace Buff
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Invincible, "FTTags.State.Buff.Invincible", "모든 피해량과 CC 연산을 일체 무력화하는 무적 상태 버프 태그");
@@ -55,10 +51,9 @@ namespace FTTags
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(AladdinComboActive, "FTTags.State.Buff.AladdinComboActive", "알라딘의 소원 성취 궁극기가 연속 격발(콤보 윈도우) 가능한 유효 버프 태그");
         }
        
-        // [재사용 대기시간 자원 관리 계층]
         namespace Cooldown
         {
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(AttackSkill, "FTTags.State.Cooldown.AttackSkill", "보조 공격 기술 공용 재사용 대기시간 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(AttackSkill, "FTTags.State.Cooldown.AttackSkill", "공격 기술 공용 재사용 대기시간 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(UtilSkill, "FTTags.State.Cooldown.UtilSkill", "Shift 생존 유틸 기술 공용 재사용 대기시간 15초 제어 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(RightClick, "FTTags.State.Cooldown.RightClick", "우클릭 스킬 전용 9초 고유 재사용 대기시간 태그");
         }
@@ -67,6 +62,8 @@ namespace FTTags
     namespace FTCombat
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage, "FTTags.Combat.Damage", "SetByCaller 우체통을 통해 마스터 속성 집합으로 피해량을 실시간 배달하는 메타 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Knockback, "FTTags.Combat.Knockback", "피격 대상에게 물리적 척력 및 밀쳐내기 강도를 전송하는 마스터 넉백 태그");
+
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(WeaponMode_Aiming, "FTTags.Combat.WeaponMode.Aiming", "빨간 망토가 탄퍼짐 수치를 초기화시키고 2배율 정조준 사격 중인 상태 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Channelling, "FTTags.Combat.Skill.Channelling", "스킬의 선딜레이 및 캐스팅 유지 상태를 감시하는 인터럽트용 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Target_Insignia, "FTTags.Combat.Target.Insignia", "앨리스 시계 토끼 공격에 노출된 표적의 시한성 태엽 인장 표식 태그");

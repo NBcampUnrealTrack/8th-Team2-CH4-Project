@@ -111,33 +111,31 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 능력이 완전히 닫히기 전 런타임 예외 방지를 위해 작동 중이던 4초 강제 차단 타이머를 클리어합니다.
-    if (GetWorld())
+    // [안전장치 1] 타이머 핸들이 유효할 때만 안전하게 클리어합니다.
+    if (GetWorld() && BulwarkDurationTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(BulwarkDurationTimerHandle);
+        BulwarkDurationTimerHandle.Invalidate(); // 핸들 메모리까지 깔끔하게 초기화
     }
 
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
-        // 채널링 태그를 제거하여 다른 평타 및 스킬 조작 권한을 다시 플레이어에게 이관
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
         
-        // 시전 시 박아넣었던 캐릭터 이동 속도 감산 페널티 버퍼를 수거 복구
+        // [안전장치 2] 이미 제거된 GE 효과를 중복 제거하려다 발생하는 경고 로그를 차단합니다.
         if (MovementPenaltyActiveHandle.IsValid())
         {
             SourceASC->RemoveActiveGameplayEffect(MovementPenaltyActiveHandle);
+            MovementPenaltyActiveHandle.Invalidate();
         }
     }
 
-    // [AOS 쿨다운 정책 스위칭 가동]
-    // 가구야의 방벽은 스킬을 누른 시점이 아니라 방벽을 풀거나 터트린 완료 시점부터 보조 공격 고유 재사용 대기시간(6초)이 돌기 시작합니다.
-    // 만약 CC기에 의해 강제 캔슬당한 상황이 아니라면 정상적으로 쿨다운 자원을 차감 마킹합니다.
+    // [쿨다운 확정 마감]
     if (!bWasCancelled)
     {
         CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
     }
     
-    // 상위 부모의 일괄 종료 공정을 호출하여 CounterReady 반격 버프 태그 등 수명 주기를 전량 반환 마감
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

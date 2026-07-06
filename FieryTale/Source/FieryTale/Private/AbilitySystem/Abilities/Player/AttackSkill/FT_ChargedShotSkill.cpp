@@ -3,6 +3,7 @@
 
 #include "AbilitySystem/Abilities/Player/AttackSkill/FT_ChargedShotSkill.h"
 #include "Character/FTPlayerCharacterBase.h"
+#include "AbilitySystemComponent.h"
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
 #include "Engine/World.h"
 #include "GameplayTags/FTTags.h"
@@ -30,7 +31,9 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    // 마나 비용이 없으므로, 현재 9초 쿨타임 태그가 걸려있는지만 순정 GAS 검문소에서 체크합니다.
+    // 만약 아직 쿨다운 태그가 남아있다면 이 자리에서 즉시 활성화를 차단하고 탈출합니다.
+    if (!CheckCooldown(Handle, ActorInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
@@ -56,15 +59,17 @@ void UFT_ChargedShotSkill::FireChargedShot()
     }
 
     AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get());
+    UAbilitySystemComponent* SourceASC = CurrentActorInfo->AbilitySystemComponent.Get();
     bool bTriggeredVisualTask = false;
 
-    if (Character)
+    if (Character && SourceASC)
     {
         float ChargeDuration = GetWorld()->GetTimeSeconds() - ChargeStartTime;
 
-        // 1초 이상 마우스 홀드 시 풀 차징 성공
+        // 1단계: 1초 이상 마우스 홀드 시 풀 차징 사출 성공 분기
         if (ChargeDuration >= 1.0f)
         {
+            // 1초 차징 조준을 무사히 성공 완수한 바로 이 시점에 쿨타임을 정식으로 격발 낙인찍습니다.
             CommitAbilityCooldown(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
             
             if (UFT_WeaponData* WeaponData = Character->GetWeaponData())
@@ -77,33 +82,19 @@ void UFT_ChargedShotSkill::FireChargedShot()
                     FVector LaunchDirection = Character->GetActorForwardVector();
                     FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
 
-                    FActorSpawnParameters SpawnParams;
-                    SpawnParams.Owner = Character;
-                    SpawnParams.Instigator = Character;
-                    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-                    // 풀 차징 종합 폭발 계산서(Spec) 조립
                     FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffectClass, GetAbilityLevel());
                     if (SpecHandle.IsValid())
                     {
-                        // ① 풀 차징 폭발 피해량(50.0f) 기입
                         SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
-                        
-                        // ② [넉백 데이터 동시 전송 배관] 
-                        // 만약 필요하시다면 전투용 공용 넉백 태그(예: FTTags::FTCombat::Knockback) 등을 활용해 
-                        // 계산서에 넉백 물리 강도(800.0f)까지 밀봉 주입하여 연동할 수 있습니다.
+                        SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Knockback, KnockbackForce);
                     }
 
-                    // 지연 생성 체계를 경유하여 지니의 폭발 주먹 투사체 안전 사출
                     AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
                         WeaponData->ProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
                     
                     if (Projectile)
                     {
-                        // 완성된 폭발/넉백 계산서를 투사체 내부 배관에 토스
                         Projectile->DamageEffectSpecHandle = SpecHandle;
-                        
-                        // 사출 완료
                         Projectile->FinishSpawning(SpawnTransform);
                     }
                     
@@ -114,7 +105,6 @@ void UFT_ChargedShotSkill::FireChargedShot()
 
                         if (MontageTask)
                         {
-                            // 완료, 방해, 강제 취소 델리게이트를 전부 묶어 관리합니다.
                             MontageTask->OnCompleted.AddDynamic(this, &UFT_ChargedShotSkill::OnFireMontageFinished);
                             MontageTask->OnInterrupted.AddDynamic(this, &UFT_ChargedShotSkill::OnFireMontageFinished);
                             MontageTask->OnCancelled.AddDynamic(this, &UFT_ChargedShotSkill::OnFireMontageFinished);
@@ -126,13 +116,16 @@ void UFT_ChargedShotSkill::FireChargedShot()
                 }
             }
         }
+        // 2단계: 1초 미만 불완전 차징 취소 분기 처리 (패널티 없는 청정 복귀)
         else
         {
-            // 1초 미만 불완전 차징 취소 구역
+            // 애초에 소모한 마나 자원 자체가 없으므로 환불 연산 연동 코드도 전량 필요 없습니다.
+            // 쿨타임 패널티를 가동하지 않고 안전하게 취소 플래그만 들고 스킬을 원점 종료합니다.
+            EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+            return;
         }
     }
     
-    // 몽타주 연출이 온전히 끝나서 바인딩된 온파이어 콜백이 가동되기 전까지 어빌리티 생명을 가두어둡니다.
     if (!bTriggeredVisualTask)
     {
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
@@ -141,7 +134,6 @@ void UFT_ChargedShotSkill::FireChargedShot()
 
 void UFT_ChargedShotSkill::OnFireMontageFinished()
 {
-    // 지니의 주먹 강타 액션 잔상이 완전히 마감된 순간 장부를 클린하게 정리합니다.
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
