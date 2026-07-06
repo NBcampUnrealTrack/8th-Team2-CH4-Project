@@ -10,9 +10,11 @@
 class UAbilitySystemComponent;
 class UFT_MinionData;
 class UGameplayAbility;
+class AFT_WayPoint;
 
 /**
  * FieryTale 전장의 블루 vs 레드 진영 미니언들을 총괄하는 GAS 내장형 C++ 마스터 캐릭터 클래스입니다.
+ * 단 1개의 클래스로 데이터 에셋(MinionData)만 교체하여 무한 생산을 집도하는 총괄님 아키텍처 규격을 준수합니다.
  */
 UCLASS()
 class FIERYTALE_API AFT_MinionCharacterBase : public AFTCharacterBase
@@ -25,8 +27,40 @@ public:
     /** [IAbilitySystemInterface 순정 오버라이드] 미니언 본체 고유의 내장형 ASC 주소지를 사출합니다. */
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override { return AbilitySystemComponent; }
 
+    // =========================================================================
+    // [AOS 내비게이션 및 런타임 데이터 에셋 주입 배관망]
+    // =========================================================================
+
+    /** 스포너가 런타임에 미니언을 스폰하자마자 초도 거점 경로 주소를 밀봉 이식할 직통 함수 */
+    UFUNCTION(BlueprintCallable, Category = "FieryTale | AI | Navigation")
+    void SetCurrentTargetWayPoint(AFT_WayPoint* InWayPoint) { CurrentTargetWayPoint = InWayPoint; }
+
+    /** 
+     * 브레인 어빌리티(UFT_Minion_Brain) 단에서 현재 미니언이 전진해야 할 
+     * 최신 거점 주소를 무결하게 역산 추출해 갈 수 있도록 열어주는 전용 장부 게터입니다.
+     */
+    FORCEINLINE AFT_WayPoint* GetCurrentTargetWayPoint() const { return CurrentTargetWayPoint; }
+
+    /** 
+     *  [심볼 해결 완료 - 런타임 자산 완착 세터]
+     * 스포너 단에서 마스터 소체를 Deferred 스폰한 직후, 이번 차례의 무기/외형 데이터 에셋과 
+     * 진영 세력 태그를 공차 없이 원자적으로 밀봉 주입해 줄 핵심 퍼블릭 인터페이스입니다.
+     */
+    FORCEINLINE void SetMinionDataAndTeam(UFT_MinionData* InData, const FGameplayTag& InTeamTag)
+    {
+        MinionData = InData;
+        MinionTeamTag = InTeamTag;
+    }
+
+    /** 
+     * [심볼 해결 완료 - 인프라 수동 가동 관문]
+     * 스포너가 팀 태그, 레일 경로, 미니언 자산 데이터 주입을 모두 완료한 완공 시점에
+     * 본체의 내장형 GAS 인프라 및 비주얼 바인딩 시동 틱을 안전하게 켜줄 수동 트리거 함수입니다.
+     */
+    void LaunchMinionInfrastructure();
+
 protected:
-    /** 월드 진입 즉시 서버 권한 하에 스탯 초기화 및 인프라 구축을 집도하는 관문 */
+    /** 월드 진입 즉시 실행되던 구형 시동 로직을 보류하고 스포너의 완성 신호를 대기하기 위해 비워둡니다. */
     virtual void BeginPlay() override;
 
     /** 미니언 본체에 직통 내장되어 모든 전술 상태 관리 및 어빌리티 격발을 통제할 고유 GAS 컴포넌트 */
@@ -55,6 +89,14 @@ protected:
      */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Minion | Design")
     TSubclassOf<UGameplayAbility> BrainAbilityClass;
+    
+    /** 
+     * [순수 레일 데이터 컨테이너]
+     * 미니언이 현재 라인을 타고 정찰 전진하며 실시간으로 쫓아가고 있는 타겟 웨이포인트 포인터입니다.
+     * 동적 AI 무빙 및 갱신 연산은 브레인 어빌리티로 이주되어 본체 오버헤드를 완벽히 제거했습니다.
+     */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | AI | Navigation")
+    TObjectPtr<AFT_WayPoint> CurrentTargetWayPoint;
 
 private:
     /** 주입된 데이터 에셋 수치 동기화, 피아식별 태그 낙인, AI 브레인 시동을 원자적으로 통합 처리하는 공정 함수 */

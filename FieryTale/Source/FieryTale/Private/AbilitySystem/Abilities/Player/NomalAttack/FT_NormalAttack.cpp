@@ -13,7 +13,7 @@
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "GameplayTags/FTTags.h"
-#include"Object/FT_ProjectileBase.h"
+#include "Object/FT_ProjectileBase.h"
 
 UFT_NormalAttack::UFT_NormalAttack()
 {
@@ -51,7 +51,7 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 {
    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
     
-   // 쿨다운 및 마나 비용 검증 관문
+   // 쿨다운 및 비용 검증 관문
    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
    {
       EndAbility(Handle, ActorInfo, ActivationInfo, true, false);    
@@ -157,6 +157,37 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 
     if (bHit && HitResult.GetActor())
     {
+       AActor* HitActor = HitResult.GetActor();
+        
+       // =========================================================================
+       // [히트스캔 분기: 실시간 동적 피아식별 검문소]
+       // 시전자와 피격 타깃 양측의 진영 태그를 비교하여 아군 오폭을 원천 차단합니다.
+       // =========================================================================
+       UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
+       UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
+       
+       if (MyASC && TargetASC)
+       {
+           bool bIsSameTeam = false;
+           
+           if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && 
+               TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+           {
+               bIsSameTeam = true;
+           }
+           else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && 
+                    TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+           {
+               bIsSameTeam = true;
+           }
+           
+           // 조준 사선에 맞은 액터가 아군으로 판명되면 대미지 연산을 즉시 중단하고 반환합니다.
+           if (bIsSameTeam)
+           {
+               return;
+           }
+       }
+
        float FinalDamage = InWeaponData->BaseDamage;
 
        // [헤드샷 전술 배관 알고리즘]
@@ -296,12 +327,40 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
 
     if (bHit)
     {
-       // 포착된 다중 적 액터 군단을 순회하며 광역 대미지 계산서 순차 발송
+       UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
+
+       // 포착된 다중 액터 군단을 순회하며 광역 피아식별 후 대미지 계산서 발송
        for (const FOverlapResult& Result : OverlapResults)
        {
           AActor* HitActor = Result.GetActor();
           if (HitActor)
           {
+             // =========================================================================
+             // [근접 공격 분기: 광역 피아식별 검문소]
+             // =========================================================================
+             UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
+             if (MyASC && TargetASC)
+             {
+                 bool bIsSameTeam = false;
+                 
+                 if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && 
+                     TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+                 {
+                     bIsSameTeam = true;
+                 }
+                 else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && 
+                          TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+                 {
+                     bIsSameTeam = true;
+                 }
+                 
+                 // 박스 오버랩에 걸린 개체 중 아군이 있다면 대미지 처리를 하지 않고 건너뜁니다.
+                 if (bIsSameTeam)
+                 {
+                     continue;
+                 }
+             }
+
              float FinalDamage = InWeaponData->BaseDamage;
 
              if (!BaseDamageEffectClass) continue;
@@ -329,7 +388,7 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
 
 void UFT_NormalAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 장부 클리어 시점에 오버플로우 방지를 위해 격발 중이던 다중 점사(Burst) 타이머를 완전히 소각합니다.
+    // 장부 클리어 시점에 오버플로우 방지를 위해 격발 중이던 다중 점사 타이머를 완전히 소각합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(BurstTimerHandle);
