@@ -47,7 +47,7 @@ protected:
     float SpawnDelayBetweenMinions = 0.5f;
 
     // =========================================================================
-    //  [총괄님 마스터 피스 슬롯]: 블루프린트는 딱 이 1개만 매핑합니다.
+    // [총괄님 마스터 피스 슬롯]: 블루프린트는 딱 이 1개만 매핑합니다.
     // =========================================================================
     /** 무한 복제 생산의 소체가 될 청정한 마스터 미니언 블루프린트 클래스 (BP_MinionCharacter) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Spawner | CoreClass")
