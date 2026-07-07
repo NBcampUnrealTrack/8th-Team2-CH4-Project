@@ -16,6 +16,7 @@
 #include "GameplayTags/FTTags.h"
 #include "GameFramework/GameModeBase.h"
 #include "Character/FTCharacterTypes.h"
+#include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
 
 #include "Lobby/FTLobbyPlayerState.h"
 #include "Lobby/FTLobbyWidget.h"
@@ -51,10 +52,17 @@ void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const F
 	//UFT_CharacterData* CharData = SoftData->LoadSynchronous();
 	//if (!CharData) { ... return; }
 
-	const FDataTableRowHandle* RowHandle = CharacterDataMap.Find(PS->GetSelectedCharacterType());
-	if (!RowHandle || RowHandle->IsNull())
+	if (!CharacterDataTable)
 	{
-		UE_LOG(FTPlayerController, Error, TEXT("CharacterDataMap에 등록되지 않은/유효하지 않은 타입: %d"), static_cast<int32>(PS->GetSelectedCharacterType()));
+		UE_LOG(FTPlayerController, Error, TEXT("CharacterDataTable이 설정되지 않았습니다."));
+		return;
+	}
+
+	// RowName은 EFTCharacterType 값 이름과 일치한다는 규약을 전제로 동적으로 찾는다 (수동 맵 등록 불필요).
+	const FName RowName(StaticEnum<EFTCharacterType>()->GetNameStringByValue(static_cast<int64>(PS->GetSelectedCharacterType())));
+	if (!CharacterDataTable->FindRowUnchecked(RowName))
+	{
+		UE_LOG(FTPlayerController, Error, TEXT("CharacterDataTable에 RowName=%s 행이 없습니다 (타입: %d)"), *RowName.ToString(), static_cast<int32>(PS->GetSelectedCharacterType()));
 		return;
 	}
 
@@ -70,8 +78,8 @@ void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const F
 
 	if (NewChar)
 	{
-		//	[이관] NewChar->CharacterData = CharData;
-		NewChar->CharacterRow = *RowHandle;
+		NewChar->CharacterRow.DataTable = CharacterDataTable;
+		NewChar->CharacterRow.RowName = RowName;
 		NewChar->FinishSpawning(SpawnTransform);
 		Possess(NewChar);
 	}
@@ -322,7 +330,7 @@ void AFTPlayerController::OnPressQ()
 {
 	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
 	{
-		Char->OnRightClick();
+		Char->OnPressQ();
 	}
 }
 

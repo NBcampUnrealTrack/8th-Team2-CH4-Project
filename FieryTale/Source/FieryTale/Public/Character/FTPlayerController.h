@@ -16,7 +16,10 @@ class UInputMappingContext;
 class UInputAction;
 class UFTLobbyWidget;
 class UFT_CharacterData;
+
+struct FFTCharacterData;
 struct FInputActionValue;
+
 enum class EFTTeam : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(FTPlayerController, Log, All);
@@ -41,9 +44,14 @@ public:
 	//UPROPERTY(EditDefaultsOnly, Category = "Character")
 	//TMap<EFTCharacterType, TSoftObjectPtr<UFT_CharacterData>> CharacterDataMap;
 
-	// 신: EFTCharacterType별 DT_CharacterData(FFTCharacterData) 행 핸들 — 스폰 시 캐릭터에 주입한다.
-	UPROPERTY(EditDefaultsOnly, Category = "Character", meta = (RowType = "FTCharacterData"))
-	TMap<EFTCharacterType, FDataTableRowHandle> CharacterDataMap;
+	// [이관/폐기 보존] 구: EFTCharacterType별 DT_CharacterData 행 핸들을 캐릭터마다 수동으로 등록하던 맵.
+	//UPROPERTY(EditDefaultsOnly, Category = "Character", meta = (RowType = "FTCharacterData"))
+	//TMap<EFTCharacterType, FDataTableRowHandle> CharacterDataMap;
+
+	// 신: DT_CharacterData 테이블 하나만 보관한다. RowName은 EFTCharacterType 값 이름(RedHood/Aladdin/Kaguya/Alice)과
+	// 반드시 일치해야 하며, 스폰 시 SpawnCharacter()에서 RowName을 동적으로 찾아 행을 주입한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Character")
+	TObjectPtr<UDataTable> CharacterDataTable;
 
 	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 클래스. 정식에는 삭제 예정
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
