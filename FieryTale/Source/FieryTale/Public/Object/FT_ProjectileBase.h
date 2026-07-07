@@ -13,37 +13,29 @@ class USphereComponent;
 UCLASS()
 class FIERYTALE_API AFT_ProjectileBase : public AActor
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
     
 public: 
-	AFT_ProjectileBase();
+    AFT_ProjectileBase();
 
-	/** 
-	 * 공격을 가한 GA 측에서 발사 직전 이 투사체에 최종 데미지 계산서를 주입해 주는 통로입니다.
-	 */
-	UPROPERTY(BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "FieryTale | GAS")
-	FGameplayEffectSpecHandle DamageEffectSpecHandle;
+    // 공격을 가한 GA 측에서 발사 직전 이 투사체에 최종 데미지 계산서를 주입해 주는 통로입니다.
+    UPROPERTY(BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "FieryTale | GAS")
+    FGameplayEffectSpecHandle DamageEffectSpecHandle;
 
 protected:
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
 
-	/** 충돌 시 적중 대상을 판별하고 데미지 배관을 연결할 관문 */
-	UFUNCTION()
-	virtual void OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+    // 순정 오버랩 관문으로 복귀합니다. 적중 즉시 대미지를 주고 소멸합니다.
+    UFUNCTION()
+    virtual void OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
-	// =========================================================================
-	// [코어 컴포넌트 슬롯]
-	// =========================================================================
+    // [코어 컴포넌트 슬롯]
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Component")
+    TObjectPtr<USphereComponent> SphereComponent;
 
-	/** 투사체의 실시간 피격 판정을 전담할 구체 충돌 컴포넌트 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Component")
-	TObjectPtr<USphereComponent> SphereComponent;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Component")
+    TObjectPtr<UStaticMeshComponent> ProjectileMesh;
 
-	/** 투사체의 비주얼을 담당할 메시 컴포넌트 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Component")
-	TObjectPtr<UStaticMeshComponent> ProjectileMesh;
-
-	/** 투사체의 속도, 중력, 유도 전반을 제어하는 엔진 순정 물리 컴포넌트 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Component")
-	TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Component")
+    TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
 };

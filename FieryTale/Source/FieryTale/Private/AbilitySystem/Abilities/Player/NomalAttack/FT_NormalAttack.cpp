@@ -20,6 +20,7 @@ UFT_NormalAttack::UFT_NormalAttack()
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
+    // 사망, 재장전, 기절 상태에서는 기본 평타 격발이 완벽히 차단되도록 방어선을 락인합니다.
     ActivationBlockedTags.AddTag(FTTags::FTStates::Core::Dead);
     ActivationBlockedTags.AddTag(FTTags::FTStates::Core::Reloading);
     ActivationBlockedTags.AddTag(FTTags::FTStates::Debuff::Stunned);
@@ -61,6 +62,7 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
    UFT_WeaponData* WeaponData = Character->GetWeaponData();
 
+   // 평타 조준 혹은 격발 모션 중 이동 속도 페널티 디버프를 시전자 본인에게 주입하는 구간입니다.
    if (MovementPenaltyGameplayEffectClass)
    {
        FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(MovementPenaltyGameplayEffectClass, GetAbilityLevel());
@@ -70,8 +72,10 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
        }
    }
 
+   // 무기 에셋의 메커니즘 타입(라인트레이스, 투사체, 근접)을 판별하여 타격을 격발합니다.
    ExecuteWeaponHitDetection(WeaponData, Character);
 
+   // 격발 애니메이션 몽타주가 부재할 경우, 안전 타이머를 가동하여 0.2초 뒤 어빌리티를 강제 정상 종료시킵니다.
    if (WeaponData->AttackMontage == nullptr)
    {
        GetWorld()->GetTimerManager().SetTimer(BurstTimerHandle, [this]()
@@ -82,6 +86,7 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
        return;
    }
 
+   // 순정 어빌리티 태스크를 통해 평타 애니메이션 몽타주를 재생하고 완료 시점의 델리게이트를 수신 대기합니다.
    UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
       this, FName("NormalAttackTask"), WeaponData->AttackMontage, 1.0f);
 
@@ -129,6 +134,7 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
     QueryParams.AddIgnoredActor(InCharacter);
     QueryParams.bReturnPhysicalMaterial = false;
 
+    // 즉시 발사형(히트스캔) 영웅들을 위한 가시성 채널 단발 레이트레이스 판정 구역입니다.
     bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility, QueryParams);
 
 #if !UE_BUILD_SHIPPING
@@ -146,6 +152,7 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
        UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
        UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
        
+       // 팀 진영 태그 비교 검문: 동일 진영(아군 영웅 및 아군 미니언) 타격 시 대미지 주입 연산을 원천 거부합니다.
        if (MyASC && TargetASC)
        {
            bool bIsSameTeam = false;
@@ -169,6 +176,7 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 
        float FinalDamage = InWeaponData->BaseDamage;
 
+       // 헤드샷 특화 연산: 무기 사양에서 헤드 판정을 허용할 경우 head/neck 본 적중 여부를 대조하여 승수를 가산합니다.
        if (InWeaponData->bAllowHeadshot)
        {
           if (HitResult.BoneName.ToString().Contains(TEXT("head")) || HitResult.BoneName.ToString().Contains(TEXT("neck")))
@@ -179,6 +187,7 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 
        if (!BaseDamageEffectClass) return;
 
+       // 타깃 데이터 핸들을 통해 적중된 컴포넌트 정보와 피격 정보를 포함한 GAS 표준 계산서 패킷을 발송합니다.
        FGameplayEffectContextHandle EffectContext = GetAbilitySystemComponentFromActorInfo()->MakeEffectContext();
        EffectContext.AddSourceObject(InCharacter);
        FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
@@ -209,18 +218,15 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
     if (!InWeaponData->ProjectileClass) return;
 
     UWorld* World = GetWorld();
-    FActorSpawnParameters SpawnParams;
-    SpawnParams.Owner = InCharacter;
-    SpawnParams.Instigator = InCharacter;
-    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     
+    // 복구된 순정 단발/점사 범용 대미지 패킷을 선제 타설합니다.
     FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
     if (DamageSpecHandle.IsValid())
     {
         DamageSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, InWeaponData->BaseDamage);
     }
 
-    // 단발 사격 분기
+    // [단발 사격 분기 복구] 투사체를 1발 사출 후 내부 장부에 대미지 계산서를 이식하여 방출합니다.
     if (InWeaponData->ProjectilesPerShot <= 1)
     {
         FTransform SpawnTransform(Forward.Rotation(), Start);
@@ -236,7 +242,7 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
         return;
     }
 
-    // 다중 점사 사격 분기
+    // [다중 점사 사격 분기 복구] 정해진 버스트 횟수만큼 지정된 딜레이 간격에 맞추어 투사체를 비동기 연속 사출합니다.
     TSharedPtr<int32> ShotCounter = MakeShared<int32>(0);
     int32 MaxShots = InWeaponData->ProjectilesPerShot;
     float Delay = InWeaponData->BurstDelay;
@@ -277,6 +283,7 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
     FVector StartLocation = InCharacter->GetActorLocation() + FVector(0, 0, 60);
     FVector ForwardVector = InCharacter->GetActorForwardVector();
 
+    // 근접 영웅 전용 전방 박스 형태의 히트박스 공간 볼륨을 정밀 정의합니다.
     FVector BoxCenter = StartLocation + (ForwardVector * (InWeaponData->AttackRange * 0.5f));
     FVector BoxHalfExtent = FVector(InWeaponData->AttackRange * 0.5f, 80.0f, 60.0f);
     FQuat BoxRotation = InCharacter->GetActorQuat();
@@ -302,6 +309,8 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
           if (HitActor)
           {
              UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
+             
+             // 근접 광역 타격 피아식별 필터링
              if (MyASC && TargetASC)
              {
                  bool bIsSameTeam = false;
@@ -321,7 +330,7 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
                  {
                      continue;
                  }
-             }
+              }
 
              float FinalDamage = InWeaponData->BaseDamage;
 
@@ -335,6 +344,7 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
              {
                 SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, FinalDamage);
 
+                // 오버랩된 타깃 다중 액터 배열을 가스 표준 타깃 데이터 형식에 포장하여 대미지를 안전 전송합니다.
                 FGameplayAbilityTargetDataHandle TargetDataHandle;
                 FGameplayAbilityTargetData_ActorArray* ActorArrayData = new FGameplayAbilityTargetData_ActorArray();
                 ActorArrayData->TargetActorArray.Add(HitActor);
@@ -349,12 +359,14 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
 
 void UFT_NormalAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+    // 어빌리티 종료 시 작동 중이던 점사 타이머를 파쇄 클리어하여 메모리 누수를 원천 봉쇄합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(BurstTimerHandle);
         BurstTimerHandle.Invalidate();
     }
 
+    // 공격 종료 타이밍에 맞춰 캐릭터 조준 이동 속도 감산 페널티(GE)를 안전하게 철거 환원합니다.
     if (ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
     {
         if (MovementPenaltyActiveHandle.IsValid())
