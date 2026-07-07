@@ -45,21 +45,20 @@ void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const F
 		return;
 	}
 
-	const TSoftObjectPtr<UFT_CharacterData>* SoftData = CharacterDataMap.Find(PS->GetSelectedCharacterType());
-	if (!SoftData)
+	// [이관/폐기 보존] 구: 소프트 UFT_CharacterData 에셋을 찾아 동기 로드.
+	//const TSoftObjectPtr<UFT_CharacterData>* SoftData = CharacterDataMap.Find(PS->GetSelectedCharacterType());
+	//if (!SoftData) { ... return; }
+	//UFT_CharacterData* CharData = SoftData->LoadSynchronous();
+	//if (!CharData) { ... return; }
+
+	const FDataTableRowHandle* RowHandle = CharacterDataMap.Find(PS->GetSelectedCharacterType());
+	if (!RowHandle || RowHandle->IsNull())
 	{
-		UE_LOG(FTPlayerController, Error, TEXT("CharacterDataMap에 등록되지 않은 타입: %d"), static_cast<int32>(PS->GetSelectedCharacterType()));
+		UE_LOG(FTPlayerController, Error, TEXT("CharacterDataMap에 등록되지 않은/유효하지 않은 타입: %d"), static_cast<int32>(PS->GetSelectedCharacterType()));
 		return;
 	}
 
-	UFT_CharacterData* CharData = SoftData->LoadSynchronous();
-	if (!CharData)
-	{
-		UE_LOG(FTPlayerController, Error, TEXT("CharacterData 로드 실패"));
-		return;
-	}
-
-	// Deferred Spawn: BeginPlay 이전에 CharacterData 주입
+	// Deferred Spawn: BeginPlay 이전에 CharacterRow 주입
 	const FTransform SpawnTransform(SpawnRotation, InSpawnLocation);
 	AFTPlayerCharacterBase* NewChar = GetWorld()->SpawnActorDeferred<AFTPlayerCharacterBase>(
 		AFTPlayerCharacterBase::StaticClass(),
@@ -71,7 +70,8 @@ void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const F
 
 	if (NewChar)
 	{
-		NewChar->CharacterData = CharData;
+		//	[이관] NewChar->CharacterData = CharData;
+		NewChar->CharacterRow = *RowHandle;
 		NewChar->FinishSpawning(SpawnTransform);
 		Possess(NewChar);
 	}

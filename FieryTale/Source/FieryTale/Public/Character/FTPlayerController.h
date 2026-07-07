@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "GameplayTagContainer.h"
+#include "Engine/DataTable.h"
 #include "Character/FTCharacterTypes.h"
 #include "FTPlayerController.generated.h"
 
@@ -36,9 +37,13 @@ public:
 	void OnPlayerDeath();
 	void RequestRespawn();
 
-	// 에디터에서 EFTCharacterType별 CharacterData 에셋을 등록 — 스폰 시 타입 기반으로 하나만 로드
-	UPROPERTY(EditDefaultsOnly, Category = "Character")
-	TMap<EFTCharacterType, TSoftObjectPtr<UFT_CharacterData>> CharacterDataMap;
+	// [이관/폐기 보존] 구: EFTCharacterType별 UFT_CharacterData 소프트 에셋 맵.
+	//UPROPERTY(EditDefaultsOnly, Category = "Character")
+	//TMap<EFTCharacterType, TSoftObjectPtr<UFT_CharacterData>> CharacterDataMap;
+
+	// 신: EFTCharacterType별 DT_CharacterData(FFTCharacterData) 행 핸들 — 스폰 시 캐릭터에 주입한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Character", meta = (RowType = "FTCharacterData"))
+	TMap<EFTCharacterType, FDataTableRowHandle> CharacterDataMap;
 
 	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 클래스. 정식에는 삭제 예정
 	UPROPERTY(EditDefaultsOnly, Category = "UI")

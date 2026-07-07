@@ -14,13 +14,40 @@
 #include "AbilitySystem/FT_AttributeSet.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameplayTags/FTTags.h"
+#include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
+#include "AbilitySystem/Abilities/Player/Data/FTSkillMetaData.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerCharacter);
+
+namespace
+{
+	//	캐릭터 행의 스킬 슬롯(FFTSkillMetaData 행)에서 AbilityClass를 꺼내 ASC에 부여하고,
+	//	버튼에 대응하는 기존 인풋 태그를 스펙에 실어 ActivateAbilityByInputTag가 매칭할 수 있게 한다.
+	void GrantSkillFromSlot(UAbilitySystemComponent* ASC, UObject* SourceObject,
+		const FDataTableRowHandle& SlotHandle, const FGameplayTag& InputTag)
+	{
+		if (!ASC || SlotHandle.IsNull())
+		{
+			return;
+		}
+
+		const FFTSkillMetaData* Row = SlotHandle.GetRow<FFTSkillMetaData>(TEXT("GrantSkillFromSlot"));
+		if (!Row || !Row->AbilityClass)
+		{
+			return;
+		}
+
+		FGameplayAbilitySpec Spec(Row->AbilityClass, 1, -1, SourceObject);
+		Spec.GetDynamicSpecSourceTags().AddTag(InputTag);
+		ASC->GiveAbility(Spec);
+	}
+}
 
 void AFTPlayerCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AFTPlayerCharacterBase, CharacterData);
+	//	[이관/폐기 보존] DOREPLIFETIME(AFTPlayerCharacterBase, CharacterData);
+	DOREPLIFETIME(AFTPlayerCharacterBase, CharacterRow);
 }
 
 void AFTPlayerCharacterBase::BeginPlay()
@@ -29,23 +56,46 @@ void AFTPlayerCharacterBase::BeginPlay()
 	ApplyCharacterVisuals();
 }
 
-void AFTPlayerCharacterBase::OnRep_CharacterData()
+//	[이관/폐기 보존] 구 OnRep_CharacterData.
+//void AFTPlayerCharacterBase::OnRep_CharacterData()
+//{
+//	ApplyCharacterVisuals();
+//}
+
+void AFTPlayerCharacterBase::OnRep_CharacterRow()
 {
 	ApplyCharacterVisuals();
 }
 
 void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 {
-	if (!CharacterData)
+	//	[이관/폐기 보존] 구 UFT_CharacterData 기반 적용.
+	//if (!CharacterData)
+	//{
+	//	return;
+	//}
+	//GetCharacterMovement()->MaxWalkSpeed = CharacterData->GetDefaultMoveSpeed();
+	//if (USkeletalMesh* CharacterMesh = CharacterData->GetCharacterMesh())
+	//{
+	//	GetMesh()->SetSkeletalMesh(CharacterMesh);
+	//}
+
+	const FFTCharacterData* Data = GetCharacterData();
+	if (!Data)
 	{
 		return;
 	}
 
-	GetCharacterMovement()->MaxWalkSpeed = CharacterData->GetDefaultMoveSpeed();
+	GetCharacterMovement()->MaxWalkSpeed = Data->DefaultMoveSpeed;
 
-	if (USkeletalMesh* CharacterMesh = CharacterData->GetCharacterMesh())
+	//	메쉬/애님BP는 소프트 참조 — 영웅이 확정된 이 시점에 동기 로드해서 적용한다.
+	if (USkeletalMesh* CharacterMesh = Data->SkeletalMesh.LoadSynchronous())
 	{
 		GetMesh()->SetSkeletalMesh(CharacterMesh);
+	}
+	if (UClass* AnimBPClass = Data->AnimClass.LoadSynchronous())
+	{
+		GetMesh()->SetAnimInstanceClass(AnimBPClass);
 	}
 }
 
@@ -86,6 +136,28 @@ UAbilitySystemComponent* AFTPlayerCharacterBase::GetAbilitySystemComponent() con
 {
 	AFTPlayerState* PS = GetPlayerState<AFTPlayerState>();
 	return PS ? PS->GetAbilitySystemComponent() : nullptr;
+}
+
+const FFTCharacterData* AFTPlayerCharacterBase::GetCharacterData() const
+{
+	if (CharacterRow.IsNull())
+	{
+		return nullptr;
+	}
+	return CharacterRow.GetRow<FFTCharacterData>(TEXT("AFTPlayerCharacterBase::GetCharacterData"));
+}
+
+UFT_WeaponData* AFTPlayerCharacterBase::GetWeaponData() const
+{
+	//	[이관/폐기 보존] 구: return CharacterData ? CharacterData->GetWeaponData() : CurrentWeaponData;
+	if (const FFTCharacterData* Data = GetCharacterData())
+	{
+		if (Data->WeaponData)
+		{
+			return Data->WeaponData;
+		}
+	}
+	return CurrentWeaponData;
 }
 
 void AFTPlayerCharacterBase::Move(const FInputActionValue& Value)
@@ -206,22 +278,28 @@ void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
 					}
 				}
 
-				// CharacterData의 인풋 태그별 어빌리티 맵(CharacterAbilities)을 부여.
-				// C++ 클래스 직접 스폰 경로에서는 StartupAbilities가 비어 있으므로,
-				// 데이터 에셋(DA_*)에 채운 스킬셋이 실제 부여 경로가 된다.
-				if (CharacterData)
+				// [이관/폐기 보존] 구: UFT_CharacterData의 인풋 태그별 어빌리티 맵(CharacterAbilities)을 순회 부여.
+				//if (CharacterData)
+				//{
+				//	for (const TPair<FGameplayTag, TSubclassOf<UGameplayAbility>>& AbilityPair : CharacterData->GetHeroAbilities())
+				//	{
+				//		if (AbilityPair.Value)
+				//		{
+				//			FGameplayAbilitySpec Spec(AbilityPair.Value, 1, -1, this);
+				//			Spec.GetDynamicSpecSourceTags().AddTag(AbilityPair.Key);
+				//			ASC->GiveAbility(Spec);
+				//		}
+				//	}
+				//}
+
+				// 신: 캐릭터 행(FFTCharacterData)의 4개 버튼 슬롯에서 스킬을 부여.
+				// 버튼→InputTag는 기존 태그를 재사용한다. (LMB→NormalAttack / RMB→AttackSkill / Space→UtilSkill / R→UltimateSkill)
+				if (const FFTCharacterData* Data = GetCharacterData())
 				{
-					for (const TPair<FGameplayTag, TSubclassOf<UGameplayAbility>>& AbilityPair : CharacterData->GetHeroAbilities())
-					{
-						if (AbilityPair.Value)
-						{
-							FGameplayAbilitySpec Spec(AbilityPair.Value, 1, -1, this);
-							// CharacterData 맵의 키(입력 태그)를 스펙에 실어, 어빌리티 자체의 AssetTags 세팅 여부와 무관하게
-							// ActivateAbilityByInputTag에서 이 태그로 매칭할 수 있게 한다.
-							Spec.GetDynamicSpecSourceTags().AddTag(AbilityPair.Key);
-							ASC->GiveAbility(Spec);
-						}
-					}
+					GrantSkillFromSlot(ASC, this, Data->LMBSkill,   FTTags::FTAbilities::NormalAttack);
+					GrantSkillFromSlot(ASC, this, Data->RMBSkill,   FTTags::FTAbilities::AttackSkill);
+					GrantSkillFromSlot(ASC, this, Data->SpaceSkill, FTTags::FTAbilities::UtilSkill);
+					GrantSkillFromSlot(ASC, this, Data->RSkill,     FTTags::FTAbilities::UltimateSkill);
 				}
 
 				// [변경 지점] 지저분한 태그 수동 주입을 제거하고, 
@@ -264,7 +342,22 @@ void AFTPlayerCharacterBase::OnRep_PlayerState()
 
 void AFTPlayerCharacterBase::InitializeCharacterAttribute() const
 {
-	if (!CharacterData || !HasAuthority())
+	//	[이관/폐기 보존] 구 UFT_CharacterData 기반 스탯 초기화.
+	//if (!CharacterData || !HasAuthority())
+	//{
+	//	return;
+	//}
+	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxHealthAttribute(),        CharacterData->GetDefaultMaxHealth());
+	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetHealthAttribute(),           CharacterData->GetDefaultMaxHealth());
+	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxShieldAttribute(),        CharacterData->GetDefaultMaxShield());
+	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetShieldAttribute(),           CharacterData->GetDefaultMaxShield());
+	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxMoveSpeedAttribute(),     CharacterData->GetDefaultMoveSpeed());
+	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMoveSpeedAttribute(),        CharacterData->GetDefaultMoveSpeed());
+	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetAttackPowerAttribute(),      CharacterData->GetDefaultAttackPower());
+	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxUltimateGaugeAttribute(), CharacterData->GetDefaultMaxUltimateGauge());
+
+	const FFTCharacterData* Data = GetCharacterData();
+	if (!Data || !HasAuthority())
 	{
 		return;
 	}
@@ -275,14 +368,14 @@ void AFTPlayerCharacterBase::InitializeCharacterAttribute() const
 		return;
 	}
 
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxHealthAttribute(),        CharacterData->GetDefaultMaxHealth());
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetHealthAttribute(),           CharacterData->GetDefaultMaxHealth());
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxShieldAttribute(),        CharacterData->GetDefaultMaxShield());
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetShieldAttribute(),           CharacterData->GetDefaultMaxShield());
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxMoveSpeedAttribute(),     CharacterData->GetDefaultMoveSpeed());
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMoveSpeedAttribute(),        CharacterData->GetDefaultMoveSpeed());
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetAttackPowerAttribute(),      CharacterData->GetDefaultAttackPower());
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxUltimateGaugeAttribute(), CharacterData->GetDefaultMaxUltimateGauge());
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxHealthAttribute(),        Data->DefaultMaxHealth);
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetHealthAttribute(),           Data->DefaultMaxHealth);
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxShieldAttribute(),        Data->DefaultMaxShield);
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetShieldAttribute(),           Data->DefaultMaxShield);
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxMoveSpeedAttribute(),     Data->DefaultMoveSpeed);
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMoveSpeedAttribute(),        Data->DefaultMoveSpeed);
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetAttackPowerAttribute(),      Data->DefaultAttackPower);
+	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxUltimateGaugeAttribute(), Data->DefaultMaxUltimateGauge);
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetUltimateGaugeAttribute(),    0.0f);
 
 	// Die()에서 부여한 Dead 태그를 해제한다 (부여 시와 동일한 복제 상태로 대칭 호출).

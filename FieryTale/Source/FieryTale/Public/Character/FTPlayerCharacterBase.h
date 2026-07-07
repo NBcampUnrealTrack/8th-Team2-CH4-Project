@@ -6,12 +6,14 @@
 #include "Character/FTCharacterBase.h"
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
 #include "AbilitySystem/Abilities/Player/Character/FT_CharacterData.h"
+#include "Engine/DataTable.h"
 #include "GameplayTagContainer.h"
 #include "FTPlayerCharacterBase.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
 struct FInputActionValue;
+struct FFTCharacterData;
 
 DECLARE_LOG_CATEGORY_EXTERN(FTPlayerCharacter, Log, All);
 
@@ -45,22 +47,25 @@ public:
 	// ASC는 PlayerState에서 가져옴
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	UPROPERTY(ReplicatedUsing = OnRep_CharacterData, EditAnywhere, BlueprintReadWrite, Category = "FieryTale | Character")
-	TObjectPtr<UFT_CharacterData> CharacterData;
+	// [이관/폐기 보존] 구: UFT_CharacterData 포인터를 직접 참조하던 방식.
+	//UPROPERTY(ReplicatedUsing = OnRep_CharacterData, EditAnywhere, BlueprintReadWrite, Category = "FieryTale | Character")
+	//TObjectPtr<UFT_CharacterData> CharacterData;
+	//
+	//UFUNCTION()
+	//void OnRep_CharacterData();
+
+	// 신: DT_CharacterData(FFTCharacterData) 행을 가리키는 핸들. BP 인스턴스 또는 스폰 시 주입으로 지정한다.
+	UPROPERTY(ReplicatedUsing = OnRep_CharacterRow, EditAnywhere, BlueprintReadWrite, Category = "FieryTale | Character", meta = (RowType = "FTCharacterData"))
+	FDataTableRowHandle CharacterRow;
 
 	UFUNCTION()
-	void OnRep_CharacterData();
-	
+	void OnRep_CharacterRow();
+
+	//	CharacterRow를 FFTCharacterData*로 해석한다. 테이블/행이 유효하지 않으면 nullptr.
+	const FFTCharacterData* GetCharacterData() const;
+
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Weapon")
-	UFT_WeaponData* GetWeaponData() const 
-	{  
-		if (CharacterData)
-		{
-			return CharacterData->GetWeaponData();	
-		}
-		
-		return CurrentWeaponData;
-	}
+	UFT_WeaponData* GetWeaponData() const;
 
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
