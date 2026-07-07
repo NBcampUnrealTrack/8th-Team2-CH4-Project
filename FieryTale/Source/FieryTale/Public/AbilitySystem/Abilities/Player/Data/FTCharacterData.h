@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataTable.h"
+#include "Character/FTCharacterTypes.h"
 #include "FTCharacterData.generated.h"
 
 class USkeletalMesh;
@@ -82,4 +83,13 @@ struct FFTCharacterData : public FTableRowBase
 	//	평타/사격 메커니즘 설정 에셋
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon")
 	TObjectPtr<UFT_WeaponData> WeaponData;
+	
+	
+	//  데이터 테이블의 이 행이 어떤 캐릭터 타입을 의미하는지 식별
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Character")
+	EFTCharacterType CharacterType;
+
+	//  로비 캐릭터 선택 버튼 및 팀 로스터에 띄울 2D 초상화 아이콘
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Character")
+	TSoftObjectPtr<UTexture2D> PortraitIcon;
 };

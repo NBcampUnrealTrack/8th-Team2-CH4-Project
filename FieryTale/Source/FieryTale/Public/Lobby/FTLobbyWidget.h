@@ -38,15 +38,17 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* Text_ReadyStatus;
 	
-	// 캐릭터 선택 슬롯
+	// 캐릭터 정보가 담긴 데이터 테이블 (에디터에서 할당)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Data")
+	class UDataTable* CharacterDataTable;
+	
+	// 동적으로 생성될 캐릭터 선택 버튼들이 담길 상자 (WrapBox 또는 HorizontalBox 추천)
 	UPROPERTY(meta = (BindWidget))
-	UButton* Btn_SelectRedHood;
-	UPROPERTY(meta = (BindWidget))
-	UButton* Btn_SelectAladdin;
-	UPROPERTY(meta = (BindWidget))
-	UButton* Btn_SelectKaguya;
-	UPROPERTY(meta = (BindWidget))
-	UButton* Btn_SelectAlice;
+	class UPanelWidget* CharacterButtonContainer;
+
+	// 생성해낼 단일 캐릭터 버튼의 위젯 클래스
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|UI")
+	TSubclassOf<class UUserWidget> CharacterSelectButtonClass;
 	
 	// 팀원들의 초상화 위젯들이 담길 가로형 박스
 	UPROPERTY(meta = (BindWidget))
@@ -72,15 +74,6 @@ private:
 	void OnStartGameClicked();
 	UFUNCTION()
 	void OnReadyStateChanged();
-	
-	UFUNCTION()
-	void OnRedHoodClicked();
-	UFUNCTION()
-	void OnAladdinClicked();
-	UFUNCTION()
-	void OnKaguyaClicked();
-	UFUNCTION()
-	void OnAliceClicked();
 	
 	// 주기적으로 타이머 호출해서 인원수 체크
 	FTimerHandle RosterCheckTimerHandle;

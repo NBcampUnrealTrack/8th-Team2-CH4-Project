@@ -9,10 +9,16 @@
 #include "GameFramework/GameStateBase.h"
 
 #include "Character/FTPlayerController.h"
+#include "Character/FTCharacterTypes.h"
 #include "Lobby/FTLobbyPlayerState.h"
 #include "Character/FTCharacterTypes.h"
 
+#include "Engine/DataTable.h"
+#include "Components/PanelWidget.h" // 컨테이너 조작용
+#include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
+
 #include "Algo/Sort.h"
+#include "Lobby/FTCharacterSelectButton.h"
 
 void UFTLobbyWidget::NativeConstruct()
 {
@@ -26,22 +32,6 @@ void UFTLobbyWidget::NativeConstruct()
 	if (Btn_StartGame)
 	{
 		Btn_StartGame->OnClicked.AddDynamic(this, &UFTLobbyWidget::OnStartGameClicked);
-	}
-	if (Btn_SelectRedHood)
-	{
-		Btn_SelectRedHood->OnClicked.AddDynamic(this, &UFTLobbyWidget::OnRedHoodClicked);
-	}
-	if (Btn_SelectAladdin)
-	{
-		Btn_SelectAladdin->OnClicked.AddDynamic(this, &UFTLobbyWidget::OnAladdinClicked);
-	}
-	if (Btn_SelectKaguya)
-	{
-		Btn_SelectKaguya->OnClicked.AddDynamic(this, &UFTLobbyWidget::OnKaguyaClicked);
-	}
-	if (Btn_SelectAlice)
-	{
-		Btn_SelectAlice->OnClicked.AddDynamic(this, &UFTLobbyWidget::OnAliceClicked);
 	}
 }
 
@@ -72,6 +62,36 @@ void UFTLobbyWidget::InitWidget(AFTPlayerController* InPC, AFTLobbyPlayerState* 
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(RosterCheckTimerHandle, this, &UFTLobbyWidget::CheckRosterCount, 0.5f, true);
+	}
+	
+	// 🌟 [추가]: 데이터 테이블 기반 동적 버튼 생성 로직
+	if (CharacterDataTable && CharacterButtonContainer && CharacterSelectButtonClass)
+	{
+		// 1. 기존에 수동으로 배치되어 있던 찌꺼기 버튼이 있다면 모두 비움
+		CharacterButtonContainer->ClearChildren();
+
+		// 2. 데이터 테이블의 모든 행 가져오기
+		static const FString ContextString(TEXT("Lobby Character Initialization"));
+		TArray<FFTCharacterData*> AllCharacters;
+		CharacterDataTable->GetAllRows<FFTCharacterData>(ContextString, AllCharacters);
+
+		// 3. 영웅 개수만큼 버튼을 만들고 데이터를 주입
+		for (FFTCharacterData* CharData : AllCharacters)
+		{
+			if (CharData && CharData->CharacterType != EFTCharacterType::None)
+			{
+				// UFTCharacterButton(가칭) 위젯 생성
+				// (이후 해당 위젯 클래스에서 CharData의 DisplayName과 PortraitIcon을 받아 화면에 세팅)
+				UFTCharacterSelectButton* NewButtonWidget = CreateWidget<UFTCharacterSelectButton>(this, CharacterSelectButtonClass);
+                
+				if (NewButtonWidget)
+				{
+					NewButtonWidget->InitializeButton(CharData, LobbyPC);
+
+					CharacterButtonContainer->AddChild(NewButtonWidget);
+				}
+			}
+		}
 	}
 	
 	RefreshTeamRoster();
@@ -166,38 +186,6 @@ void UFTLobbyWidget::OnReadyStateChanged()
 			Text_ReadyStatus->SetText(FText::FromString(TEXT("상태: 대기 중...")));
 			Text_ReadyStatus->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 		}
-	}
-}
-
-void UFTLobbyWidget::OnRedHoodClicked()
-{
-	if (LobbyPC)
-	{
-		LobbyPC->RequestSetCharacter(EFTCharacterType::RedHood);
-	}
-}
-
-void UFTLobbyWidget::OnAladdinClicked()
-{
-	if (LobbyPC)
-	{
-		LobbyPC->RequestSetCharacter(EFTCharacterType::Aladdin);
-	}
-}
-
-void UFTLobbyWidget::OnKaguyaClicked()
-{
-	if (LobbyPC)
-	{
-		LobbyPC->RequestSetCharacter(EFTCharacterType::Kaguya);
-	}
-}
-
-void UFTLobbyWidget::OnAliceClicked()
-{
-	if (LobbyPC)
-	{
-		LobbyPC->RequestSetCharacter(EFTCharacterType::Alice);
 	}
 }
 
