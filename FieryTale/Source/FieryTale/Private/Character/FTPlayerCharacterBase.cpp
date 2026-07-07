@@ -16,6 +16,7 @@
 #include "GameplayTags/FTTags.h"
 #include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
 #include "AbilitySystem/Abilities/Player/Data/FTSkillMetaData.h"
+#include "Engine/SkeletalMesh.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerCharacter);
 
@@ -91,7 +92,38 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 	//	메쉬/애님BP는 소프트 참조 — 영웅이 확정된 이 시점에 동기 로드해서 적용한다.
 	if (USkeletalMesh* CharacterMesh = Data->SkeletalMesh.LoadSynchronous())
 	{
+		//GetMesh()->SetSkeletalMesh(CharacterMesh);
 		GetMesh()->SetSkeletalMesh(CharacterMesh);
+
+		// 1. 메쉬 에셋 자체의 원본 바운드 정보 가져오기
+		FBoxSphereBounds MeshBounds = CharacterMesh->GetBounds();
+		float MeshOriginalHeight = MeshBounds.BoxExtent.Z * 2.0f;
+
+		if (MeshOriginalHeight > 0.0f)
+		{
+			// 2. 캡슐 절반 높이 가져오기 (기본값: 96.0f)
+			float CapsuleHalfHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+			float TargetHeight = CapsuleHalfHeight * 2.0f;
+
+			// 3. 목표 높이 대비 메쉬 원본 높이의 비율 계산
+			float TargetScale = TargetHeight / MeshOriginalHeight;
+
+			// 4. 균등 스케일 적용 (X, Y, Z 모두 동일 비율로 축소/확대)
+			GetMesh()->SetRelativeScale3D(FVector(TargetScale));
+
+			// 5. 스케일이 적용된 메쉬를 캡슐 바닥에 정확히 정렬
+			// 언리얼 캐릭터 메쉬의 기본 회전축인 -90도(Z)도 함께 처리
+			const FVector NewMeshRelativeLocation(0.f, 0.f, -CapsuleHalfHeight);
+			const FRotator NewMeshRelativeRotation(0.f, -90.f, 0.f);
+			GetMesh()->SetRelativeLocationAndRotation(NewMeshRelativeLocation, NewMeshRelativeRotation);
+
+			// 6. PostInitializeComponents에서 이미 캐싱된 BaseTranslationOffset/BaseRotationOffset을
+			// 방금 바뀐 메쉬 트랜스폼 기준으로 갱신한다.
+			// 이걸 안 하면 원격 클라이언트(Simulated Proxy)의 네트워크 스무딩이 옛 오프셋 기준으로
+			// 메쉬를 재배치해서, 캡슐 위치와 어긋나 붕 뜬 것처럼 보인다.
+			CacheInitialMeshOffset(NewMeshRelativeLocation, NewMeshRelativeRotation);
+		}
+
 	}
 	if (UClass* AnimBPClass = Data->AnimClass.LoadSynchronous())
 	{

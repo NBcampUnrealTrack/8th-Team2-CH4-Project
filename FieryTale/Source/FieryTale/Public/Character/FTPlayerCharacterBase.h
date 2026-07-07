@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "Character/FTCharacterBase.h"
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
-#include "AbilitySystem/Abilities/Player/Character/FT_CharacterData.h"
 #include "Engine/DataTable.h"
 #include "GameplayTagContainer.h"
 #include "FTPlayerCharacterBase.generated.h"
