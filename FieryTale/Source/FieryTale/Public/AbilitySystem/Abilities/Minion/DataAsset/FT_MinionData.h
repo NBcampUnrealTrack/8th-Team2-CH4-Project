@@ -22,15 +22,19 @@ class FIERYTALE_API UFT_MinionData : public UDataAsset
 public:
     // =========================================================================
     // [미니언 식별 사양 선언부]
-    // 지령에 따라 에넘을 완전 배제하고, FTTags::FTMinionRole::Melee 또는 Ranged 태그를
+    // 에넘을 완전 배제하고, FTTags::FTMinionRole::Melee 또는 Ranged 태그를
     // 디테일 창에서 다이렉트로 주입받아 역할군을 명세합니다.
     // =========================================================================
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Design")
     FGameplayTag MinionRoleTag;
 
-    /** 미니언의 인게임 외형 비주얼을 담당할 에셋 슬롯 */
+    /** 
+     * [메모리 릭 수선 완료]: 하드 레퍼런스를 소각하고 소프트 레퍼런스로 전환합니다.
+     * 게임 기동 시 무거운 비주얼 데이터가 메모리에 상시 잔주하는 현상을 차단하고, 
+     * 스포너가 지연 생성을 단행하는 런타임 순간에만 스트리밍 로드되도록 제어합니다.
+     */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
-    TObjectPtr<USkeletalMesh> MinionMesh;
+    TSoftObjectPtr<USkeletalMesh> MinionMesh;
 
     // =========================================================================
     // [미니언 기본 속성 수치 장부]
@@ -49,16 +53,16 @@ public:
     // [미니언 GAS 및 AI 인프라 자산 슬롯]
     // =========================================================================
     
-    /** 미니언이 전선 격돌 시 사출할 GAS 어빌리티 목록입니다.
+    /** 미니언 전선 격돌 시 사출할 GAS 어빌리티 목록입니다.
      * 근접 미니언은 MeleeAttack GA, 원거리 미니언은 RangedProjectile 사출 GA를 매핑합니다.
      */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | GAS")
     TArray<TSubclassOf<UGameplayAbility>> MinionAbilities;
 
     /** 
-     * 미니언 본체의 정신을 깨우고 실시간 시야 스캔 및 가중치 타겟팅을 집도할 고유 C++ AI 뇌세포 어빌리티 클래스 명세입니다.
-     * 미니언 캐릭터 베이스가 이 정보를 인양하여 수동으로 AI 틱 시동을 가동합니다.
+     * [네이밍 가드 완착]: 본체 캐릭터의 런타임 변수와 혼동되지 않도록 명 명세를 정비했습니다.
+     * 에디터 단에서 기획자가 장착해 둔 기저 사고 회로의 원본 클래스 명세입니다.
      */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | AI")
-    TSubclassOf<UGameplayAbility> BrainAbilityClass;
+    TSubclassOf<UGameplayAbility> DefaultBrainAbilityClass;
 };

@@ -14,7 +14,11 @@
 
 UFT_MinionAttackBase::UFT_MinionAttackBase()
 {
+    // 인스턴싱 정책: 미니언 개체별 개별 쿨타임 및 공격 상태 제어를 위해 인스턴스 격리 생성
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+    
+    // [GAS 마스터 CC 가드선 완착]
+    // 기절(Stunned) 디버프 상태 레이어가 가동 중일 때는 미니언 공격 행동 자체를 차단 봉쇄합니다.
     ActivationBlockedTags.AddTag(FTTags::FTStates::Debuff::Stunned);
 }
 
@@ -42,8 +46,9 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
     if (MontageTask)
     {
+        // [타이밍 릭 수선]: OnBlendOut 관문을 제외시킵니다. 블렌드가 시작되어도 몽타주가 완전히 끝날 때(OnCompleted)까지 
+        // 어빌리티 생명주기를 살려두어 노티파이 이벤트 가 사출 전 공중 분해되는 버그를 원천 진압합니다.
         MontageTask->OnCompleted.AddDynamic(this, &UFT_MinionAttackBase::OnMontageCompletedOrCancelled);
-        MontageTask->OnBlendOut.AddDynamic(this, &UFT_MinionAttackBase::OnMontageCompletedOrCancelled);
         MontageTask->OnInterrupted.AddDynamic(this, &UFT_MinionAttackBase::OnMontageCompletedOrCancelled);
         MontageTask->OnCancelled.AddDynamic(this, &UFT_MinionAttackBase::OnMontageCompletedOrCancelled);
         
@@ -81,6 +86,7 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     
     if (!AIC || !MyASC || !DamageEffectClass) return;
 
+    // 브레인 어빌리티가 실시간으로 고정해 준 Focus 대상(적 영웅, 적 미니언, 구조물)을 타깃 액터로 정밀 견인합니다.
     AActor* TargetActor = AIC->GetFocusActor();
     if (!TargetActor) return;
 

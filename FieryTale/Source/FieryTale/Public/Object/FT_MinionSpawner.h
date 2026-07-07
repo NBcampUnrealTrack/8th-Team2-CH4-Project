@@ -74,6 +74,13 @@ private:
     /** 30초 주기로 웨이브 생산 종을 울리는 통제 함수 */
     void TriggerMinionWave();
 
+    /** 
+     * [비동기 스트리밍 연동 수선 완료]
+     * 엔진 StreamableManager가 백그라운드에서 소프트 메쉬 에셋들을 완벽하게 다 읽어 들인 직후,
+     * 안전하게 정기 순차 사출 타이머를 가동해 줄 비동기 처리 콜백 함수입니다.
+     */
+    void StartSequentialSpawn();
+
     /** 대기 큐에서 데이터 에셋을 하나씩 꺼내 실물 육체에 주입 사출하는 엔진 함수 */
     void SpawnMinionFromQueue();
 

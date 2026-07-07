@@ -63,14 +63,11 @@ void UFT_Minion_Brain::ExecuteAILogic()
         return;
     }
 
-    FGameplayTag MyTeamTag;
-    if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) MyTeamTag = FTTags::FTFaction::Team_Blue;
-    else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) MyTeamTag = FTTags::FTFaction::Team_Red;
+    UBlackboardComponent* BB = AIC->GetBlackboardComponent();
+    if (!BB) return;
 
-    if (!MyTeamTag.IsValid()) return;
-
-    // [1단계: 브레인 소속의 마스터 타깃 셀렉터 스캔 발동]
-    AActor* BestTarget = InternalScanBestTarget(AvatarChar, MyTeamTag);
+    // 배관 융합 코어: 컨트롤러의 AIPerception이 인양하여 블랙보드 장부에 정비해 둔 진짜 타깃을 직접 인양합니다.
+    AActor* BestTarget = Cast<AActor>(BB->GetValueAsObject(TEXT("TargetEnemy")));
 
     if (BestTarget)
     {
@@ -85,145 +82,63 @@ void UFT_Minion_Brain::ExecuteAILogic()
             
             FGameplayTagContainer AttackTags;
             AttackTags.AddTag(FTTags::FTAbilities::Minion_Attack);
+            
+            // 주권 서버 하에서 확실하게 일반 공격 어빌리티 파이프라인을 사출 유도합니다.
             MyASC->TryActivateAbilitiesByTag(AttackTags);
         }
         else
         {
-            // [적 추격 상태]: 사거리 밖의 타깃을 끝까지 추격
-            AIC->MoveToActor(BestTarget, AttackAcceptanceRadius);
+            // [적 추격 상태]: 사거리 밖의 타깃을 최단 경로 내비게이션으로 끝까지 추격하도록 컨트롤러에 기동 하달
+            AIC->MoveToActor(BestTarget, AttackAcceptanceRadius, true, true, true);
         }
     }
     else
     {
-        // =========================================================================
-        // [2단계: 평화 진격 상태 - 캐릭터의 거점 장부를 파싱하여 블랙보드 갱신 동기화]
-        // 주위에 적이 없다면 타깃 시선 락을 클리어하고, 캐릭터 육체가 보관 중인 레일 데이터를 
-        // 브레인이 제어 분석하여 다음 웨이포인트 벡터 좌표로 스위칭 전진시킵니다.
-        // =========================================================================
+        // 주위에 적이 없다면 타깃 시선 락을 클리어하고 라인 복귀 연산을 단행합니다.
         AIC->ClearFocus(EAIFocusPriority::Gameplay);
 
         AFT_MinionCharacterBase* MinionChar = Cast<AFT_MinionCharacterBase>(AvatarChar);
-        if (UBlackboardComponent* BB = AIC->GetBlackboardComponent())
+        if (MinionChar)
         {
-            if (MinionChar)
+            // 미니언 본체 헤더에 보관 중인 현재 타겟 웨이포인트 주소지 견인
+            AFT_WayPoint* TargetWP = MinionChar->GetCurrentTargetWayPoint();
+            if (TargetWP)
             {
-                // 미니언 본체 헤더에 증설해 둔 현재 타겟 웨이포인트 주소지 견인
-                AFT_WayPoint* TargetWP = MinionChar->GetCurrentTargetWayPoint();
+                float DistanceToWP = FVector::Dist(MinionChar->GetActorLocation(), TargetWP->GetActorLocation());
+                
+                // 거점 도달 반경 검수 및 다음 연결 고리 웨이포인트 갱신 피드백
+                if (DistanceToWP <= TargetWP->ArrivalRadius)
+                {
+                    AFT_WayPoint* NextWP = TargetWP->NextWayPoint;
+                    MinionChar->SetCurrentTargetWayPoint(NextWP);
+                    TargetWP = NextWP;
+                }
+                
+                // 최종 유효 거점의 3D 공간 좌표 벡터 패킷을 순정 블랙보드 우체통에 주입 주사합니다.
                 if (TargetWP)
                 {
-                    float DistanceToWP = FVector::Dist(MinionChar->GetActorLocation(), TargetWP->GetActorLocation());
-                    
-                    // 거점 도달 반경 검수 및 다음 연결 고리 갱신 명령 피드백
-                    if (DistanceToWP <= TargetWP->ArrivalRadius)
-                    {
-                        AFT_WayPoint* NextWP = TargetWP->NextWayPoint;
-                        MinionChar->SetCurrentTargetWayPoint(NextWP);
-                        TargetWP = NextWP;
-                    }
-                    
-                    // 최종 유효 거점의 3D 공간 좌표 벡터 패킷을 순정 블랙보드 우체통에 동동 주입 주사합니다.
-                    if (TargetWP)
-                    {
-                        BB->SetValueAsVector(TEXT("LineWaypoint"), TargetWP->GetActorLocation());
-                    }
-                    else
-                    {
-                        BB->ClearValue(TEXT("LineWaypoint"));
-                    }
+                    BB->SetValueAsVector(TEXT("LineWaypoint"), TargetWP->GetActorLocation());
+                }
+                else
+                {
+                    BB->ClearValue(TEXT("LineWaypoint"));
                 }
             }
+        }
 
-            // 정비된 블랙보드 목적지 벡터를 인양하여 라인 순찰 복귀 기동 지령 사출
-            FVector NextLineLocation = BB->GetValueAsVector(TEXT("LineWaypoint"));
-            if (!NextLineLocation.IsZero())
-            {
-                AIC->MoveToLocation(NextLineLocation, 50.0f, true, true, true);
-            }
+        // 정비된 블랙보드 목적지 벡터를 인양하여 라인 순찰 전진 기동 지령 사출
+        FVector NextLineLocation = BB->GetValueAsVector(TEXT("LineWaypoint"));
+        if (!NextLineLocation.IsZero())
+        {
+            AIC->MoveToLocation(NextLineLocation, 50.0f, true, true, true);
         }
     }
 }
 
 AActor* UFT_Minion_Brain::InternalScanBestTarget(AFTCharacterBase* AvatarChar, const FGameplayTag& MyTeamTag)
 {
-    FVector MyLoc = AvatarChar->GetActorLocation();
-    TArray<FOverlapResult> OverlapResults;
-    FCollisionShape ScanSphere = FCollisionShape::MakeSphere(ScanRange);
-    FCollisionQueryParams QueryParams;
-    QueryParams.AddIgnoredActor(AvatarChar);
-
-    // [리뷰 저격 박멸 1 - 확장 빌드업 개통]
-    // 영웅 액터에만 필터링이 국한되지 않도록 단일 폰 채널 다이내믹 포괄 스캔
-    bool bHasActors = GetWorld()->OverlapMultiByChannel(
-        OverlapResults, MyLoc, FQuat::Identity, ECollisionChannel::ECC_Pawn, ScanSphere, QueryParams
-    );
-
-    if (!bHasActors) return nullptr;
-
-    AActor* BestTarget = nullptr;
-    float BestTargetScore = -10000.0f;
-
-    for (const FOverlapResult& Result : OverlapResults)
-    {
-        AActor* CandidateActor = Result.GetActor();
-        if (!CandidateActor) continue;
-
-        // [리뷰 저격 박멸 2 - 순정 GAS 인터페이스 기반 가상 캐스팅 완화]
-        // 타겟팅 대상을 캐릭터 군단에 락온하지 않고 포탑, 억제기, 넥서스 구조물까지 무결 포괄 인양합니다.
-        IAbilitySystemInterface* ASI = Cast<IAbilitySystemInterface>(CandidateActor);
-        if (!ASI) continue;
-
-        UAbilitySystemComponent* CandidateASC = ASI->GetAbilitySystemComponent();
-        if (!CandidateASC) continue;
-
-        // [오타 수선 마감 완료]: HasMatchingMatching... 중복 자구 오타를 순정 멤버명으로 청정 보수 완착
-        if (CandidateASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
-
-        // 동적 피아식별 필터링
-        bool bCandidateIsBlue = CandidateASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue);
-        bool bCandidateIsRed = CandidateASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red);
-        if (!bCandidateIsBlue && !bCandidateIsRed) continue;
-
-        bool bIsSameTeam = (MyTeamTag == FTTags::FTFaction::Team_Blue && bCandidateIsBlue) ||
-                           (MyTeamTag == FTTags::FTFaction::Team_Red && bCandidateIsRed);
-        if (bIsSameTeam) continue;
-
-        // =========================================================================
-        // [AOS 전술 가중치 스코어링 연산 가동]
-        // 포탑 및 주요 구조물 오브젝트들이 이 장부선에 정상 도달하여 가중치 배율을 배정받습니다.
-        // =========================================================================
-        float CurrentScore = 0.0f;
-        float Distance = FVector::Dist(MyLoc, CandidateActor->GetActorLocation());
-
-        // 영웅 캐릭터 가중치 (플레이어 제어 대상 최우선 점사 처단 가중치)
-        if (AFTCharacterBase* TargetChar = Cast<AFTCharacterBase>(CandidateActor))
-        {
-            if (TargetChar->IsPlayerControlled())
-            {
-                CurrentScore += 6000.0f;
-            }
-        }
-        
-        // 공성 연산 구조물(포탑 / 넥서스) 식별 및 전술 가중치 합산
-        if (CandidateASC->HasMatchingGameplayTag(FTTags::FTObjectType::Structure_Turret))
-        {
-            CurrentScore += 5000.0f;
-        }
-        else if (CandidateASC->HasMatchingGameplayTag(FTTags::FTObjectType::Structure_Nexus))
-        {
-            CurrentScore += 4500.0f;
-        }
-
-        // 거리 기반 비례 보정 합산 (가장 가까운 대상일수록 우선순위 가산)
-        CurrentScore += (ScanRange - Distance) * 0.1f;
-
-        if (CurrentScore > BestTargetScore)
-        {
-            BestTargetScore = CurrentScore;
-            BestTarget = CandidateActor;
-        }
-    }
-
-    return BestTarget;
+    // 중복 연산 소각: 이제 AI 컨트롤러의 AIPerception이 실시간 정밀 스캔을 전담하므로, 이 구역은 가벼움을 위해 완전 공백 정지합니다.
+    return nullptr;
 }
 
 void UFT_Minion_Brain::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)

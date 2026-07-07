@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "FT_WayPoint.generated.h"
 
+class USphereComponent;
+
 /**
  * AOS 라인의 주요 거점 및 모퉁이를 마킹하고 체인 형태로 연결하는
  * 순정 웨이포인트 액터 클래스입니다.
@@ -24,5 +26,23 @@ public:
 
 	/** 개발 및 레벨 디자인 편의를 위한 거점 반경 범위 가시화용 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FieryTale | Navigation")
-	float ArrivalRadius;
+	float ArrivalRadius = 150.0f;
+
+protected:
+#if WITH_EDITOR
+	// =========================================================================
+	// [에디터 무결성 보정 배관]
+	// 디테일 패널에서 디자이너가 ArrivalRadius 수치를 변경하는 즉시 
+	// 가시화용 구체 컴포넌트의 반경이 실시간 비례 연동되도록 제어하는 엔진 순정 함수입니다.
+	// =========================================================================
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+private:
+	/** 
+	 * [레벨 디자인 픽스]: 에디터 뷰포트에서 미니언 도달 범위를 시각적으로 명확히 락인해 줄 가시화 헬퍼 컴포넌트입니다.
+	 * 인게임 빌드(Shipping) 환경에서는 물리 연산 비용을 0으로 지우기 위해 콜리전을 원천 소각합니다.
+	 */
+	UPROPERTY(VisibleAnywhere, Category = "FieryTale | Editor Only")
+	TObjectPtr<USphereComponent> EditorVisualizerSphere;
 };
