@@ -11,13 +11,17 @@ class UImage;
 class UTextBlock;
 class UProgressBar;
 class UAbilitySystemComponent;
-class UFT_GameplayAbility;
+class UFT_GameplayAbility;   // [구 경로] 어빌리티 CDO 조회용 — 주석과 함께 보존
+class AFTPlayerCharacterBase;
+struct FFTSkillMetaData;
+struct FFTCharacterData;
+struct FDataTableRowHandle;
 
 /**
  *	스킬 슬롯 1개의 정보(아이콘/이름/설명)와 쿨타임을 표시하는 위젯.
- *	- SkillInputTag로 슬롯(RMB/Shift/Q 등)을 지정하면, 소유 플레이어의 ASC에서
- *	  그 인풋 태그로 부여된 어빌리티를 찾아 CDO(UFT_GameplayAbility)의 메타데이터를 읽어 표시한다.
- *	- 해당 어빌리티의 CooldownTag를 감시해 남은 쿨타임 비율을 CooldownBar에 표시한다.
+ *	- SkillInputTag로 슬롯(LMB/RMB/Space/R)을 지정하면, 소유 플레이어 캐릭터의 CharacterData(FFTCharacterData)에서
+ *	  해당 슬롯의 스킬 행(FFTSkillMetaData)을 조회해 아이콘/이름/설명을 표시한다. (DataTable 기반)
+ *	- 그 행의 CooldownTag를 ASC에서 감시해 남은 쿨타임 비율을 CooldownBar에 표시한다.
  *	- 표시용 위젯(Image/Text/ProgressBar)은 모두 BindWidgetOptional이라, 필요한 것만 WBP에 배치하면 된다.
  */
 UCLASS()
@@ -38,7 +42,7 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	//	스킬 아이콘 (머티리얼) — 어빌리티 CDO의 SkillIcon으로 채운다
+	//	스킬 아이콘 (머티리얼) — 스킬 행(FFTSkillMetaData)의 Icon으로 채운다
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> SkillIcon;
 
@@ -59,14 +63,20 @@ protected:
 	TObjectPtr<UTextBlock> CooldownText;
 
 private:
-	//	소유 Pawn에서 ASC + 대상 어빌리티를 찾아 바인딩. 아직이면(복제/부여 지연) 재시도 타이머를 건다.
+	//	소유 Pawn에서 ASC + 스킬 행을 찾아 바인딩. 아직이면(복제/부여 지연) 재시도 타이머를 건다.
 	void TryBindToOwnerASC();
 	UAbilitySystemComponent* ResolveOwnerASC() const;
 
-	//	SkillInputTag로 부여된 어빌리티(CDO)를 찾는다. 못 찾으면 nullptr.
-	UFT_GameplayAbility* ResolveAbilityCDO() const;
+	//	[구 경로/폐기 보존] SkillInputTag로 부여된 어빌리티(CDO)를 찾던 방식.
+	//UFT_GameplayAbility* ResolveAbilityCDO() const;
 
-	//	어빌리티 CDO의 메타데이터로 아이콘/이름/설명을 채우고, 쿨다운 감시를 1회 등록한다.
+	//	소유 캐릭터의 CharacterData(FFTCharacterData)에서 SkillInputTag 슬롯의 스킬 행을 조회한다. 못 찾으면 nullptr.
+	const FFTSkillMetaData* ResolveSkillRow() const;
+
+	//	SkillInputTag(버튼)에 대응하는 슬롯 핸들(LMBSkill/RMBSkill/SpaceSkill/RSkill)을 고른다.
+	const FDataTableRowHandle* GetSlotHandle(const FFTCharacterData& CharData) const;
+
+	//	스킬 행의 메타데이터로 아이콘/이름/설명을 채우고, 쿨다운 감시를 1회 등록한다.
 	//	성공하면 bSkillInfoResolved를 true로 만든다.
 	void RefreshSkillInfo();
 

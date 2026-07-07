@@ -3,7 +3,11 @@
 
 #include "AbilitySystem/Abilities/Player/UI/FTPlayerSkillInfoWidget.h"
 
-#include "AbilitySystem/Abilities/FT_GameplayAbility.h"
+//#include "AbilitySystem/Abilities/FT_GameplayAbility.h"   // [구 경로] ResolveAbilityCDO용 — 주석 보존
+#include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
+#include "AbilitySystem/Abilities/Player/Data/FTSkillMetaData.h"
+#include "Character/FTPlayerCharacterBase.h"
+#include "GameplayTags/FTTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameplayEffectTypes.h"
@@ -119,6 +123,8 @@ UAbilitySystemComponent* UFTPlayerSkillInfoWidget::ResolveOwnerASC() const
 	return nullptr;
 }
 
+/*	[구 경로/폐기 보존] SkillInputTag로 부여된 어빌리티 CDO를 찾아 CDO 메타데이터를 읽던 방식.
+	이제 메타데이터는 DataTable(FFTSkillMetaData)에서 조회한다. (아래 ResolveSkillRow 참고)
 UFT_GameplayAbility* UFTPlayerSkillInfoWidget::ResolveAbilityCDO() const
 {
 	if (!BoundASC || !SkillInputTag.IsValid())
@@ -126,8 +132,6 @@ UFT_GameplayAbility* UFTPlayerSkillInfoWidget::ResolveAbilityCDO() const
 		return nullptr;
 	}
 
-	//	어빌리티 부여 시 인풋 태그를 DynamicSpecSourceTags에 실어두므로(FTPlayerCharacterBase),
-	//	AssetTags 또는 DynamicSpecSourceTags 어느 쪽으로든 슬롯을 매칭할 수 있다.
 	for (const FGameplayAbilitySpec& Spec : BoundASC->GetActivatableAbilities())
 	{
 		if (!Spec.Ability)
@@ -141,52 +145,82 @@ UFT_GameplayAbility* UFTPlayerSkillInfoWidget::ResolveAbilityCDO() const
 
 		if (bMatch)
 		{
-			//	메타데이터는 UFT_GameplayAbility 계열에만 있다. 아니면 nullptr.
 			return Cast<UFT_GameplayAbility>(Spec.Ability);
 		}
 	}
 
 	return nullptr;
 }
+*/
+
+const FFTSkillMetaData* UFTPlayerSkillInfoWidget::ResolveSkillRow() const
+{
+	//	소유 플레이어 캐릭터 → CharacterData(FFTCharacterData) → SkillInputTag 슬롯의 스킬 행.
+	const AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetOwningPlayerPawn());
+	if (!Char)
+	{
+		return nullptr;
+	}
+
+	const FFTCharacterData* CharData = Char->GetCharacterData();
+	if (!CharData)
+	{
+		return nullptr;
+	}
+
+	const FDataTableRowHandle* SlotHandle = GetSlotHandle(*CharData);
+	if (!SlotHandle || SlotHandle->IsNull())
+	{
+		return nullptr;
+	}
+
+	return SlotHandle->GetRow<FFTSkillMetaData>(TEXT("UFTPlayerSkillInfoWidget::ResolveSkillRow"));
+}
+
+const FDataTableRowHandle* UFTPlayerSkillInfoWidget::GetSlotHandle(const FFTCharacterData& CharData) const
+{
+	//	버튼→슬롯 매핑은 기존 인풋 태그를 재사용한다. (캐릭터 부여 로직과 동일한 대응)
+	if (SkillInputTag == FTTags::FTAbilities::NormalAttack)  { return &CharData.LMBSkill; }
+	if (SkillInputTag == FTTags::FTAbilities::AttackSkill)   { return &CharData.RMBSkill; }
+	if (SkillInputTag == FTTags::FTAbilities::UtilSkill)     { return &CharData.SpaceSkill; }
+	if (SkillInputTag == FTTags::FTAbilities::UltimateSkill) { return &CharData.RSkill; }
+	return nullptr;
+}
 
 void UFTPlayerSkillInfoWidget::RefreshSkillInfo()
 {
-	UFT_GameplayAbility* AbilityCDO = ResolveAbilityCDO();
-	if (!AbilityCDO)
+	const FFTSkillMetaData* Skill = ResolveSkillRow();
+	if (!Skill)
 	{
-		//	아직 어빌리티가 부여되지 않았을 수 있다 — 재시도 타이머가 다시 호출한다.
+		//	아직 캐릭터/행이 준비되지 않았을 수 있다 — 재시도 타이머가 다시 호출한다.
 		return;
 	}
-/*
-	//	메타데이터 표시
+
+	//	메타데이터 표시 (DataTable 기반)
 	if (SkillName)
 	{
-		SkillName->SetText(AbilityCDO->GetSkillDisplayName());
+		SkillName->SetText(Skill->DisplayName);
 	}
 	if (SkillDescription)
 	{
-		SkillDescription->SetText(AbilityCDO->GetSkillDescription());
+		SkillDescription->SetText(Skill->Description);
 	}
-	if (SkillIcon)
+	if (SkillIcon && Skill->Icon)
 	{
-		if (UMaterialInterface* IconMaterial = AbilityCDO->GetSkillIcon())
-		{
-			SkillIcon->SetBrushFromMaterial(IconMaterial);
-		}
+		SkillIcon->SetBrushFromMaterial(Skill->Icon);
 	}
 
-	//	쿨다운 감시 1회 등록 — 유효한 쿨다운 태그가 있고 아직 등록 전일 때만.
-	const FGameplayTag CooldownTag = AbilityCDO->GetCooldownTag();
-	if (CooldownTag.IsValid() && !ActiveCooldownTag.IsValid())
+	//	쿨다운 감시 1회 등록 — 행에 유효한 쿨다운 태그가 있고, ASC가 준비됐고, 아직 등록 전일 때만.
+	if (Skill->CooldownTag.IsValid() && !ActiveCooldownTag.IsValid() && BoundASC)
 	{
-		ActiveCooldownTag = CooldownTag;
+		ActiveCooldownTag = Skill->CooldownTag;
 		CooldownTagEventHandle = BoundASC->RegisterGameplayTagEvent(ActiveCooldownTag, EGameplayTagEventType::NewOrRemoved)
 			.AddUObject(this, &UFTPlayerSkillInfoWidget::OnCooldownTagChanged);
 
-		//	위젯이 늦게 생성/바인딩됐어도 현재 태그 상태로 즉시 동기화 (이미 쿨다운 중일 수 있음)
+		//	이미 쿨다운 중일 수 있으므로 현재 태그 상태로 즉시 동기화
 		OnCooldownTagChanged(ActiveCooldownTag, BoundASC->GetTagCount(ActiveCooldownTag));
 	}
-*/
+
 	bSkillInfoResolved = true;
 }
 
