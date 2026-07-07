@@ -12,41 +12,46 @@ class UGameplayAbility;
 class UMaterialInterface;
 
 /**
- *	스킬 1개의 어빌리티 + 표시 메타데이터를 한 행으로 묶는 DataTable Row.
- *	- 기획자가 DT_SkillMetaData 같은 데이터테이블에서 스킬별로 한 행씩 채운다.
- *	- HUD 스킬 위젯(UFTPlayerSkillInfoWidget 등)이 AbilityClass로 이 행을 조회해
- *	  아이콘/이름/설명/쿨다운을 표시하는 데 사용한다.
- *	- 슬롯(버튼) 배치 권한은 캐릭터 테이블(FFTCharacterData)이 가지므로 여기엔 InputTag를 두지 않는다.
- *	- 각 GA CDO에 흩어져 있던 표시 데이터를 이 테이블로 중앙 집중 관리하는 것이 목적이다.
+ * 스킬 1개의 어빌리티 및 표시 메타데이터를 한 행으로 묶는 DataTable Row 구조체입니다.
  */
 USTRUCT(BlueprintType)
 struct FFTSkillMetaData : public FTableRowBase
 {
 	GENERATED_BODY()
 
-	//	이 메타데이터가 연결되는 스킬 어빌리티 클래스. (테이블과 어빌리티를 묶는 핵심 키)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Skill")
+	/** 이 메타데이터와 결합되어 인게임 실물 가동을 집도할 GAS 어빌리티 클래스 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Core")
 	TSubclassOf<UGameplayAbility> AbilityClass;
 
-	//	[이관/폐기] 슬롯(버튼) 배치 권한을 캐릭터 테이블(FFTCharacterData)로 이관하면서 InputTag는 제거한다.
-	//	폐기 정책상 삭제하지 않고 주석으로 보존 — 버튼→InputTag 매핑은 기존 태그를 소비 코드에서 재사용한다.
-	//UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Skill")
-	//FGameplayTag InputTag;
-
-	//	스킬 표시 이름
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Skill")
+	/** 스킬창이나 HUD 툴팁에 실시간 출력될 스킬의 고유 이름 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Display")
 	FText DisplayName;
 
-	//	스킬 설명 (툴팁/상세창용, 여러 줄 허용)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Skill", meta = (MultiLine = true))
+	/** 스킬의 상세 효과 명세 설명 문구 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Display", meta = (MultiLine = true))
 	FText Description;
 
-	//	스킬 아이콘 머티리얼 — UImage::SetBrushFromMaterial로 표시한다.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Skill")
+	/** 차징 조작이나 채널링 유지 시간 등 특수 조작법을 출력할 가이드 텍스트 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Display")
+	FText HoldCastDescription;
+
+	/** 스킬 슬롯에 표현될 2D 그래픽 머티리얼 주소 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Visual")
 	TObjectPtr<UMaterialInterface> Icon;
 
-	//	쿨다운 표시용 태그. 어빌리티(UFT_GameplayAbility)의 CooldownTag와 동일하게 맞춘다.
-	//	(비워두면 쿨다운 바를 갱신하지 않는다. 궁극기처럼 게이지 기반이면 비워둔다.)
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Skill")
+	/** 이 스킬의 기획서 고유 재사용 대기시간 원본 수치 (UI 쿨다운 바 똬리 연산용 원자 데이터) */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Design")
+	float MaxCooldownTime = 0.0f;
+
+	/** 이 스킬이 돌 때 가동될 고유 쿨타임 태그 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Tag")
 	FGameplayTag CooldownTag;
+
+	/** 스킬 분류 장부에 등록될 마스터 분류 태그 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Tag")
+	FGameplayTag SkillCategoryTag;
+
+	/** HUD 스킬 위젯에서 특수 연출 테두리를 인지하기 위한 궁극기 판정 플래그 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Design")
+	bool bIsUltimate = false;
 };
