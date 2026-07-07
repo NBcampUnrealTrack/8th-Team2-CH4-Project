@@ -296,6 +296,15 @@ void AFTPlayerController::Move(const FInputActionValue& Value)
 
 void AFTPlayerController::Look(const FInputActionValue& Value)
 {
+	//	HUD 편집 모드(Alt 홀드 또는 F11) 동안에는 카메라 회전 입력을 무시한다.
+	if (const UFTHUDLayoutSubsystem* Subsystem = GetHUDLayoutSubsystem())
+	{
+		if (Subsystem->IsEditMode())
+		{
+			return;
+		}
+	}
+
 	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
 	{
 		Char->Look(Value);
@@ -351,16 +360,16 @@ void AFTPlayerController::Server_DebugDie_Implementation()
 
 void AFTPlayerController::ToggleHUDEditMode()
 {
-	ULocalPlayer* LocalPlayer = GetLocalPlayer();
-	if (!LocalPlayer)
-	{
-		return;
-	}
-
-	if (UFTHUDLayoutSubsystem* Subsystem = LocalPlayer->GetSubsystem<UFTHUDLayoutSubsystem>())
+	if (UFTHUDLayoutSubsystem* Subsystem = GetHUDLayoutSubsystem())
 	{
 		Subsystem->ToggleEditMode();
 	}
+}
+
+UFTHUDLayoutSubsystem* AFTPlayerController::GetHUDLayoutSubsystem() const
+{
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	return LocalPlayer ? LocalPlayer->GetSubsystem<UFTHUDLayoutSubsystem>() : nullptr;
 }
 
 void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter)
@@ -399,14 +408,22 @@ void AFTPlayerController::OnScoreboardPressed()
 
 void AFTPlayerController::OnAltPressed()
 {
-	bShowMouseCursor = true;
-	// SetIgnoreLookInput(true); // 카메라 입력 무시
+	//	Alt 홀드 = 임시(모멘터리) HUD 편집 모드.
+	//	서브시스템의 SetEditMode(true)가 [마우스 커서 노출 + 입력 모드(GameAndUI) 전환 + Movable 위젯 핸들 표시]를
+	//	한 번에 처리한다. 카메라 회전(Look)은 편집 모드 동안 Look()에서 차단된다.
+	if (UFTHUDLayoutSubsystem* Subsystem = GetHUDLayoutSubsystem())
+	{
+		Subsystem->SetEditMode(true);
+	}
 }
 
 void AFTPlayerController::OnAltReleased()
 {
-	bShowMouseCursor = false;
-	// SetIgnoreLookInput(false); // 카메라 입력 다시 받음
+	//	Alt 해제 = 편집 모드 종료 → 커서 숨김 + 입력 모드(GameOnly) 복귀 + 핸들 숨김.
+	if (UFTHUDLayoutSubsystem* Subsystem = GetHUDLayoutSubsystem())
+	{
+		Subsystem->SetEditMode(false);
+	}
 }
 
 void AFTPlayerController::OnChatPressed()

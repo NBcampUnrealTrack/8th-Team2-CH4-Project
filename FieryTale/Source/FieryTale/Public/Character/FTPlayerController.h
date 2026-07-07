@@ -16,6 +16,7 @@ class UInputMappingContext;
 class UInputAction;
 class UFTLobbyWidget;
 class UFT_CharacterData;
+class UFTHUDLayoutSubsystem;
 struct FInputActionValue;
 enum class EFTTeam : uint8;
 
@@ -141,7 +142,11 @@ private:
 	// HUD 편집 모드 토글 (F11) — Movable 위젯 위치 조정
 	void ToggleHUDEditMode();
 
+	// LocalPlayer의 HUD 레이아웃 서브시스템 취득 (편집 모드 On/Off·조회 공용). 없으면 nullptr.
+	UFTHUDLayoutSubsystem* GetHUDLayoutSubsystem() const;
+
 	void OnScoreboardPressed();
+	// Alt 홀드 = 임시 HUD 편집 모드 (커서 노출 + Movable 위젯 편집 활성 / 해제 시 원복)
 	void OnAltPressed();
 	void OnAltReleased();
 	void OnChatPressed();
