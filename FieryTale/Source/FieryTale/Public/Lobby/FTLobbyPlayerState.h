@@ -10,6 +10,8 @@
 
 // 대기방 목록 UI가 바인딩해서 다시 그리도록 알리는 이벤트.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFTOnLobbyReadyStateChanged);
+// 상대방의 캐릭터 선택 상태가 변화했을 때의 델리게이트
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FFTOnCharacterStateChanged);
 
 /**
  * 대기방에서 각 플레이어의 준비(Ready) 상태를 복제하는 PlayerState.
@@ -37,6 +39,10 @@ public:
 	/** Ready 상태가 바뀔 때(서버 직접 변경 또는 클라 OnRep) 발생. UI가 목록을 갱신할 때 바인딩한다. */
 	UPROPERTY(BlueprintAssignable, Category = "FieryTale|Lobby")
 	FFTOnLobbyReadyStateChanged OnReadyStateChanged;
+	
+	// 캐릭터 선택이 바뀔 때
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FFTOnCharacterStateChanged OnCharacterStateChanged;
 
 	// 플레이어 진열대 자리 번호
 	UPROPERTY(Replicated)

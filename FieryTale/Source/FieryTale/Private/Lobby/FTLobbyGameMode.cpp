@@ -26,6 +26,8 @@ AFTLobbyGameMode::AFTLobbyGameMode()
 
 	// 기본 매치 레벨. 에디터(BP_FTLobbyGameMode)에서 GameLevel 을 지정하면 그 값이 우선한다.
 	GameLevel = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Maps/L_Arena.L_Arena")));
+	
+	DefaultPawnClass = nullptr;
 }
 
 void AFTLobbyGameMode::BeginPlay()

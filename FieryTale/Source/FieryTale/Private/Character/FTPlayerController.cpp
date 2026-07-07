@@ -20,6 +20,8 @@
 #include "Lobby/FTLobbyPlayerState.h"
 #include "Lobby/FTLobbyWidget.h"
 #include "FieryTaleLog.h"
+#include "Camera/CameraActor.h"
+#include "Kismet/GameplayStatics.h"
 #include "Lobby/FTLobbyGameMode.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerController);
@@ -156,30 +158,18 @@ void AFTPlayerController::BeginPlay()
 		return;
 	}
 
-	/** 이제 플레이어 컨트롤러는 SeamlessTravel에 의해 로비맵과 아레나 맵에서 변경없이 그대로 이어집니다 그렇기 때문에 맵에 따른 로직의 분기 처리 **/
+	// 심리스 트래블을 이용한 앱에 따른 로직 분기 처리
 	FString MapName = GetWorld()->GetMapName();
+	
 	if (MapName.Contains(TEXT("Lobby")) && LobbyWidgetClass)
 	{
-		// 로비 UI 생성 로직
-		UFTLobbyWidget* LobbyUI = CreateWidget<UFTLobbyWidget>(this, LobbyWidgetClass);
-		if (LobbyUI)
+		if (PlayerState)
 		{
-			LobbyWidgetInstance = LobbyUI;
-			LobbyWidgetInstance->AddToViewport();
-			
-			bShowMouseCursor = true;
-			FInputModeUIOnly InputModeData;
-			InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-			SetInputMode(InputModeData);
-
-			if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
-			{
-				LobbyUI->InitWidget(this, LobbyPS);
-			}
+			InitializeLobbyLocal();
 		}
 	}
 	
-	
+	// 아레나 맵의 BeginPlay() 로직은 여기에 작성해주세요
 }
 
 void AFTPlayerController::OnPossess(APawn* InPawn)
@@ -476,28 +466,25 @@ void AFTPlayerController::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	
-	// 1. 로비 맵인 경우: FTLobbyPlayerState로 캐스팅이 성공합니다.
+	if (!IsLocalController()) return;
+	
+	// 로비 맵인 경우: FTLobbyPlayerState로 캐스팅
 	if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
 	{
-		if (LobbyWidgetInstance) 
-		{
-			LobbyWidgetInstance->InitWidget(this, LobbyPS);
-		}
+		InitializeLobbyLocal();
 	}
+	
+	// 아레나 맵의 경우 AFTPlayerState로 캐스팅
 	else if (AFTPlayerState* PS = GetPlayerState<AFTPlayerState>())
 	{
-		// [추가]: 클라이언트(접속자)의 아레나 세팅
-		if (IsLocalController())
+		bShowMouseCursor = false;
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+        
+		if (ArenaHUDWidget && !ArenaHUDWidgetInstance)
 		{
-			bShowMouseCursor = false;
-			FInputModeGameOnly InputMode;
-			SetInputMode(InputMode);
-
-			if (ArenaHUDWidget && !ArenaHUDWidgetInstance)
-			{
-				ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);
-				if (ArenaHUDWidgetInstance) ArenaHUDWidgetInstance->AddToViewport();
-			}
+			ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);
+			if (ArenaHUDWidgetInstance) ArenaHUDWidgetInstance->AddToViewport();
 		}
 		
 		UE_LOG(LogTemp, Log, TEXT("[PlayerController] 전장 클라이언트 UI 및 입력 모드 복구 완료!"));
@@ -530,5 +517,39 @@ void AFTPlayerController::ServerSetCharacter_Implementation(EFTCharacterType New
 	if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
 	{
 		LobbyPS->SetCharacterType(NewCharacter);
+	}
+}
+
+void AFTPlayerController::InitializeLobbyLocal()
+{
+	// 이미 세팅이 완료되었다면 중복 실행 방지
+	if (LobbyWidgetInstance) return;
+
+	if (AFTLobbyPlayerState* LobbyPS = GetPlayerState<AFTLobbyPlayerState>())
+	{
+		// 1. UI 생성
+		if (LobbyWidgetClass)
+		{
+			LobbyWidgetInstance = CreateWidget<UFTLobbyWidget>(this, LobbyWidgetClass);
+			if (LobbyWidgetInstance)
+			{
+				LobbyWidgetInstance->AddToViewport();
+				
+				bShowMouseCursor = true;
+				FInputModeUIOnly InputModeData;
+				InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+				SetInputMode(InputModeData);
+
+				LobbyWidgetInstance->InitWidget(this, LobbyPS);
+			}
+		}
+
+		// 2. 스튜디오 카메라 시야 고정
+		TArray<AActor*> FoundCameras;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACameraActor::StaticClass(), FoundCameras);
+		if (FoundCameras.Num() > 0)
+		{
+			SetViewTarget(FoundCameras[0]); 
+		}
 	}
 }

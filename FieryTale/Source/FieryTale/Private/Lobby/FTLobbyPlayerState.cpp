@@ -54,30 +54,23 @@ void AFTLobbyPlayerState::OnRep_IsReady()
 
 void AFTLobbyPlayerState::SetCharacterType(EFTCharacterType InCharacterType)
 {
-	if (HasAuthority())
+	if (HasAuthority() && SelectedCharacterType != InCharacterType)
 	{
-		if (SelectedCharacterType != InCharacterType)
-		{
-			SelectedCharacterType = InCharacterType;
-			
-			// 🌟 [추가]: 서버에서 진짜 값이 몇 번으로 바뀌었는지 찍어봅니다.
-			UE_LOG(LogFTSession, Log, TEXT("[CharacterDebug] 서버 권한으로 %s의 캐릭터를 %d번으로 변경 완료!"), 
-				*GetPlayerName(), (int32)SelectedCharacterType);
-			
-			// 🌟 서버는 스스로 호출, 클라이언트는 OnRep이 자동 호출됨
-			OnRep_SelectedCharacter(); 
-		}
+		SelectedCharacterType = InCharacterType;
+		
+		// 🌟 방장 환경에서도 UI 갱신과 3D 단상 갱신이 정상적으로 처리되도록 강제 호출
+		OnRep_SelectedCharacter(); 
 	}
 }
 
 void AFTLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 {
+	Super::CopyProperties(PlayerState);
+	
 	if (PlayerState)
 	{
 		PlayerState->SetPlayerName(GetPlayerName());
 	}
-	
-	Super::CopyProperties(PlayerState);
 	
 	if (AFTPlayerState* PS = Cast<AFTPlayerState>(PlayerState))
 	{
@@ -90,20 +83,22 @@ void AFTLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 
 void AFTLobbyPlayerState::OnRep_SelectedCharacter()
 {
-	UE_LOG(LogFTSession, Log, TEXT("[Character] OnRep_SelectedCharacter 호출됨! OwnerName: %s"), GetOwner() ? *GetOwner()->GetName() : TEXT("NULL"));
+	OnCharacterStateChanged.Broadcast();
 
-	if (UWorld* World = GetWorld())
+	APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
+	if (LocalPC && LocalPC->PlayerState == this)
 	{
-		for (TActorIterator<AFTCharacterDisplayStand> It(World); It; ++It)
+		UE_LOG(LogFTSession, Log, TEXT("[Character] 내 캐릭터가 변경됨! 로컬 스탠드 업데이트 시작"));
+
+		if (UWorld* World = GetWorld())
 		{
-			AFTCharacterDisplayStand* Stand = *It;
-			// 로그로 StandIndex 비교 과정 확인
-			UE_LOG(LogFTSession, Log, TEXT("[Character] Stand 검사 중: StandIndex=%d, 내 PlayerIndex=%d"), Stand->StandIndex, PlayerIndex);
-            
-			if (Stand && Stand->StandIndex == PlayerIndex)
+			for (TActorIterator<AFTCharacterDisplayStand> It(World); It; ++It)
 			{
-				Stand->UpdateCharacter(SelectedCharacterType);
-				return; // 찾았으면 종료
+				if (AFTCharacterDisplayStand* Stand = *It)
+				{
+					Stand->UpdateCharacter(SelectedCharacterType);
+					return; // 단상을 찾아서 갱신했으면 종료
+				}
 			}
 		}
 	}

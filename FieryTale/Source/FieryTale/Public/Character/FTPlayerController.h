@@ -168,6 +168,7 @@ public:
 	void RequestSetCharacter(EFTCharacterType NewCharacter); // Enum 통일
 
 	virtual void OnRep_PlayerState() override;
+	void InitializeLobbyLocal();
 
 protected:
 	UFUNCTION(Server, Reliable)

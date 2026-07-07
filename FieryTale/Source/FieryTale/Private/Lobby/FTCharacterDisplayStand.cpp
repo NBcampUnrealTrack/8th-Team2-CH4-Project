@@ -45,7 +45,7 @@ void AFTCharacterDisplayStand::UpdateCharacter(EFTCharacterType NewType)
 		// 🌟 복제 활성화 명시
 		if (SpawnedCharacter)
 		{
-			SpawnedCharacter->SetReplicates(true); 
+			SpawnedCharacter->SetReplicates(false); 
 			SpawnedCharacter->AttachToComponent(SpawnPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		}
 	}
