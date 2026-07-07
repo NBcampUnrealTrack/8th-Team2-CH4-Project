@@ -41,10 +41,10 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         return;
     }
     
-    // 1단계: 동적 해킹 레이더 기동 및 적군 필터 스캔 마킹
+    // 동적 해킹 레이더 기동 및 적군 필터 스캔 마킹
     ScanHackingTargets();
 
-    // 2단계: 비동기 몽타주 재생 및 분기형 콜백 배관망 가동
+    // 비동기 몽타주 재생 및 분기형 콜백 배관망 가동
     bool bHasVisualTask = false;
     if (AttackMontage)
     {
@@ -63,7 +63,7 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         }
     }
     
-    // 3단계: 실물 투사체 사출 (정상적인 흐름에서 격발)
+    // 실물 투사체 사출 (정상적인 흐름에서 격발)
     FireClockRabbit();
     
     if (!bHasVisualTask)
@@ -173,7 +173,7 @@ void UFT_AliceSkill::FireClockRabbit()
 
 void UFT_AliceSkill::OnSkillMontageFinished()
 {
-    // 스킬 모션 연출이 도중에 방해받지 않고 온전히 성공 완료된 "이 최종 시점"에만 9초 쿨타임을 명시적으로 격발시킵니다.
+    // 스킬 모션 연출이 도중에 방해받지 않고 온전히 성공 완료된 이 최종 시점에만 9초 쿨타임을 명시적으로 격발시킵니다.
     CommitAbilityCooldown(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
     
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
@@ -181,7 +181,7 @@ void UFT_AliceSkill::OnSkillMontageFinished()
 
 void UFT_AliceSkill::HandleSkillInterrupted()
 {
-    // 시전 도중 하드 CC기를 처맞아 끊긴 경우, 사출 로직을 파쇄하고 쿨타임 패널티 없이 취소 플래그(bWasCancelled = true)를 들고 즉시 청정 종료합니다.
+    // 시전 도중 하드 CC기를 처맞아 끊긴 경우, 사출 로직을 파쇄하고 쿨타임 패널티 없이 취소 플래그를 들고 즉시 청정 종료합니다.
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 

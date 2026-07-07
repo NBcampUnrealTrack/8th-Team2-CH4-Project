@@ -31,7 +31,7 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 마나 비용이 없으므로, 현재 9초 쿨타임 태그가 걸려있는지만 순정 GAS 검문소에서 체크합니다.
+    // 마나 비용이 없으므로 현재 9초 쿨타임 태그가 걸려있는지만 순정 GAS 검문소에서 체크합니다.
     // 만약 아직 쿨다운 태그가 남아있다면 이 자리에서 즉시 활성화를 차단하고 탈출합니다.
     if (!CheckCooldown(Handle, ActorInfo))
     {
@@ -66,7 +66,7 @@ void UFT_ChargedShotSkill::FireChargedShot()
     {
         float ChargeDuration = GetWorld()->GetTimeSeconds() - ChargeStartTime;
 
-        // 1단계: 1초 이상 마우스 홀드 시 풀 차징 사출 성공 분기
+        // 1초 이상 마우스 홀드 시 풀 차징 사출 성공 분기
         if (ChargeDuration >= 1.0f)
         {
             // 1초 차징 조준을 무사히 성공 완수한 바로 이 시점에 쿨타임을 정식으로 격발 낙인찍습니다.
@@ -116,7 +116,7 @@ void UFT_ChargedShotSkill::FireChargedShot()
                 }
             }
         }
-        // 2단계: 1초 미만 불완전 차징 취소 분기 처리 (패널티 없는 청정 복귀)
+        // 1초 미만 불완전 차징 취소 분기 처리 (패널티 없는 청정 복귀)
         else
         {
             // 애초에 소모한 마나 자원 자체가 없으므로 환불 연산 연동 코드도 전량 필요 없습니다.

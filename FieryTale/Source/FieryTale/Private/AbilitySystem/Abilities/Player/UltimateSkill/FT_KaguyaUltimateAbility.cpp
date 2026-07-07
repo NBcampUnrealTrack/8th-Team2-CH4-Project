@@ -31,7 +31,7 @@ UFT_KaguyaUltimateAbility::UFT_KaguyaUltimateAbility()
 
 void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    // GAS 마스터 규격: 궁극기 게이지 소모 파이프라인(ApplyCost)을 통해 자원 검증 및 소모를 최상단 관문에서 처리합니다.
+    // GAS 마스터 규격: 궁극기 게이지 소모 파이프라인을 통해 자원 검증 및 소모를 최상단 관문에서 처리합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -55,7 +55,7 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
         UE_LOG(LogTemp, Log, TEXT("Kaguya Ultimate Activated: 달의 군대여 이 땅의 혼란을 가라앉히소서."));
     }
 
-    // --- 1단계: 자신 중심 12미터 광역 스캔 및 천인 강림 가동 구역 ---
+    // 자신 중심 12미터 광역 스캔 및 천인 강림 가동 구역
     FVector KaguyaLocation = OwnerActor->GetActorLocation();
     TArray<FOverlapResult> OverlapResults;
     // 기획 데이터 락인: 에디터 변수인 AscensionRadius 수치를 실시간 참조하여 구체 형태의 스캔 범위를 결정합니다.
@@ -94,7 +94,6 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
                 
                 // 에셋 바인딩 가이드: 대미지 이펙트 에셋
                 // 에디터 내 DamageGameplayEffectClass 슬롯에 광역 피해용 이펙트 에셋을 장착하십시오.
-                // 런타임 흐름: BaseDamageValue를 피해 연산기 우체통에 담아 발송합니다.
                 if (DamageGameplayEffectClass)
                 {
                     FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffectClass, GetAbilityLevel());
@@ -112,7 +111,7 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
                 // 구조체가 아닌 영웅 및 미니언 대상의 물리 견인 및 디버프 파이프라인 개통
                 if (!bIsStructure)
                 {
-                    // 2단계: 중심부 강제 인장 (Pull Mechanism)
+                    // 중심부 강제 인장 (Pull Mechanism)
                     ACharacter* TargetCharacter = Cast<ACharacter>(TargetActor);
                     if (TargetCharacter)
                     {
@@ -140,7 +139,7 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
                         }
                     }
 
-                    // 3단계: 2초간 80퍼센트 슬로우 디버프 주입
+                    // 2초간 80퍼센트 슬로우 디버프 주입
                     // 에셋 바인딩 가이드: 에디터 내 SlowDebuffEffectClass 슬롯에 둔화 이펙트 에셋을 장착하십시오.
                     if (SlowDebuffEffectClass)
                     {

@@ -57,6 +57,7 @@ namespace FTTags
         {
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(AttackSkill);
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(UtilSkill);
+            UE_DECLARE_GAMEPLAY_TAG_EXTERN(UltimateSkill);
             UE_DECLARE_GAMEPLAY_TAG_EXTERN(RightClick);
         }
     }
@@ -65,6 +66,7 @@ namespace FTTags
     {
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Damage);
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Knockback);
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(UltimateCost);
 
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(WeaponMode_Aiming);
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Channelling);

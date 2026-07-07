@@ -31,8 +31,8 @@ AFT_ProjectileBase::AFT_ProjectileBase()
     ProjectileMovement->MaxSpeed = 1500.0f;
     ProjectileMovement->ProjectileGravityScale = 0.0f;
 
-    // 💡 [최대 수명 안전장치 락인]: 사출 후 적을 맞추지 못해도 5초가 지나면 월드에서 자동 소멸하도록 타이머를 예약합니다.
-    // 이 한 줄을 통해 허공이나 맵 밖으로 날아간 좀비 투사체들의 메모리 누수 버그를 완벽하게 파쇄합니다.
+    // 최대 수명 안전장치 적용: 사출 후 적을 맞추지 못해도 5초가 지나면 월드에서 자동 소멸하도록 타이머를 예약합니다.
+    // 이 한 줄을 통해 허공이나 맵 밖으로 날아간 투사체들의 메모리 누수 버그를 파쇄합니다.
     InitialLifeSpan = 5.0f;
 }
 

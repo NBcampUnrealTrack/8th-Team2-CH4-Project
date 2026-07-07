@@ -42,20 +42,21 @@ namespace FTTags
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Invincible, "FTTags.State.Buff.Invincible", "모든 피해량과 CC 연산을 일체 무력화하는 무적 상태 버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Invisibility, "FTTags.State.Buff.Invisibility", "적의 조준선 크로스헤어 활성화를 차단하고 미니맵 노출을 지우는 은신 버프 태그");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Flying, "FTTags.State.Buff.Flying", "알라딘 마법 양탄자 탑승 및 이동 속도 30퍼센트 감산 비행 버프 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Flying, "FTTags.State.Buff.Flying", "알라딘 마법 양탄자 탑승 및 이동 속도 감산 비행 버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Evading, "FTTags.State.Buff.Evading", "구르기 무적 판정 및 대나무 안개 범위 진입 시 부여되는 회피 기동 버프 태그");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ShrinkActive, "FTTags.State.Buff.ShrinkActive", "2초 동안 앨리스의 히트박스를 축소하고 이동 속도를 50퍼센트 올리는 축소 버프 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(ShrinkActive, "FTTags.State.Buff.ShrinkActive", "지속 시간 동안 앨리스의 히트박스를 축소하고 이동 속도를 올리는 축소 버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(CounterReady, "FTTags.State.Buff.CounterReady", "GEEC 대미지 연산을 즉시 중단시키고 타격을 무효화하는 가구야 반격 가드 태세 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(BambooGroveDeploying, "FTTags.State.Buff.BambooGroveDeploying", "가구야 공주가 대나무 숲 전술 연막을 전개하고 있는 시전 버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(HackedMark, "FTTags.State.Buff.HackedMark", "앨리스의 레이더 스캔에 적발되어 해킹 락온 연출이 연동될 타깃 표식 태그");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(AladdinComboActive, "FTTags.State.Buff.AladdinComboActive", "알라딘의 소원 성취 궁극기가 연속 격발(콤보 윈도우) 가능한 유효 버프 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(AladdinComboActive, "FTTags.State.Buff.AladdinComboActive", "알라딘의 소원 성취 궁극기가 연속 격발 가능한 유효 버프 태그");
         }
        
         namespace Cooldown
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(AttackSkill, "FTTags.State.Cooldown.AttackSkill", "공격 기술 공용 재사용 대기시간 태그");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(UtilSkill, "FTTags.State.Cooldown.UtilSkill", "Shift 생존 유틸 기술 공용 재사용 대기시간 15초 제어 태그");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(RightClick, "FTTags.State.Cooldown.RightClick", "우클릭 스킬 전용 9초 고유 재사용 대기시간 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(UtilSkill, "FTTags.State.Cooldown.UtilSkill", "Shift 생존 유틸 기술 공용 재사용 대기시간 제어 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(UltimateSkill, "FTTags.State.Cooldown.UltimateSkill", "Q 궁극기 전용 고유 재사용 대기시간 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(RightClick, "FTTags.State.Cooldown.RightClick", "우클릭 스킬 전용 고유 재사용 대기시간 태그");
         }
     }
     
@@ -63,8 +64,9 @@ namespace FTTags
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage, "FTTags.Combat.Damage", "SetByCaller 우체통을 통해 마스터 속성 집합으로 피해량을 실시간 배달하는 메타 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Knockback, "FTTags.Combat.Knockback", "피격 대상에게 물리적 척력 및 밀쳐내기 강도를 전송하는 마스터 넉백 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(UltimateCost, "FTTags.Combat.UltimateCost", "궁극기 시전 시 자원 게이지를 차감 청소 초기화하기 위한 비용 전달용 마스터 태그");
 
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(WeaponMode_Aiming, "FTTags.Combat.WeaponMode.Aiming", "빨간 망토가 탄퍼짐 수치를 초기화시키고 2배율 정조준 사격 중인 상태 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(WeaponMode_Aiming, "FTTags.Combat.WeaponMode.Aiming", "빨간 망토가 탄퍼짐 수치를 초기화시키고 정조준 사격 중인 상태 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Channelling, "FTTags.Combat.Skill.Channelling", "스킬의 선딜레이 및 캐스팅 유지 상태를 감시하는 인터럽트용 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Target_Insignia, "FTTags.Combat.Target.Insignia", "앨리스 시계 토끼 공격에 노출된 표적의 시한성 태엽 인장 표식 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Muted, "FTTags.Combat.Structure.Muted", "포탑의 AI 자동 포격 감지 루프를 강제로 정지시키는 마비 제어 태그");
@@ -85,17 +87,17 @@ namespace FTTags
     
     namespace FTAugments
     {
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Eligible_Phase1, "FTTags.Augment.Eligible.Phase1", "레벨 성장에 따른 1차 카드 증강 선택 자격 획득 태그");
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Eligible_Phase2, "FTTags.Augment.Eligible.Phase2", "레벨 성장에 따른 2차 카드 증강 선택 자격 획득 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Eligible_Phase1, "FTTags.Augment.Eligible.Phase1", "레벨 성장에 따른 카드 증강 선택 자격 획득 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Eligible_Phase2, "FTTags.Augment.Eligible.Phase2", "레벨 성장에 따른 카드 증강 선택 자격 획득 태그");
 
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Applied_RedRidingHood_TopBody, "FTTags.Augment.Applied.Phase1.RedRidingHood.TopBody", "빨간 망토 전용 상체 운동 선택 증강 적용 상태 태그");
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Applied_Aladdin_MercyMirage, "FTTags.Augment.Applied.Phase1.Aladdin.MercyMirage", "알라딘 전용 지니 궁극기 피해량 2배 증가 자비의 신기루 증강 적용 상태 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Applied_Aladdin_MercyMirage, "FTTags.Augment.Applied.Phase1.Aladdin.MercyMirage", "알라딘 전용 지니 궁극기 피해량 증가 증강 적용 상태 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Applied_Alice_TimeIsMedicine, "FTTags.Augment.Applied.Phase1.Alice.TimeIsMedicine", "앨리스 전용 시간이 약 선택 증강 적용 상태 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Applied_Kaguya_BulwarkHeal, "FTTags.Augment.Applied.Phase1.Kaguya.BulwarkHeal", "가구야 공주 전용 대나무 장인의 가업 수호 증강 적용 상태 태그");
      }
     
     namespace Events
     {
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(KeepScore, "FTTags.Event.KillScored", "적 영웅 혹은 크리처 처치 달성 시 배관망에 사출되는 마스터 이벤트 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(KillScored, "FTTags.Event.KillScored", "적 영웅 혹은 크리처 처치 달성 시 배관망에 사출되는 마스터 이벤트 태그");
     }
 }

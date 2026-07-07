@@ -486,7 +486,7 @@ void AFTPlayerController::OnRep_PlayerState()
 	}
 	else if (AFTPlayerState* PS = GetPlayerState<AFTPlayerState>())
 	{
-		// 🌟 [추가]: 클라이언트(접속자)의 아레나 세팅
+		// [추가]: 클라이언트(접속자)의 아레나 세팅
 		if (IsLocalController())
 		{
 			bShowMouseCursor = false;
