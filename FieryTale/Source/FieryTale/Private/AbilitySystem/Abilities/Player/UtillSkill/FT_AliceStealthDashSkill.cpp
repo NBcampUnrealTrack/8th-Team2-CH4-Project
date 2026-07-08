@@ -61,7 +61,7 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
 
     // =========================================================================
     // 💡 [이속 장부 파괴 릭 완치 - GAS 순정 대시 가속 라인 연동]
-    // MaxWalkSpeed 변수를 직접 조지는 원시 하드코딩을 소각하고, 다른 버프/디버프와 
+    // MaxWalkSpeed 변수를 직접 조지는 원시 하드코딩을 소각하고, 다른 버프/디버프와
     // 정밀 가산/곱산 중첩 연산이 가능하도록 대시 가속(1.5배 증가) GE를 주입합니다.
     // =========================================================================
     if (DashSpeedGameplayEffectClass)
@@ -72,9 +72,9 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
             DashSpeedActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*SpeedSpecHandle.Data.Get());
         }
     }
-    
-    // 시각적 연동: 캐릭터 비주얼 메시 스케일을 기획 스펙에 맞추어 축소합니다.
-    Character->SetActorScale3D(FVector(TargetMeshScale));
+
+    // 신: 캡슐/메시를 기본값 기준으로 일관되게 축소 — CharacterBase가 소유한 단일 진입점 
+    Character->SetCharacterScale(TargetMeshScale);
 
     // 2초 버프 지속 제한 시간 타이머 가동
     UWorld* World = GetWorld();
@@ -115,8 +115,8 @@ void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Hand
 
     if (Character)
     {
-        // 캐릭터 메시 스케일을 다시 순정 1대1대1 규격으로 원상 복귀시킵니다.
-        Character->SetActorScale3D(FVector(1.0f));
+        // 캡슐/메시를 CharacterBase가 캐싱한 기본값 기준으로 원복합니다 
+        Character->ResetCharacterScale();
     }
 
     if (SourceASC)
