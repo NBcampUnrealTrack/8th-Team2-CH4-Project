@@ -11,12 +11,15 @@
 #include "InputActionValue.h"
 #include "Character/FTPlayerState.h"
 #include "AbilitySystemComponent.h"
+#include "TimerManager.h"
 #include "AbilitySystem/FT_AttributeSet.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameplayTags/FTTags.h"
 #include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
 #include "AbilitySystem/Abilities/Player/Data/FTSkillMetaData.h"
 #include "Engine/SkeletalMesh.h"
+#include "Components/TimelineComponent.h"
+#include "Curves/CurveFloat.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerCharacter);
 
@@ -49,6 +52,7 @@ void AFTPlayerCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	//	[이관/폐기 보존] DOREPLIFETIME(AFTPlayerCharacterBase, CharacterData);
 	DOREPLIFETIME(AFTPlayerCharacterBase, CharacterRow);
+	DOREPLIFETIME(AFTPlayerCharacterBase, ReplicatedCharacterScale);
 }
 
 void AFTPlayerCharacterBase::BeginPlay()
@@ -92,7 +96,6 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 	//	메쉬/애님BP는 소프트 참조 — 영웅이 확정된 이 시점에 동기 로드해서 적용한다.
 	if (USkeletalMesh* CharacterMesh = Data->SkeletalMesh.LoadSynchronous())
 	{
-		//GetMesh()->SetSkeletalMesh(CharacterMesh);
 		GetMesh()->SetSkeletalMesh(CharacterMesh);
 
 		// 1. 메쉬 에셋 자체의 원본 바운드 정보 가져오기
@@ -122,6 +125,12 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 			// 이걸 안 하면 원격 클라이언트(Simulated Proxy)의 네트워크 스무딩이 옛 오프셋 기준으로
 			// 메쉬를 재배치해서, 캡슐 위치와 어긋나 붕 뜬 것처럼 보인다.
 			CacheInitialMeshOffset(NewMeshRelativeLocation, NewMeshRelativeRotation);
+
+			// 7. SetCharacterScale의 기준값으로 캐싱 — 이 시점의 캡슐/메시 배치가 이 캐릭터의 "100% 크기"다.
+			DefaultCapsuleRadius = GetCapsuleComponent()->GetUnscaledCapsuleRadius();
+			DefaultCapsuleHalfHeight = CapsuleHalfHeight;
+			DefaultMeshRelativeScale = GetMesh()->GetRelativeScale3D();
+			DefaultMeshRelativeLocation = NewMeshRelativeLocation;
 		}
 
 	}
@@ -163,6 +172,9 @@ AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectI
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
 	FollowCamera->FieldOfView = 90.0f;
+	DefaultFov = FollowCamera->FieldOfView;
+
+	FovTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("FovTimeline"));
 }
 
 UAbilitySystemComponent* AFTPlayerCharacterBase::GetAbilitySystemComponent() const
@@ -191,6 +203,154 @@ UFT_WeaponData* AFTPlayerCharacterBase::GetWeaponData() const
 		}
 	}
 	return CurrentWeaponData;
+}
+
+void AFTPlayerCharacterBase::PlayCameraFovEffect(float TargetFov, float Duration, UCurveFloat* Curve)
+{
+	//	FOV는 소유 클라이언트 화면에만 의미가 있는 순수 로컬 연출 — 서버/다른 클라이언트에서는 재생하지 않는다.
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (!FollowCamera || !FovTimeline || Duration <= 0.f)
+	{
+		return;
+	}
+
+	UCurveFloat* CurveToUse = Curve;
+	if (!CurveToUse)
+	{
+		if (!DefaultLinearFovCurve)
+		{
+			DefaultLinearFovCurve = NewObject<UCurveFloat>(this);
+			DefaultLinearFovCurve->FloatCurve.AddKey(0.f, 0.f);
+			DefaultLinearFovCurve->FloatCurve.AddKey(1.f, 1.f);
+		}
+		CurveToUse = DefaultLinearFovCurve;
+	}
+
+	FovEffectStartValue = FollowCamera->FieldOfView;
+	FovEffectTargetValue = TargetFov;
+
+	static const FName FovTrackName(TEXT("FovTrack"));
+
+	if (!bFovTrackInitialized)
+	{
+		//	트랙은 최초 1회만 등록 — 이후엔 SetFloatCurve로 커브만 교체한다 (반복 호출 시 트랙 중복 방지)
+		FOnTimelineFloat ProgressFunction;
+		ProgressFunction.BindUFunction(this, FName("OnFovTimelineUpdate"));
+		FovTimeline->AddInterpFloat(CurveToUse, ProgressFunction, NAME_None, FovTrackName);
+		bFovTrackInitialized = true;
+	}
+	else
+	{
+		FovTimeline->SetFloatCurve(CurveToUse, FovTrackName);
+	}
+
+	FovTimeline->SetTimelineLength(Duration);
+	FovTimeline->SetTimelineLengthMode(TL_TimelineLength);
+	FovTimeline->SetLooping(false);
+	FovTimeline->SetPlayRate(1.f);
+	FovTimeline->PlayFromStart();
+}
+
+void AFTPlayerCharacterBase::OnFovTimelineUpdate(float Alpha)
+{
+	if (FollowCamera)
+	{
+		FollowCamera->FieldOfView = FMath::Lerp(FovEffectStartValue, FovEffectTargetValue, Alpha);
+	}
+}
+
+UCurveFloat* AFTPlayerCharacterBase::GetOrBuildFovCurve(TObjectPtr<UCurveFloat>& CurveCache, const TArray<FVector2D>& Keys)
+{
+	if (!CurveCache)
+	{
+		CurveCache = NewObject<UCurveFloat>(this);
+		for (const FVector2D& Key : Keys)
+		{
+			CurveCache->FloatCurve.AddKey(Key.X, Key.Y);
+		}
+	}
+	return CurveCache;
+}
+
+void AFTPlayerCharacterBase::PlayCameraFovPunch(float TargetFov, float PunchDuration, float HoldDuration, float ReturnDuration, UCurveFloat* PunchCurve)
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	PlayCameraFovEffect(TargetFov, PunchDuration, PunchCurve);
+
+	//	펀치인이 끝나고 HoldDuration만큼 버틴 뒤 자동으로 기본 FOV로 복귀시킨다.
+	GetWorldTimerManager().ClearTimer(FovResetTimerHandle);
+	GetWorldTimerManager().SetTimer(
+		FovResetTimerHandle,
+		FTimerDelegate::CreateUObject(this, &AFTPlayerCharacterBase::ResetCameraFov, ReturnDuration),
+		FMath::Max(PunchDuration + HoldDuration, 0.01f),
+		false);
+}
+
+void AFTPlayerCharacterBase::ResetCameraFov(float Duration)
+{
+	if (!IsLocallyControlled() || !FollowCamera)
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(FovResetTimerHandle);
+
+	if (Duration <= 0.f)
+	{
+		if (FovTimeline)
+		{
+			FovTimeline->Stop();
+		}
+		FollowCamera->FieldOfView = DefaultFov;
+		return;
+	}
+
+	PlayCameraFovEffect(DefaultFov, Duration);
+}
+
+void AFTPlayerCharacterBase::SetCharacterScale(float Scale)
+{
+	if (HasAuthority())
+	{
+		ReplicatedCharacterScale = Scale;
+	}
+
+	ApplyCharacterScaleVisual(Scale);
+}
+
+void AFTPlayerCharacterBase::ResetCharacterScale()
+{
+	SetCharacterScale(1.f);
+}
+
+void AFTPlayerCharacterBase::OnRep_CharacterScale()
+{
+	ApplyCharacterScaleVisual(ReplicatedCharacterScale);
+}
+
+void AFTPlayerCharacterBase::ApplyCharacterScaleVisual(float Scale)
+{
+	//	캡슐은 SetCapsuleSize(절대값)로만 조절한다. 액터 스케일(SetActorScale3D)까지 같이 걸면 캡슐이
+	//	RootComponent라 스케일이 이중으로 곱해져, 콜리전은 Scale^2배로 줄어드는데 메시는 Scale배만 줄어들어
+	//	발이 바닥 아래로 파고드는 문제가 생긴다.
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCapsuleSize(DefaultCapsuleRadius * Scale, DefaultCapsuleHalfHeight * Scale, true);
+	}
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->SetRelativeScale3D(DefaultMeshRelativeScale * Scale);
+		MeshComp->SetRelativeLocation(FVector(DefaultMeshRelativeLocation.X, DefaultMeshRelativeLocation.Y, DefaultMeshRelativeLocation.Z * Scale));
+	}
 }
 
 void AFTPlayerCharacterBase::Move(const FInputActionValue& Value)
@@ -225,6 +385,11 @@ void AFTPlayerCharacterBase::OnLeftClick()
 {
 	UE_LOG(FTPlayerCharacter, Display, TEXT("LeftClick"));
 	ActivateAbilityByInputTag(FTTags::FTAbilities::NormalAttack, true);
+
+	
+	// TODO:: 테스트용 - 평타관련 
+	static const TArray<FVector2D> AttackFovKeys = { FVector2D(0.f, 0.f), FVector2D(0.35f, 1.f), FVector2D(1.f, 0.85f) };
+	PlayCameraFovPunch(85.f, 0.08f, 0.02f, 0.15f, GetOrBuildFovCurve(AttackFovCurve, AttackFovKeys));
 }
 
 void AFTPlayerCharacterBase::OnRightClick()
@@ -235,11 +400,32 @@ void AFTPlayerCharacterBase::OnRightClick()
 void AFTPlayerCharacterBase::OnPressQ()
 {
 	ActivateAbilityByInputTag(FTTags::FTAbilities::UltimateSkill, true);
+
+	// TODO:: 테스트용, 스킬 종류따라 적용하도록 수정해야 함
+	static const TArray<FVector2D> UltimateFovKeys =
+	{
+		FVector2D(0.f,   0.f),
+		FVector2D(0.15f, -0.1f),
+		FVector2D(0.5f,  1.1f),
+		FVector2D(0.75f, 0.9f),
+		FVector2D(1.f,   1.f)
+	};
+	PlayCameraFovPunch(60.f, 0.5f, 0.3f, 0.5f, GetOrBuildFovCurve(UltimateFovCurve, UltimateFovKeys));
 }
 
 void AFTPlayerCharacterBase::OnShift()
 {
 	ActivateAbilityByInputTag(FTTags::FTAbilities::UtilSkill, true);
+
+	// TODO:: 테스트용, 스킬 종류따라 적용하도록 수정해야 함
+	static const TArray<FVector2D> UtilFovKeys =
+	{
+		FVector2D(0.f,   0.f),
+		FVector2D(0.3f,  1.15f),
+		FVector2D(0.65f, 0.9f),
+		FVector2D(1.f,   1.f)
+	};
+	PlayCameraFovPunch(100.f, 0.15f, 0.1f, 0.25f, GetOrBuildFovCurve(UtilFovCurve, UtilFovKeys));
 }
 
 void AFTPlayerCharacterBase::Revive()
