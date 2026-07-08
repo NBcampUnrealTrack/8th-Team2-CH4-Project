@@ -1,5 +1,4 @@
 // Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -10,79 +9,63 @@
 
 class UBoxComponent;
 class UStaticMeshComponent;
+class UGeometryCollectionComponent;
 class UFT_AbilitySystemComponent;
 class UFT_AttributeSet;
 class UDataTable;
 class USoundBase;
 class UParticleSystem;
 
-/**
- *	터렛/넥서스 등 파괴 가능한 구조물의 공통 베이스.
- *	- 루트 = 박스 콜리전(투사체/스킬이 오버랩으로 피격), 외형 스태틱 메시는 루트에 부착.
- *	- 공통: ASC/AttributeSet, 진영·식별 태그 부여, 데이터테이블 기반 체력 초기화, 피격 사망 연출.
- *	- 서브클래스는 진영 태그 / 식별 태그 / 기본 체력 / 파괴 통보만 제공한다.
- */
 UCLASS(Abstract)
 class FIERYTALE_API AFTTowerBase : public AActor, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
 public:
-	AFTTowerBase();
+	AFTTowerBase(); // 생성자
 
-	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override; // 어빌리티 시스템 컴포넌트 주소 반환 인터페이스
 
 protected:
-	virtual void BeginPlay() override;
-	virtual void Tick(float DeltaTime) override;
+	virtual void BeginPlay() override; // 액터 초기화 기동 루틴
 
-	//	체력 0 도달 감지 → 파괴 연출 시작
-	void OnHealthChanged(const struct FOnAttributeChangeData& Data);
+	void OnHealthChanged(const struct FOnAttributeChangeData& Data); // 내구도 속성 변동 콜백 함수
 
-	//	공통 파괴 연출(사운드/이펙트/침강) 시작 + 서브클래스 파괴 통보
-	void StartDestruction();
+	void StartDestruction(); // 독립 카오스 파쇄 시퀀스 개시 함수
 
-	// --- 서브클래스가 제공하는 차이점 ---
-	//	진영 태그(Team_Blue/Team_Red). 무효 태그를 반환하면 부여하지 않는다.
-	virtual FGameplayTag GetTeamTag() const { return FGameplayTag(); }
-	//	구조물 식별 태그(Structure_Turret/Structure_Nexus).
-	virtual FGameplayTag GetStructureTag() const { return FGameplayTag(); }
-	//	데이터테이블 미지정 시 사용할 기본 최대 체력.
-	virtual float GetDefaultMaxHealth() const { return 1000.f; }
-	//	파괴 시 GameMode 등에 통보(서브클래스별 처리).
-	virtual void NotifyDestroyed() {}
+	virtual FGameplayTag GetTeamTag() const { return FGameplayTag(); } // 하위 진영 태그 반환 가상 함수
+	virtual FGameplayTag GetStructureTag() const { return FGameplayTag(); } // 하위 구조물 고유 태그 반환 가상 함수
+	virtual float GetDefaultMaxHealth() const { return 1000.f; } // 디폴트 내구도 반환 가상 함수
+	virtual void NotifyDestroyed() {} // 파생 클래스 특화 통보용 가상 함수
 
-	// --- 공통 컴포넌트 ---
-	//	루트: 피격 판정용 박스 콜리전. 투사체(OverlapAllDynamic)가 오버랩하도록 동적 타입으로 설정한다.
+protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UBoxComponent> CollisionBox;
+	TObjectPtr<UStaticMeshComponent> TurretMesh; // 최상위 루트 외형 담당 스태틱 메시
 
-	//	외형(+선택적 이동 차단). 루트 박스에 부착된다.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> TowerMesh;
+	TObjectPtr<UBoxComponent> CollisionBox; // 루트 하위에 귀속되는 투사체 피격 박스 콜리전
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UGeometryCollectionComponent> DebrisMesh; // 독립 분쇄 연출을 보장받는 카오스 지오메트리 컬렉션
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
-	TObjectPtr<UFT_AbilitySystemComponent> AbilitySystemComponent;
+	TObjectPtr<UFT_AbilitySystemComponent> AbilitySystemComponent; // GAS ASC 인스턴스
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
-	TObjectPtr<UFT_AttributeSet> AttributeSet;
-
-	// --- 공통 데이터 ---
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
-	TObjectPtr<UDataTable> TowerDataTable;
+	TObjectPtr<UFT_AttributeSet> AttributeSet; // 체력 스탯 어트리뷰트 세트
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
-	FName DataRowName;
+	TObjectPtr<UDataTable> TowerDataTable; // 스탯 데이터 테이블 시트 보관 슬롯
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
+	FName DataRowName; // 데이터 테이블 행 추적 이름
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
-	TObjectPtr<USoundBase> DestructionSound;
+	TObjectPtr<USoundBase> DestructionSound; // 파괴 시점 효과음 오디오 소스
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
-	TObjectPtr<UParticleSystem> DestructionEffect;
+	TObjectPtr<UParticleSystem> DestructionEffect; // 파괴 시점 폭발 파티클 소스
 
-	// --- 파괴 연출 상태 ---
-	FVector InitialLocation = FVector::ZeroVector;
-	bool bIsDying = false;
-	float DyingTimer = 0.f;
-	float MaxDyingTime = 2.f;
+	bool bIsDying = false; // 파괴 제어 중복 진입 방어용 플래그
+	float MaxDyingTime = 5.f; // 메모리 자동 완전 소거 대기 수명 타임
 };
