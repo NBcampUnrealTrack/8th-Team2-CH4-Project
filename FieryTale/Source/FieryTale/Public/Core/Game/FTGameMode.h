@@ -19,7 +19,7 @@ public:
 
 	virtual void BeginPlay() override;
 	
-	// 심리스 트래블을 통해 플레이어가 새 레벨에 완전히 정착했을 때 호출되는 핵심 함수
+	// 일반 트래블을 통해 플레이어가 새 레벨에 완전히 정착했을 때 호출되는 핵심 함수
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 	
 	// 심리스 트래블로 넘어온 플레이어를 처리하는 함수 오버라이드

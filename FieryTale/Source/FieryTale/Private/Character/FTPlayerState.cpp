@@ -65,5 +65,6 @@ void AFTPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AFTPlayerState, SpawnedCharacter);
 	DOREPLIFETIME(AFTPlayerState, Team);
 	DOREPLIFETIME(AFTPlayerState, SelectedCharacterType);
+	DOREPLIFETIME(AFTPlayerState, PlayerIndex);
 }
 

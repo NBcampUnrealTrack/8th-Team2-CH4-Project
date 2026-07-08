@@ -21,3 +21,10 @@ enum class EFTCharacterType : uint8
 	Kaguya  UMETA(DisplayName = "Kaguya"),
 	Alice   UMETA(DisplayName = "Alice")
 };
+
+UENUM(BlueprintType)
+enum class EFTTeam : uint8
+{
+	Blue UMETA(DisplayName = "Blue Team"),
+	Red  UMETA(DisplayName = "Red Team"),
+};

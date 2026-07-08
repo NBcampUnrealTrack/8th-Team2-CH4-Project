@@ -74,10 +74,12 @@ void AFTLobbyPlayerState::CopyProperties(APlayerState* PlayerState)
 	
 	if (AFTPlayerState* PS = Cast<AFTPlayerState>(PlayerState))
 	{
+		// 캐릭터 타입과 플레이어 인덱스를 넘겨주기		
 		PS->SetSelectedCharacterType(this->SelectedCharacterType);
+		PS->SetPlayerIndex(this->PlayerIndex);
 		
-		UE_LOG(LogFTSession, Log, TEXT("[SeamlessTravel] %s 님의 데이터 복사 성공! 캐릭터: %d"), 
-			*GetPlayerName(), (int32)PS->GetSelectedCharacterType());
+		UE_LOG(LogFTSession, Log, TEXT("[SeamlessTravel] %s 님의 데이터 복사 성공! 캐릭터: %d, 인덱스: %d"), 
+			*GetPlayerName(), (int32)PS->GetSelectedCharacterType(), PS->GetPlayerIndex());
 	}
 }
 

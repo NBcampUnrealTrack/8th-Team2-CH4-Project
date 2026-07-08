@@ -67,21 +67,18 @@ void UFTLobbyWidget::InitWidget(AFTPlayerController* InPC, AFTLobbyPlayerState* 
 	// 🌟 [추가]: 데이터 테이블 기반 동적 버튼 생성 로직
 	if (CharacterDataTable && CharacterButtonContainer && CharacterSelectButtonClass)
 	{
-		// 1. 기존에 수동으로 배치되어 있던 찌꺼기 버튼이 있다면 모두 비움
 		CharacterButtonContainer->ClearChildren();
 
-		// 2. 데이터 테이블의 모든 행 가져오기
+		// 데이터 테이블의 모든 행 가져오기
 		static const FString ContextString(TEXT("Lobby Character Initialization"));
 		TArray<FFTCharacterData*> AllCharacters;
 		CharacterDataTable->GetAllRows<FFTCharacterData>(ContextString, AllCharacters);
 
-		// 3. 영웅 개수만큼 버튼을 만들고 데이터를 주입
+		// 영웅 개수만큼 버튼을 만들고 데이터를 주입
 		for (FFTCharacterData* CharData : AllCharacters)
 		{
 			if (CharData && CharData->CharacterType != EFTCharacterType::None)
 			{
-				// UFTCharacterButton(가칭) 위젯 생성
-				// (이후 해당 위젯 클래스에서 CharData의 DisplayName과 PortraitIcon을 받아 화면에 세팅)
 				UFTCharacterSelectButton* NewButtonWidget = CreateWidget<UFTCharacterSelectButton>(this, CharacterSelectButtonClass);
                 
 				if (NewButtonWidget)

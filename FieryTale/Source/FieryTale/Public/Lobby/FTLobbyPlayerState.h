@@ -44,7 +44,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FFTOnCharacterStateChanged OnCharacterStateChanged;
 
-	// 플레이어 진열대 자리 번호
+	// 플레이어 진열대 자리 번호KO
 	UPROPERTY(Replicated)
 	int32 PlayerIndex = -1;
 	

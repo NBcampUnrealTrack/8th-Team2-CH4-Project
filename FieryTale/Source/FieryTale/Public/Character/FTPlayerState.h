@@ -11,12 +11,7 @@
 class UFT_AbilitySystemComponent;
 class UFT_AttributeSet;
 
-UENUM(BlueprintType)
-enum class EFTTeam : uint8
-{
-	Blue UMETA(DisplayName = "Blue Team"),
-	Red  UMETA(DisplayName = "Red Team"),
-};
+
 
 UCLASS()
 class FIERYTALE_API AFTPlayerState  : public APlayerState, public IAbilitySystemInterface
@@ -36,6 +31,12 @@ public:
 
 	// GameMode → PlayerController → 여기로 전달되는 팀 태그 바인딩 함수
 	void AssignTeamTag(EFTTeam InTeam);
+	
+	UPROPERTY(Replicated)
+	int32 PlayerIndex = -1;
+
+	int32 GetPlayerIndex() const { return PlayerIndex; }
+	void SetPlayerIndex(int32 InIndex) { PlayerIndex = InIndex; }
 
 	void SetSelectedCharacterType(EFTCharacterType InType) { SelectedCharacterType = InType; }
 	EFTCharacterType GetSelectedCharacterType() const { return SelectedCharacterType; }

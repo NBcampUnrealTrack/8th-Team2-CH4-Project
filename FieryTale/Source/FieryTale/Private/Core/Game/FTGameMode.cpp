@@ -24,6 +24,8 @@
 #include "GameFramework/GameSession.h"
 #include "Engine/GameInstance.h"
 #include "Blueprint/UserWidget.h"
+#include "Level/FTTeamPlayerStart.h"
+#include "EngineUtils.h"
 
 AFTGameMode::AFTGameMode()
 {
@@ -89,30 +91,28 @@ void AFTGameMode::InitializeAndSpawnPlayer(APlayerController* NewPlayer)
 	// 컨트롤러 캐스팅 (통합된 FTPlayerController 사용)
 	AFTPlayerController* FTPlayerPC = Cast<AFTPlayerController>(NewPlayer);
 	if (!FTPlayerPC) return;
-	
-	if (GameState) // 게임 스테이트는 게임모드에서 관리
-	{
-		/** GameState의 PlayerArray에서 현재 접속한 플레이어의 인덱스를 찾습니다. PlayerController::AssignTeam 호출하면
-		PlayerState::AssignTeamTag 을 호출하게 되고 개별 플레어의 팀 태그를 지정할 수 있습니다. **/
-		
-		int32 PlayerIndex = GameState->PlayerArray.Find(FTPlayerPC->GetPlayerState<APlayerState>());
-		
-		if (PlayerIndex == INDEX_NONE)
-		{
-			PlayerIndex = GameState->PlayerArray.Num();
-		}
-		
-		EFTTeam AssignedTeam = (PlayerIndex % 2 == 0) ? EFTTeam::Blue : EFTTeam::Red;
-		
-		FTPlayerPC->AssignTeam(AssignedTeam);
-
-		UE_LOG(LogFTSession, Log, TEXT("[Team] 🛡️ 플레이어 [%s]님에게 %s 팀이 배정되었습니다! (Index: %d)"), 
-			*NewPlayer->GetName(), (AssignedTeam == EFTTeam::Blue) ? TEXT("Blue") : TEXT("Red"), PlayerIndex);
-	}
 
 	AFTPlayerState* Ps = FTPlayerPC->GetPlayerState<AFTPlayerState>();
 	if (Ps)
 	{
+		int32 MyIndex = Ps->GetPlayerIndex();
+		
+		// (안전장치) 혹시라도 에디터에서 바로 아레나 맵을 켜서 인덱스가 없는 경우 순차 배정
+		if (MyIndex == -1 && GameState) 
+		{
+			MyIndex = GameState->PlayerArray.Find(Ps);
+			if (MyIndex == INDEX_NONE) MyIndex = GameState->PlayerArray.Num();
+		}
+
+		// 인덱스를 기준으로 짝수(0, 2, 4...)는 블루, 홀수(1, 3, 5...)는 레드
+		EFTTeam AssignedTeam = (MyIndex % 2 == 0) ? EFTTeam::Blue : EFTTeam::Red;
+		FTPlayerPC->AssignTeam(AssignedTeam);
+
+		UE_LOG(LogFTSession, Log, TEXT("[Team] 🛡️ 플레이어 [%s]님에게 %s 팀이 배정되었습니다! (고유 Index: %d)"), 
+			*NewPlayer->GetName(), (AssignedTeam == EFTTeam::Blue) ? TEXT("Blue") : TEXT("Red"), MyIndex);
+		
+		
+		
 		EFTCharacterType ChosenCharacter = Ps->GetSelectedCharacterType();
        
 		if (ChosenCharacter == EFTCharacterType::None)
@@ -135,20 +135,41 @@ void AFTGameMode::InitializeAndSpawnPlayer(APlayerController* NewPlayer)
 
 		if (!bAlreadySpawned)
 		{
-			// 기존에 빙의하고 있던 쓸모없는 기본 폰(SpectatorPawn 등) 파괴
 			if (APawn* OldPawn = NewPlayer->GetPawn())
 			{
 				OldPawn->Destroy(); 
 			}
 
-			// PlayerStart 위치 찾기
-			AActor* StartSpot = FindPlayerStart(NewPlayer);
+			// 🌟 [변경]: 배정받은 팀(AssignedTeam)에 맞는 스폰 지점 찾기
+			TArray<AFTTeamPlayerStart*> ValidSpawns;
+		
+			for (TActorIterator<AFTTeamPlayerStart> It(GetWorld()); It; ++It)
+			{
+				if (It->SpawnTeam == AssignedTeam)
+				{
+					ValidSpawns.Add(*It);
+				}
+			}
+
+			AActor* StartSpot = nullptr;
+			if (ValidSpawns.Num() > 0)
+			{
+				// 팀에 맞는 스폰 포인트 중 하나를 무작위로 선택 (스폰 겹침 방지)
+				int32 RandomIndex = FMath::RandRange(0, ValidSpawns.Num() - 1);
+				StartSpot = ValidSpawns[RandomIndex];
+			}
+			else
+			{
+				// 만약 맵에 팀 전용 스폰이 하나도 없다면 기존 방식으로 폴백(Fallback)
+				StartSpot = FindPlayerStart(NewPlayer);
+				UE_LOG(LogFTSession, Warning, TEXT("[Spawn] %s 팀 전용 스폰 지점이 없습니다! 기본 스폰을 사용합니다."), 
+					(AssignedTeam == EFTTeam::Blue) ? TEXT("Blue") : TEXT("Red"));
+			}
+
 			FVector SpawnLocation = StartSpot ? StartSpot->GetActorLocation() : FVector::ZeroVector;
 			FRotator SpawnRotation = StartSpot ? StartSpot->GetActorRotation() : FRotator::ZeroRotator;
 
-			// 컨트롤러에게 데이터 주입 및 스폰 명령
 			FTPlayerPC->SpawnCharacter(SpawnLocation, SpawnRotation);
-    
 			UE_LOG(LogFTSession, Log, TEXT("[ArenaDebug] 플레이어 [%s] 캐릭터 스폰 요청 완료!"), *NewPlayer->GetName());
 		}
 	}
