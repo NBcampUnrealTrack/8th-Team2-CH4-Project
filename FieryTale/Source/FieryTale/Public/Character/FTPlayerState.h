@@ -32,6 +32,9 @@ public:
 	// GameMode → PlayerController → 여기로 전달되는 팀 태그 바인딩 함수
 	void AssignTeamTag(EFTTeam InTeam);
 	
+	UFUNCTION(BlueprintPure, Category = "FieryTale|Team")
+	EFTTeam GetTeam() const { return Team; }
+	
 	UPROPERTY(Replicated)
 	int32 PlayerIndex = -1;
 

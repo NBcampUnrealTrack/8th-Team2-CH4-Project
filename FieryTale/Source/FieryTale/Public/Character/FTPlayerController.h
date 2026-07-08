@@ -182,6 +182,10 @@ public:
 
 	virtual void OnRep_PlayerState() override;
 	void InitializeLobbyLocal();
+	
+	// 서버가 클라이언트에게 결과창을 띄우라고 지시하는 RPC
+	UFUNCTION(Client, Reliable)
+	void Client_ShowResultUI(uint8 WinningTeam);
 
 protected:
 	UFUNCTION(Server, Reliable)
@@ -192,4 +196,11 @@ protected:
 	
 	UFUNCTION(Server, Reliable)
 	void ServerSetCharacter(EFTCharacterType NewCharacter);
+	
+	// 결과창 위젯 (에디터에서 지정)
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<class UUserWidget> ResultWidgetClass;
+
+	UPROPERTY()
+	UUserWidget* ResultWidgetInstance;
 };

@@ -4,6 +4,7 @@
 #include "Character/FTPlayerState.h"
 #include "Character/FTCharacterBase.h"
 #include "Character/FTPlayerCharacterBase.h"
+#include "Character/FTCharacterTypes.h"
 #include "UI/FTHUDLayoutSubsystem.h"
 #include "AbilitySystemComponent.h"
 #include "Components/InputComponent.h"
@@ -15,7 +16,6 @@
 #include "Blueprint/UserWidget.h"
 #include "GameplayTags/FTTags.h"
 #include "GameFramework/GameModeBase.h"
-#include "Character/FTCharacterTypes.h"
 #include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
 
 #include "Lobby/FTLobbyPlayerState.h"
@@ -24,6 +24,7 @@
 #include "Camera/CameraActor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Lobby/FTLobbyGameMode.h"
+#include "UI/FTResultWidget.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerController);
 
@@ -577,4 +578,49 @@ void AFTPlayerController::InitializeLobbyLocal()
 			SetViewTarget(FoundCameras[0]); 
 		}
 	}
+}
+
+void AFTPlayerController::Client_ShowResultUI_Implementation(uint8 WinningTeam)
+{
+	// 1. 마우스 커서 표시 및 입력 모드 전환
+	bShowMouseCursor = true;
+	FInputModeUIOnly InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+
+	// 2. 결과창 생성 및 뷰포트 추가
+	if (ResultWidgetClass && !ResultWidgetInstance)
+	{
+		ResultWidgetInstance = CreateWidget<UUserWidget>(this, ResultWidgetClass);
+		if (ResultWidgetInstance)
+		{
+			if (UFTResultWidget* ResultUI = Cast<UFTResultWidget>(ResultWidgetInstance))
+			{
+				bool bIsVictory = false;
+
+				// 🌟 2. 내 팀이 어디인지 확인합니다.
+				if (AFTPlayerState* PS = GetPlayerState<AFTPlayerState>())
+				{
+					// 현재 내 팀
+					EFTTeam MyTeam = PS->GetTeam();
+					
+					// 서버가 보내준 숫자(1 또는 2)를 Enum으로 안전하게 변환
+					EFTTeam WinnerTeamEnum = (WinningTeam == 1) ? EFTTeam::Blue : EFTTeam::Red;
+					
+					// 두 팀이 정확히 일치하면 승리!
+					if (MyTeam == WinnerTeamEnum)
+					{
+						bIsVictory = true;
+					}
+				}
+
+				// 🌟 3. 위젯에 승패 결과를 전달하여 텍스트와 색상을 바꿉니다.
+				ResultUI->SetMatchResult(bIsVictory);
+			}
+			
+			ResultWidgetInstance->AddToViewport();
+		}
+	}
+	
+	UE_LOG(LogTemp, Log, TEXT("[PlayerController] 결과 UI 출력 완료! 우승 팀: %d"), WinningTeam);
 }

@@ -238,44 +238,57 @@ void AFTGameMode::HandleGameOver(uint8 WinningTeam)
 		return;
 	}
 
-	// 매치 상태를 GameOver로 전환 (복제되어 클라이언트도 종료를 인지).
-	if (ArenaGS)
-	{
-		ArenaGS->SetArenaMatchState(EFTArenaMatchState::GameOver);
-	}
+	UE_LOG(LogFTSession, Log, TEXT("[Arena] 매치 종료! 우승 팀: %s"), (WinningTeam == 1) ? TEXT("Blue") : TEXT("Red"));
 
-	if (WinningTeam == 1)
-	{
-		UE_LOG(LogTemp, Log, TEXT("Blue Team Wins"));
-	}
-	else if (WinningTeam == 2)
-	{
-		UE_LOG(LogTemp, Log, TEXT("Red Team Wins"));
-	}
+	// 서버 주도로 전 세계의 시간을 0.2배속으로 늦춥니다. (자동으로 클라이언트에 동기화됨)
+	UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 0.2f);
+	
+	FTimerDelegate ResultUIDelegate = FTimerDelegate::CreateUObject(this, &AFTGameMode::ShowResultUI, WinningTeam);
+	GetWorldTimerManager().SetTimer(GameOverSequenceTimerHandle, ResultUIDelegate, 0.6f, false);
 
-	// [뼈대] 결과 UI가 등록되지 않았으면 결과 보고 없이 세션(연결)을 해산하고 메인 레벨로 복귀한다.
-	if (!ResultWidgetClass)
+	// Gamemode는 서버만 소유하고 잇으므로 UI는 playercontroller에서 처리
+}
+
+void AFTGameMode::ShowResultUI(uint8 WinningTeam)
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		// 1) 온라인 세션 파괴 (방 목록에서 제거)
-		if (UGameInstance* GameInstance = GetGameInstance())
+		if (AFTPlayerController* PC = Cast<AFTPlayerController>(It->Get()))
 		{
-			if (UFTSessionSubsystem* Session = GameInstance->GetSubsystem<UFTSessionSubsystem>())
-			{
-				Session->LeaveSession();
-			}
+			PC->DisableInput(PC);
 		}
-
-		// 2) 호스트가 전 클라이언트를 메인 메뉴로 돌려보내고 자신도 복귀 (연결 해산).
-		//    GameDefaultMap(L_MainMenu)로 이동한다.
-		//    TODO: LeaveSession 파괴 콜백을 기다린 뒤 이동하도록 순서 보강 (현재는 최소 뼈대).
-		if (GameSession)
+	}
+	
+	//  모든 접속자(클라이언트)에게 결과창 UI를 띄우라고 RPC 명령 송출
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AFTPlayerController* PC = Cast<AFTPlayerController>(It->Get()))
 		{
-			GameSession->ReturnToMainMenuHost();
+			PC->Client_ShowResultUI(WinningTeam);
 		}
-		return;
 	}
 
-	// TODO(결과 UI): ResultWidgetClass가 지정된 경우 —
-	//   승자 정보를 GameState에 복제하고, 각 클라이언트에서 이 위젯을 생성해 결과를 표시한 뒤
-	//   확인/타이머로 세션 해산·메인 복귀로 이어지도록 확장한다. (다음 단계)
+	// 2. 결과창을 띄운 상태로 감상할 시간 제공 후 최종 로비 복귀
+	// 0.2배속 상태에서 현실 시간 5초 대기 = 1.0f
+	GetWorldTimerManager().SetTimer(GameOverSequenceTimerHandle, this, &AFTGameMode::EndSessionAndReturn, 1.0f, false);
+}
+
+void AFTGameMode::EndSessionAndReturn()
+{
+	// 1. 다음 맵 이동 및 정상화를 위해 시간을 1.0으로 복구
+	UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
+
+	// 2. 온라인 세션 파괴 및 메인 레벨로 복귀 (기존 로직 유지)
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UFTSessionSubsystem* Session = GameInstance->GetSubsystem<UFTSessionSubsystem>())
+		{
+			Session->LeaveSession();
+		}
+	}
+
+	if (GameSession)
+	{
+		GameSession->ReturnToMainMenuHost();
+	}
 }
