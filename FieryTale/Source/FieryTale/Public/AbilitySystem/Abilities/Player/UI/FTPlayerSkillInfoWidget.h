@@ -10,6 +10,9 @@
 class UImage;
 class UTextBlock;
 class UProgressBar;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UTexture2D;
 class UAbilitySystemComponent;
 class UFT_GameplayAbility;   // [구 경로] 어빌리티 CDO 조회용 — 주석과 함께 보존
 class AFTPlayerCharacterBase;
@@ -17,11 +20,21 @@ struct FFTSkillMetaData;
 struct FFTCharacterData;
 struct FDataTableRowHandle;
 
+/** 스킬 슬롯 — 캐릭터 데이터의 4개 버튼 슬롯 중 하나를 가리킨다. */
+UENUM(BlueprintType)
+enum class EFTSkillSlot : uint8
+{
+	LMB   UMETA(DisplayName = "LMB (좌클릭)"),
+	RMB   UMETA(DisplayName = "RMB (우클릭)"),
+	Space UMETA(DisplayName = "Space (이동/유틸)"),
+	R     UMETA(DisplayName = "R (궁극기)")
+};
+
 /**
  *	스킬 슬롯 1개의 정보(아이콘/이름/설명)와 쿨타임을 표시하는 위젯.
- *	- SkillInputTag로 슬롯(LMB/RMB/Space/R)을 지정하면, 소유 플레이어 캐릭터의 CharacterData(FFTCharacterData)에서
- *	  해당 슬롯의 스킬 행(FFTSkillMetaData)을 조회해 아이콘/이름/설명을 표시한다. (DataTable 기반)
- *	- 그 행의 CooldownTag를 ASC에서 감시해 남은 쿨타임 비율을 CooldownBar에 표시한다.
+ *	- SkillSlot으로 슬롯(LMB/RMB/Space/R)만 지정하면, 소유 플레이어 캐릭터의 CharacterData(FFTCharacterData)에서
+ *	  해당 슬롯의 스킬 행(FFTSkillMetaData)과 쿨다운 태그를 가져와 아이콘/이름/설명/쿨타임을 표시한다. (DataTable 기반)
+ *	- 미리 태그를 지정할 필요 없이, 슬롯만 정하면 캐릭터 데이터에서 스킬·태그를 복제해온다.
  *	- 표시용 위젯(Image/Text/ProgressBar)은 모두 BindWidgetOptional이라, 필요한 것만 WBP에 배치하면 된다.
  */
 UCLASS()
@@ -33,10 +46,24 @@ public:
 	//	HUD/컨트롤러가 ASC를 직접 알고 있을 때 명시적으로 초기화 (선택)
 	void InitializeWithAbilitySystem(UAbilitySystemComponent* InASC);
 
-	//	이 위젯이 표시할 스킬 슬롯의 인풋 태그.
-	//	(예: FTTags::FTAbilities::AttackSkill / UtilSkill / UltimateSkill / NormalAttack)
+	//	이 위젯이 표시할 스킬 슬롯(LMB/RMB/Space/R). 소유 플레이어 캐릭터의 CharacterData에서
+	//	이 슬롯의 스킬 메타데이터/쿨다운 태그를 가져온다. (미리 태그를 지정할 필요 없음)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Skill")
-	FGameplayTag SkillInputTag;
+	EFTSkillSlot SkillSlot = EFTSkillSlot::LMB;
+
+	//	아이콘 영역에 사용할 머티리얼(인스턴스). 아이콘 텍스처와 남은 쿨타임(0~1)을
+	//	이 머티리얼의 파라미터로 전달해 쿨타임 스윕 등을 표시하는 용도. (동적 인스턴스 생성/파라미터 세팅은 소비 측에서)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Skill")
+	TObjectPtr<UMaterialInterface> CooldownIconMaterial;
+
+	//	머티리얼에 넘길 값을 한 번에 반환: 아이콘 텍스처(OutIcon) + 남은 쿨타임 비율(OutCooldownRatio, 0~1).
+	//	현재 표시할 스킬이 있으면 true.
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Skill")
+	bool GetSkillIconAndCooldownRatio(UTexture2D*& OutIcon, float& OutCooldownRatio) const;
+
+	//	현재 남은 쿨타임 비율(0~1). 1=방금 시전, 0=사용 가능. (머티리얼 스칼라 파라미터 갱신용)
+	UFUNCTION(BlueprintPure, Category = "FieryTale|Skill")
+	float GetCooldownRatio() const;
 
 protected:
 	virtual void NativeConstruct() override;
@@ -70,10 +97,10 @@ private:
 	//	[구 경로/폐기 보존] SkillInputTag로 부여된 어빌리티(CDO)를 찾던 방식.
 	//UFT_GameplayAbility* ResolveAbilityCDO() const;
 
-	//	소유 캐릭터의 CharacterData(FFTCharacterData)에서 SkillInputTag 슬롯의 스킬 행을 조회한다. 못 찾으면 nullptr.
+	//	소유 캐릭터의 CharacterData(FFTCharacterData)에서 SkillSlot 슬롯의 스킬 행을 조회한다. 못 찾으면 nullptr.
 	const FFTSkillMetaData* ResolveSkillRow() const;
 
-	//	SkillInputTag(버튼)에 대응하는 슬롯 핸들(LMBSkill/RMBSkill/SpaceSkill/RSkill)을 고른다.
+	//	SkillSlot(버튼)에 대응하는 슬롯 핸들(LMBSkill/RMBSkill/SpaceSkill/RSkill)을 고른다.
 	const FDataTableRowHandle* GetSlotHandle(const FFTCharacterData& CharData) const;
 
 	//	스킬 행의 메타데이터로 아이콘/이름/설명을 채우고, 쿨다운 감시를 1회 등록한다.
@@ -94,6 +121,11 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> BoundASC;
+
+	//	CooldownIconMaterial로부터 생성한 아이콘 영역용 동적 인스턴스.
+	//	텍스처 파라미터 "Icon"(아이콘)과 스칼라 파라미터 "CooldownTime"(남은 쿨타임 0~1)을 갱신한다.
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> IconMID;
 
 	//	현재 감시 중인 쿨다운 태그 (대상 어빌리티의 CooldownTag). 어빌리티마다 다르다.
 	FGameplayTag ActiveCooldownTag;

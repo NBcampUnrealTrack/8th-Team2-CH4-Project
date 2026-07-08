@@ -7,17 +7,24 @@
 #include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
 #include "AbilitySystem/Abilities/Player/Data/FTSkillMetaData.h"
 #include "Character/FTPlayerCharacterBase.h"
-#include "GameplayTags/FTTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameplayEffectTypes.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+
+namespace
+{
+	//	CooldownIconMaterial의 파라미터 이름 (텍스처: 아이콘, 스칼라: 남은 쿨타임 0~1)
+	const FName ParamIcon(TEXT("Icon"));
+	const FName ParamCooldownTime(TEXT("CooldownTime"));
+}
 
 void UFTPlayerSkillInfoWidget::NativeConstruct()
 {
@@ -162,7 +169,7 @@ UFT_GameplayAbility* UFTPlayerSkillInfoWidget::ResolveAbilityCDO() const
 
 const FFTSkillMetaData* UFTPlayerSkillInfoWidget::ResolveSkillRow() const
 {
-	//	소유 플레이어 캐릭터 → CharacterData(FFTCharacterData) → SkillInputTag 슬롯의 스킬 행.
+	//	소유 플레이어 캐릭터 → CharacterData(FFTCharacterData) → SkillSlot 슬롯의 스킬 행.
 	const AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetOwningPlayerPawn());
 	if (!Char)
 	{
@@ -186,12 +193,15 @@ const FFTSkillMetaData* UFTPlayerSkillInfoWidget::ResolveSkillRow() const
 
 const FDataTableRowHandle* UFTPlayerSkillInfoWidget::GetSlotHandle(const FFTCharacterData& CharData) const
 {
-	//	버튼→슬롯 매핑은 기존 인풋 태그를 재사용한다. (캐릭터 부여 로직과 동일한 대응)
-	if (SkillInputTag == FTTags::FTAbilities::NormalAttack)  { return &CharData.LMBSkill; }
-	if (SkillInputTag == FTTags::FTAbilities::AttackSkill)   { return &CharData.RMBSkill; }
-	if (SkillInputTag == FTTags::FTAbilities::UtilSkill)     { return &CharData.SpaceSkill; }
-	if (SkillInputTag == FTTags::FTAbilities::UltimateSkill) { return &CharData.RSkill; }
-	return nullptr;
+	//	위젯에 지정된 슬롯(LMB/RMB/Space/R)에 대응하는 캐릭터 데이터의 스킬 핸들을 고른다.
+	switch (SkillSlot)
+	{
+	case EFTSkillSlot::LMB:   return &CharData.LMBSkill;
+	case EFTSkillSlot::RMB:   return &CharData.RMBSkill;
+	case EFTSkillSlot::Space: return &CharData.SpaceSkill;
+	case EFTSkillSlot::R:     return &CharData.RSkill;
+	default:                  return nullptr;
+	}
 }
 
 void UFTPlayerSkillInfoWidget::RefreshSkillInfo()
@@ -226,10 +236,28 @@ void UFTPlayerSkillInfoWidget::RefreshSkillInfo()
 	}
 	if (SkillIcon)
 	{
-		//	아이콘 머티리얼은 소프트 참조 — 표시하는 이 시점에만 로드한다.
-		if (UMaterialInterface* IconMaterial = Skill->Icon.LoadSynchronous())
+		//	아이콘 텍스처는 소프트 참조 — 표시하는 이 시점에만 로드한다.
+		UTexture2D* IconTexture = Skill->Icon.LoadSynchronous();
+
+		if (CooldownIconMaterial)
 		{
-			SkillIcon->SetBrushFromMaterial(IconMaterial);
+			//	머티리얼 방식: 브러시 재질을 지정하고 MID를 만들어 아이콘("Icon")과 쿨타임("CooldownTime")을 파라미터로 전달한다.
+			SkillIcon->SetBrushFromMaterial(CooldownIconMaterial);
+			IconMID = SkillIcon->GetDynamicMaterial();
+			if (IconMID)
+			{
+				if (IconTexture)
+				{
+					IconMID->SetTextureParameterValue(ParamIcon, IconTexture);
+				}
+				IconMID->SetScalarParameterValue(ParamCooldownTime, GetCooldownRatio());
+			}
+		}
+		else if (IconTexture)
+		{
+			//	머티리얼 미지정 시 폴백: 텍스처를 브러시에 직접 표시.
+			IconMID = nullptr;
+			SkillIcon->SetBrushFromTexture(IconTexture);
 		}
 	}
 
@@ -276,6 +304,10 @@ void UFTPlayerSkillInfoWidget::OnCooldownTagChanged(const FGameplayTag Tag, int3
 		if (CooldownBar)
 		{
 			CooldownBar->SetPercent(0.f);
+		}
+		if (IconMID)
+		{
+			IconMID->SetScalarParameterValue(ParamCooldownTime, 0.f);
 		}
 		if (CooldownText)
 		{
@@ -333,27 +365,29 @@ void UFTPlayerSkillInfoWidget::StopCooldownPolling()
 
 void UFTPlayerSkillInfoWidget::UpdateCooldownDisplay()
 {
-	float Percent = 0.f;
-	float RemainingTime = 0.f;
+	const float Ratio = GetCooldownRatio();
 
+	//	남은 초(텍스트용) 계산 및 계산상 종료 시 폴링 조기 정지.
+	float RemainingTime = 0.f;
 	UWorld* World = GetWorld();
 	if (World && CachedCooldownDuration > 0.f)
 	{
 		RemainingTime = CachedCooldownEndTime - World->GetTimeSeconds();
-		Percent = FMath::Clamp(RemainingTime / CachedCooldownDuration, 0.f, 1.f);
-
 		if (RemainingTime <= 0.f)
 		{
 			//	태그 제거 이벤트가 아직 안 왔더라도 계산상 끝났으면 폴링을 미리 정지 (안전장치)
 			StopCooldownPolling();
 			RemainingTime = 0.f;
-			Percent = 0.f;
 		}
 	}
 
 	if (CooldownBar)
 	{
-		CooldownBar->SetPercent(Percent);
+		CooldownBar->SetPercent(Ratio);
+	}
+	if (IconMID)
+	{
+		IconMID->SetScalarParameterValue(ParamCooldownTime, Ratio);
 	}
 	if (CooldownText)
 	{
@@ -362,4 +396,32 @@ void UFTPlayerSkillInfoWidget::UpdateCooldownDisplay()
 			? FText::AsNumber(FMath::CeilToInt(RemainingTime))
 			: FText::GetEmpty());
 	}
+}
+
+float UFTPlayerSkillInfoWidget::GetCooldownRatio() const
+{
+	const UWorld* World = GetWorld();
+	if (!World || CachedCooldownDuration <= 0.f)
+	{
+		return 0.f;
+	}
+	const float RemainingTime = CachedCooldownEndTime - World->GetTimeSeconds();
+	return FMath::Clamp(RemainingTime / CachedCooldownDuration, 0.f, 1.f);
+}
+
+bool UFTPlayerSkillInfoWidget::GetSkillIconAndCooldownRatio(UTexture2D*& OutIcon, float& OutCooldownRatio) const
+{
+	OutIcon = nullptr;
+	OutCooldownRatio = 0.f;
+
+	const FFTSkillMetaData* Skill = ResolveSkillRow();
+	if (!Skill)
+	{
+		return false;
+	}
+
+	//	아이콘 텍스처(소프트 참조 로드) + 현재 남은 쿨타임 비율(0~1)을 함께 돌려준다.
+	OutIcon = Skill->Icon.LoadSynchronous();
+	OutCooldownRatio = GetCooldownRatio();
+	return true;
 }
