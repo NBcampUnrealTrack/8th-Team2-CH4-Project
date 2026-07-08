@@ -6,12 +6,11 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
+#include "AbilitySystemComponent.h" // ◄ ASC 상호작용을 위해 추가 완착
 #include "GameplayTags/FTTags.h"
 
 UFT_AladdinFlySkill::UFT_AladdinFlySkill()
     : FlyDuration(5.0f)
-    , FlySpeedPenaltyMultiplier(0.7f)
-    , OriginalMaxWalkSpeed(0.0f)
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
@@ -22,6 +21,7 @@ UFT_AladdinFlySkill::UFT_AladdinFlySkill()
 
     CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
+    // 활성화 기간 동안 알라딘 고유 비행 버프 태그를 확정 부여합니다.
     ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::Flying);
 }
 
@@ -29,7 +29,7 @@ void UFT_AladdinFlySkill::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     const FGameplayEventData* TriggerEventData)
 {
-    // 마나 자원이 없으므로 현재 15초 시프트 쿨타임 태그가 걸려있는지만 순정 GAS 관문에서 체크합니다.
+    // 1단계: 시프트 생존기 쿨타임 검문
     if (!CheckCooldown(Handle, ActorInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -38,29 +38,47 @@ void UFT_AladdinFlySkill::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
+    // =========================================================================
+    // [쿨타임 완치 배관]: 이륙 시점에 CommitAbility 마스터 함수를 확실하게 격발합니다.
+    // 이를 통해 우클릭/시프트 공용 Cooldown GE 장부가 시스템에 안착합니다.
+    // =========================================================================
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
+
     ACharacter* Character = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
     UCharacterMovementComponent* MoveComp = Character ? Character->GetCharacterMovement() : nullptr;
+    UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     
-    if (!Character || !MoveComp)
+    if (!Character || !MoveComp || !SourceASC)
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
     
-    // 비행 페널티 연산 적용 직전 캐릭터의 순정 최대 걷기 속도를 보관소에 안전 백업합니다.
-    OriginalMaxWalkSpeed = MoveComp->MaxWalkSpeed;
+    // =========================================================================
+    // 💡 [속도 누수 완치 - GAS 순정 이속 페널티 라인 연동]
+    // 변수를 직접 조지는 하드코딩을 소각하고, 다른 버프/디버프와 복합 연산이 원활하도록
+    // 기획서 명세(비행 중 속도 30% 감산)가 세팅된 순정 GE를 내 몸에 투입합니다.
+    // =========================================================================
+    if (FlyMovementPenaltyGameplayEffectClass)
+    {
+        FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(FlyMovementPenaltyGameplayEffectClass, GetAbilityLevel());
+        if (PenaltySpecHandle.IsValid())
+        {
+            FlyMovementPenaltyActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*PenaltySpecHandle.Data.Get());
+        }
+    }
     
-    // 기획 스펙 반영: 비행 전개에 따른 고유 비행 속도 수치를 배정하고 최대 속도 통제선에 다이렉트 주입합니다.
-    MoveComp->MaxFlySpeed = OriginalMaxWalkSpeed * FlySpeedPenaltyMultiplier;
-    MoveComp->MaxWalkSpeed = MoveComp->MaxFlySpeed;
-    
-    // 무브먼트 스위칭: 지면 마찰과 중력의 물리 영향을 전면 끄고 공중 비행 자유 모드로 강제 제어합니다.
+    // 무브먼트 모드를 비행으로 안전 변환
     MoveComp->SetMovementMode(EMovementMode::MOVE_Flying);
 
-    // 공중으로 떠오르는 물리 부력 연출을 순간 격발합니다.
+    // 공중 부력 물리 벡터 순간 격발
     Character->LaunchCharacter(FVector(0.0f, 0.0f, 250.0f), false, true);
     
-    // 기획 스펙 반영: 무한 비행 치트를 방지하기 위해 5초 지속 제한 시간 타임아웃 타이머를 가동합니다.
+    // 5초 지속 제한 시간 타이머 가동
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().SetTimer(
@@ -79,14 +97,14 @@ void UFT_AladdinFlySkill::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 void UFT_AladdinFlySkill::OnFlyDurationExpired()
 {
-    // 5초 지속 시간이 안전하게 모두 만료되면 표준 종료 마감 관문으로 상태를 이관합니다.
+    // 5초 만료 시 정상 착륙 종료선 진입 (bWasCancelled = false)
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_AladdinFlySkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머 누수 안전 해제: 능력이 닫히기 시작하면 가동 중이던 5초 지속시간 타이머 핸들을 즉시 청소 수거하고 무효화합니다.
+    // 타이머 청정 소각
     if (GetWorld() && FlyDurationTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(FlyDurationTimerHandle);
@@ -94,26 +112,46 @@ void UFT_AladdinFlySkill::EndAbility(const FGameplayAbilitySpecHandle Handle, co
     }
 
     ACharacter* Character = Cast<ACharacter>(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr);
+    UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+
     if (Character && Character->GetCharacterMovement())
     {
-        UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement();
-        
-        // 인터럽트 예외 방어: 비행 지속시간 도중 적의 침묵이나 하드 CC기를 맞아 능력이 강제 캔슬당하더라도,
-        // 무조건 중력의 영향을 받는 순정 걷기 모드로 안전 착륙 복귀 조치합니다.
-        MoveComp->SetMovementMode(EMovementMode::MOVE_Walking);
-        
-        // 이속 복구 확정: 처음에 안전 백업해 두었던 순정 원본 속도 수치 그대로 최대 걷기 속도 배관에 1대1 환원 복구시킵니다.
-        if (OriginalMaxWalkSpeed > 0.0f)
-        {
-            MoveComp->MaxWalkSpeed = OriginalMaxWalkSpeed;
-        }
+        // 하드 CC나 타이머 만료 등 어떤 경로로든 비행이 종료되면 무조건 순정 걷기 모드로 복귀 조치
+        Character->GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
     }
 
-    // AOS 쿨다운 정책 완착: 양탄자 비행이 정상 종료되어 안전하게 지상 착륙을 완료한 바로 이 최종 시점에만 15초 고유 쿨타임을 발동시킵니다.
-    // 만약 적의 하드 CC기에 의해 비행 도중 강제 취소당한 억까 상황이라면 쿨타임 패널티 없이 리턴 복귀합니다.
-    if (!bWasCancelled)
+    if (SourceASC)
     {
-        CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
+        // 💡 비행 종료 시점에 이속 페널티 GE를 깔끔하게 철거하여 속도를 원래 스탯대로 자동 환원합니다.
+        if (FlyMovementPenaltyActiveHandle.IsValid())
+        {
+            SourceASC->RemoveActiveGameplayEffect(FlyMovementPenaltyActiveHandle);
+            FlyMovementPenaltyActiveHandle.Invalidate();
+        }
+
+        // =========================================================================
+        // [AOS 기획 사양 대응]: 양탄자 비행 도중 적의 하드 CC기에 억까당해 취소당했다면(bWasCancelled),
+        // 선제 적용되었던 시프트 쿨타임 이펙트를 찾아내어 장부에서 무결하게 환불 복구합니다.
+        // 정상 수명 만료로 종료되었다면 쿨타임이 그대로 유지됩니다.
+        // =========================================================================
+        if (bWasCancelled)
+        {
+            FGameplayEffectQuery UniversalQuery;
+            TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
+
+            for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
+            {
+                const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
+                if (ActiveGE && ActiveGE->Spec.Def)
+                {
+                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
+                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
+                    {
+                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
+                    }
+                }
+            }
+        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

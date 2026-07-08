@@ -68,33 +68,73 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
     const FGameplayAttribute ModifiedAttribute = Data.EvaluatedData.Attribute;
 
     // [기획 사양 공식 대미지 파이프라인]
-    // 계산기(ExecutionCalculation)를 통해 가공이 완료된 Meta Attribute인 Damage 가 배달되었을 때 처리하는 구역입니다.
     if (ModifiedAttribute == GetDamageAttribute())
     {
-        // 배달된 대미지 수치를 로컬 스택에 백업한 뒤 즉시 0으로 초기화하여 다음 타격을 위해 대미지 우체통을 비웁니다.
         const float LocalDamageDone = GetDamage();
         SetDamage(0.0f);
 
         if (LocalDamageDone > 0.0f)
         {
-            // [보호막 선제 차단 연산] 현재 영웅이 보유한 보호막(Shield) 통장에서 대미지를 먼저 차감합니다.
+            // [실제 가해진 최종 피해량 실측 변수] 보호막과 체력 연산 후 최종 가산 수치로 활용됩니다.
+            float ActualDamageApplied = 0.0f;
+
+            // [보호막 선제 차단 연산]
             const float NewShield = GetShield() - LocalDamageDone;
             if (NewShield >= 0.0f)
             {
-                // 보호막 잔여량이 남았다면 쉴드만 깎고 체력은 온전히 보존합니다.
                 SetShield(FMath::Clamp<float>(NewShield, 0.0f, GetMaxShield()));
+                // 보호막만 깠더라도 상대에게 유효타를 입혔으므로 대미지 전량 실측
+                ActualDamageApplied = LocalDamageDone;
             }
             else
             {
-                // 보호막이 통째로 파괴되었다면, 보호막을 0으로 털어버리고 남은 관통 대미지를 체력(Health)에서 차감합니다.
                 SetShield(0.0f);
-                const float NewHealth = GetHealth() + NewShield; // NewShield 가 음수이므로 더하면 감산됩니다.
-                SetHealth(FMath::Clamp<float>(NewHealth, 0.0f, GetMaxHealth()));
+                const float NewHealth = GetHealth() + NewShield; // NewShield가 음수이므로 감산
+                
+                // 💡 [실 대미지 정밀 계산릭 보정]: 체력이 오버킬(음수)되는 수치를 제외하고, 
+                // 타깃의 현재 체력통 한도 내에서 실제로 깎인 실질 대미지만 발라냅니다.
+                const float CurrentHealth = GetHealth();
+                const float ClampedNewHealth = FMath::Clamp<float>(NewHealth, 0.0f, GetMaxHealth());
+                
+                // 실제 깎인 체력량 + 쉴드가 버텨준 수치 = 진짜 가해진 피해
+                ActualDamageApplied = (CurrentHealth - ClampedNewHealth) + GetShield();
+                
+                SetHealth(ClampedNewHealth);
+            }
+
+            // =========================================================================
+            // ⚡ [공격적 획득 선로 - 궁극기 게이지 대미지 비례 충전 파이프라인]
+            // 피해를 입은 타깃이 아닌, '피해를 입힌 시전자(Instigator)'의 ASC를 역추적합니다.
+            // =========================================================================
+            if (ActualDamageApplied > 0.0f && Data.EffectSpec.GetContext().IsValid())
+            {
+                // 타격을 가한 가해자(시전자)의 어빌리티 시스템 컴포넌트를 호출합니다.
+                if (UAbilitySystemComponent* InstigatorASC = Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent())
+                {
+                    // 시전자의 스탯 장부(AttributeSet)를 색출합니다.
+                    const UFT_AttributeSet* InstigatorAttributeSet = Cast<UFT_AttributeSet>(InstigatorASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
+                    
+                    if (InstigatorAttributeSet)
+                    {
+                        // 기획 밸런스 셋업: 대미지 100당 궁극기 2.5% 충전 사양 (0.025f 계수)
+                        // 추후 전역 변수나 DataAsset으로 승수를 분리 빼내면 밸런싱이 더 편해집니다.
+                        const float UltimateChargeMultiplier = 0.025f;
+                        const float UltimateBonus = ActualDamageApplied * UltimateChargeMultiplier;
+
+                        // 시전자의 현재 궁극기 잔고를 확인 후 보너스를 합산 주입합니다.
+                        float CurrentSourceUlt = InstigatorAttributeSet->GetUltimateGauge();
+                        float NewSourceUlt = FMath::Clamp<float>(CurrentSourceUlt + UltimateBonus, 0.0f, InstigatorAttributeSet->GetMaxUltimateGauge());
+
+                        // [서버 강제 동기화 락인]: 시전자의 궁극기 속성 수치를 정석대로 강제 업데이트 갱신합니다.
+                        // 서버 권한에서 셋 수치가 변경되는 순간, 상단에 선언해 둔 DOREPLIFETIME_CONDITION_NOTIFY에 의해
+                        // 가해자 화면(UI 등)으로 실시간 패킷 복제 전파가 격발됩니다.
+                        InstigatorASC->SetNumericAttributeBase(GetUltimateGaugeAttribute(), NewSourceUlt);
+                    }
+                }
             }
         }
     }
     // [실질 수치 변경 후 최종 안전 클램핑 구역]
-    // GameplayEffect에 의해 베이스 값(Base Value)이 바뀐 후 최종 상태 장부를 안전 범위로 다시 가둡니다.
     else if (ModifiedAttribute == GetHealthAttribute())
     {
         SetHealth(FMath::Clamp<float>(GetHealth(), 0.0f, GetMaxHealth()));
@@ -105,11 +145,7 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
     }
     else if (ModifiedAttribute == GetMoveSpeedAttribute())
     {
-        // 이동 속도 속성이 이펙트(둔화 버프 등)에 의해 변경된 경우 최종 클램핑을 수행합니다.
         SetMoveSpeed(FMath::Clamp<float>(GetMoveSpeed(), 0.0f, GetMaxMoveSpeed()));
-        
-        // [물리 이속 컴포넌트 강제 동기화]
-        // GAS 속성만 바뀌고 실제 캐릭터가 느려지지 않는 현상을 막기 위해 CharacterMovement 의 MaxWalkSpeed 주입선까지 다이렉트로 개통합니다.
         if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
         {
             if (ACharacter* TargetChar = Cast<ACharacter>(Data.Target.AbilityActorInfo->AvatarActor.Get()))
@@ -131,16 +167,12 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
     }
 
     // [정석 마스터 죽음 파이프라인]
-    // 실시간 피해 누적으로 인해 체력 속성이 최종적으로 0f 이하에 도달했는지 정밀 감지선을 구동합니다.
     if (GetHealth() <= 0.0f)
     {
         if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
         {
-            // 피격 상태가 된 아바타 액터를 마스터 베이스 캐릭터 클래스로 캐스팅 견인합니다.
             if (AFTCharacterBase* BaseChar = Cast<AFTCharacterBase>(Data.Target.AbilityActorInfo->AvatarActor.Get()))
             {
-                // 서버 권한에서만 사망 진입 — Die()가 Dead 태그 부여, 입력/이동 차단,
-                // 사망 델리게이트 브로드캐스트(컨트롤러의 리스폰 예약)까지 처리한다.
                 if (BaseChar->HasAuthority())
                 {
                     BaseChar->Die();

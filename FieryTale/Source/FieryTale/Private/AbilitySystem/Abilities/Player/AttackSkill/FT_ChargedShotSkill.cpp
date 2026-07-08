@@ -9,10 +9,10 @@
 #include "GameplayTags/FTTags.h"
 #include "Object/FT_ProjectileBase.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitInputRelease.h" // 릴리즈 감시 태스크 인클루드 완착
 
 UFT_ChargedShotSkill::UFT_ChargedShotSkill()
-    : ChargeStartTime(0.0f)
-    , BaseDamage(50.0f)      
+    : BaseDamage(50.0f)      
     , KnockbackForce(800.0f) 
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -31,18 +31,28 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 마나 비용이 없으므로 현재 9초 쿨타임 태그가 걸려있는지만 순정 GAS 검문소에서 체크합니다.
-    // 만약 아직 쿨다운 태그가 남아있다면 이 자리에서 즉시 활성화를 차단하고 탈출합니다.
+    // 1단계: 9초 쿨타임 검문
     if (!CheckCooldown(Handle, ActorInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
 
-    UWorld* World = GetWorld();
-    if (World)
+    if (!GetWorld())
     {
-        ChargeStartTime = World->GetTimeSeconds();
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
+
+    // =========================================================================
+    // [인풋 릴리즈 감시선 개통]: 마우스 버튼을 떼는 이벤트를 비동기 추적합니다.
+    // 플레이어가 버튼을 누르고 있던 총 시간이 OnRelease 델리게이트를 통해 사출됩니다.
+    // =========================================================================
+    UAbilityTask_WaitInputRelease* ReleaseTask = UAbilityTask_WaitInputRelease::WaitInputRelease(this, true);
+    if (ReleaseTask)
+    {
+        ReleaseTask->OnRelease.AddDynamic(this, &UFT_ChargedShotSkill::FireChargedShot);
+        ReleaseTask->ReadyForActivation();
     }
     else
     {
@@ -50,7 +60,8 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     }
 }
 
-void UFT_ChargedShotSkill::FireChargedShot()
+// 💡 [컴파일 릭 완치]: 헤더 장부와 일치하도록 float TimePressed 매개변수 파이프라인을 연결했습니다.
+void UFT_ChargedShotSkill::FireChargedShot(float TimePressed)
 {
     if (!CurrentActorInfo || !CurrentActorInfo->AvatarActor.IsValid() || !GetWorld())
     {
@@ -64,13 +75,15 @@ void UFT_ChargedShotSkill::FireChargedShot()
 
     if (Character && SourceASC)
     {
-        float ChargeDuration = GetWorld()->GetTimeSeconds() - ChargeStartTime;
-
-        // 1초 이상 마우스 홀드 시 풀 차징 사출 성공 분기
-        if (ChargeDuration >= 1.0f)
+        // [기획 사양 완착]: 수동 시간 계산 장부를 들어내고, 태스크가 실측한 TimePressed를 직격 제어합니다.
+        if (TimePressed >= 1.0f)
         {
-            // 1초 차징 조준을 무사히 성공 완수한 바로 이 시점에 쿨타임을 정식으로 격발 낙인찍습니다.
-            CommitAbilityCooldown(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+            // 1초 이상 풀 차징 달성 순간에 정석대로 활성화 장부 마킹 및 9초 쿨타임 GE 강제 착륙
+            if (!CommitAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo))
+            {
+                EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+                return;
+            }
             
             if (UFT_WeaponData* WeaponData = Character->GetWeaponData())
             {
@@ -116,11 +129,9 @@ void UFT_ChargedShotSkill::FireChargedShot()
                 }
             }
         }
-        // 1초 미만 불완전 차징 취소 분기 처리 (패널티 없는 청정 복귀)
+        // 1초 미만 불완전 차징 낙폭 분기 (패널티 제로 원점 회군)
         else
         {
-            // 애초에 소모한 마나 자원 자체가 없으므로 환불 연산 연동 코드도 전량 필요 없습니다.
-            // 쿨타임 패널티를 가동하지 않고 안전하게 취소 플래그만 들고 스킬을 원점 종료합니다.
             EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
             return;
         }

@@ -100,4 +100,10 @@ namespace FTTags
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(KillScored, "FTTags.Event.KillScored", "적 영웅 혹은 크리처 처치 달성 시 배관망에 사출되는 마스터 이벤트 태그");
     }
+	
+    namespace FTGameplayCue
+    {
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_AttackHit, "GameplayCue.Minion.AttackHit", "미니언 평타 적중 및 투사체 폭발 시 시각/청각 연출 격발용 큐");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Stunned, "GameplayCue.Debuff.Stunned", "기절 상태 지속 시간 동안 머리 위에 루핑 이펙트를 부착하는 상태 큐");
+    }
 }

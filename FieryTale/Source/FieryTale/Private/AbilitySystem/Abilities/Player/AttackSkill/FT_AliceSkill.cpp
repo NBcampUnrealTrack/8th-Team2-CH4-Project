@@ -7,12 +7,9 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemInterface.h" 
-#include "DrawDebugHelpers.h"
-#include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
 #include "GameplayTags/FTTags.h"
 #include "Object/FT_ProjectileBase.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
-#include "Engine/OverlapResult.h"
 
 UFT_AliceSkill::UFT_AliceSkill()
     : BaseDamage(30.0f)
@@ -33,16 +30,18 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 마나 자원이 없으므로 현재 9초 쿨타임 태그가 걸려있는지만 순정 GAS 관문에서 체크합니다.
-    // 쿨타임 중이라면 아래의 레이더 스캔과 투사체 사출을 원천 차단하고 즉시 탈출합니다.
+    // [1단계: 관문 검문] 쿨타임 상태라면 즉시 어빌리티 가동을 차단합니다.
     if (!CheckCooldown(Handle, ActorInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
     
-    // 동적 해킹 레이더 기동 및 적군 필터 스캔 마킹
-    ScanHackingTargets();
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
 
     // 비동기 몽타주 재생 및 분기형 콜백 배관망 가동
     bool bHasVisualTask = false;
@@ -53,7 +52,6 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
         if (MontageTask)
         {
-            // 배관 분리: 정상 완료 시와 방해/취소 당했을 때의 수신 파이프라인을 완전히 쪼개어 연동합니다.
             MontageTask->OnCompleted.AddDynamic(this, &UFT_AliceSkill::OnSkillMontageFinished);
             MontageTask->OnInterrupted.AddDynamic(this, &UFT_AliceSkill::HandleSkillInterrupted);
             MontageTask->OnCancelled.AddDynamic(this, &UFT_AliceSkill::HandleSkillInterrupted);
@@ -63,94 +61,24 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         }
     }
     
-    // 실물 투사체 사출 (정상적인 흐름에서 격발)
+    // 시계 토끼 환영(독립 투사체) 사출 격발
     FireClockRabbit();
     
     if (!bHasVisualTask)
     {
-        // 비주얼 태스크가 없다면 사출 직후 즉시 쿨타임을 확정 차감하고 종료합니다.
-        CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, true);
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
     }
-}
-
-void UFT_AliceSkill::ScanHackingTargets()
-{
-    AFTPlayerCharacterBase* Character = CurrentActorInfo ? Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get()) : nullptr;
-    UWorld* World = GetWorld();
-    if (!Character || !World) return;
-    
-    UAbilitySystemComponent* OwnerASC = CurrentActorInfo->AbilitySystemComponent.Get();
-    if (!OwnerASC) return;
-
-    FGameplayTag TargetEnemyTag = FGameplayTag::EmptyTag;
-
-    if (OwnerASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
-    {
-        TargetEnemyTag = FTTags::FTFaction::Team_Red;
-    }
-    else if (OwnerASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
-    {
-        TargetEnemyTag = FTTags::FTFaction::Team_Blue;
-    }
-    
-    if (!TargetEnemyTag.IsValid()) return;
-    
-    TrackedTargets.Empty();
-    
-    const float ScanRadius = 800.0f;
-    FVector ScanCenter = Character->GetActorLocation();
-
-    FCollisionQueryParams QueryParams;
-    QueryParams.AddIgnoredActor(Character);
-    
-    TArray<FOverlapResult> OverlapResults;
-    bool bHasOverlap = World->OverlapMultiByChannel(
-        OverlapResults,
-        ScanCenter,
-        FQuat::Identity,
-        ECC_Pawn,
-        FCollisionShape::MakeSphere(ScanRadius),
-        QueryParams
-    );
-
-    if (bHasOverlap)
-    {
-        for (const FOverlapResult& Result : OverlapResults)
-        {
-            AActor* OverlappedActor = Result.GetActor();
-            if (!OverlappedActor) continue;
-
-            if (IAbilitySystemInterface* GASInterface = Cast<IAbilitySystemInterface>(OverlappedActor))
-            {
-                if (UAbilitySystemComponent* TargetASC = GASInterface->GetAbilitySystemComponent())
-                {
-                    if (TargetASC->HasMatchingGameplayTag(TargetEnemyTag))
-                    {
-                        TrackedTargets.Add(OverlappedActor);
-                        TargetASC->AddLooseGameplayTag(FTTags::FTStates::Buff::HackedMark);
-                    }
-                }
-            }
-        }
-    }
-    
-#if !UE_BUILD_SHIPPING
-    DrawDebugSphere(World, ScanCenter, ScanRadius, 16, FColor::Cyan, false, 1.0f, 0, 1.5f);
-#endif
 }
 
 void UFT_AliceSkill::FireClockRabbit()
 {
     AFTPlayerCharacterBase* Character = CurrentActorInfo ? Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get()) : nullptr;
-    if (!Character || !Character->GetWeaponData()) return;
-
-    UFT_WeaponData* WeaponData = Character->GetWeaponData();
     UWorld* World = GetWorld();
 
-    if (World && WeaponData->ProjectileClass && RabbitImpactEffectClass)
+    // [2번째 사양 반영 완료]: WeaponData 참조 장부를 완전히 끊고, 헤더의 ClockRabbitProjectileClass를 직격 타겟팅합니다.
+    if (World && ClockRabbitProjectileClass && RabbitImpactEffectClass)
     {
-        FVector SpawnLocation = Character->GetActorLocation() + FVector(0, 0, 60);
+        FVector SpawnLocation = Character->GetActorLocation() + Character->GetActorForwardVector() * 50.0f + FVector(0, 0, 40.0f);
         FVector LaunchDirection = Character->GetActorForwardVector();
         FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
 
@@ -160,8 +88,9 @@ void UFT_AliceSkill::FireClockRabbit()
             SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
         }
 
+        // 평타 에셋이 아닌 오직 이 스킬 창에서 세팅한 전용 시계 토끼 실체 클래스를 Deferred 소환합니다.
         AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-            WeaponData->ProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            ClockRabbitProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         
         if (Projectile)
         {
@@ -173,36 +102,31 @@ void UFT_AliceSkill::FireClockRabbit()
 
 void UFT_AliceSkill::OnSkillMontageFinished()
 {
-    // 스킬 모션 연출이 도중에 방해받지 않고 온전히 성공 완료된 이 최종 시점에만 9초 쿨타임을 명시적으로 격발시킵니다.
-    CommitAbilityCooldown(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
-    
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_AliceSkill::HandleSkillInterrupted()
 {
-    // 시전 도중 하드 CC기를 처맞아 끊긴 경우, 사출 로직을 파쇄하고 쿨타임 패널티 없이 취소 플래그를 들고 즉시 청정 종료합니다.
-    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
-}
-
-void UFT_AliceSkill::EndAbility(const FGameplayAbilitySpecHandle Handle,
-    const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
-    bool bReplicateEndAbility, bool bWasCancelled)
-{
-    // 스킬 수명 주기가 끝나는 순간 포착했던 적들의 머리 위 해킹 표식을 깨끗하게 수거 복구합니다.
-    for (TObjectPtr<AActor> TargetActor : TrackedTargets)
+    if (CurrentActorInfo && CurrentActorInfo->AbilitySystemComponent.IsValid())
     {
-        if (::IsValid(TargetActor))
+        UAbilitySystemComponent* MyASC = CurrentActorInfo->AbilitySystemComponent.Get();
+        
+        FGameplayEffectQuery UniversalQuery;
+        TArray<FActiveGameplayEffectHandle> ActiveHandles = MyASC->GetActiveEffects(UniversalQuery);
+
+        for (const FActiveGameplayEffectHandle& Handle : ActiveHandles)
         {
-            if (IAbilitySystemInterface* GASInterface = Cast<IAbilitySystemInterface>(TargetActor))
+            const FActiveGameplayEffect* ActiveGE = MyASC->GetActiveGameplayEffect(Handle);
+            if (ActiveGE && ActiveGE->Spec.Def)
             {
-                if (UAbilitySystemComponent* TargetASC = GASInterface->GetAbilitySystemComponent())
+                if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
+                    ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
                 {
-                    TargetASC->RemoveLooseGameplayTag(FTTags::FTStates::Buff::HackedMark);
+                    MyASC->RemoveActiveGameplayEffect(Handle);
                 }
             }
         }
     }
 
-    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }

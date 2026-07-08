@@ -31,8 +31,19 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 마나 자원이 없으므로 현재 9초 우클릭 쿨타임 태그가 걸려있는지만 순정 GAS 관문에서 필터링합니다.
+    // 1단계: 우클릭 쿨타임 검문
     if (!CheckCooldown(Handle, ActorInfo))
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
+
+    // =========================================================================
+    // [쿨타임 완치 배관]: 채널링 진입 시점에 CommitAbility 마스터 함수를 가동합니다.
+    // 이를 통해 우클릭 Cooldown GE 장부가 굳건하게 잠기기 시작합니다.
+    // 만약 중간에 CC기를 맞아 취소된다면 EndAbility에서 무결하게 환불 처리합니다.
+    // =========================================================================
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
@@ -56,7 +67,7 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
             if (MontageTask)
             {
-                // 채널링 도중 적의 군중제어기 공격을 받아 애니메이션이 끊기면 투사체 사출 없이 능력을 강제 취소 종료합니다.
+                // 채널링 도중 CC기를 맞아 끊기면 HandleChannellingInterrupted 콜백으로 강제 취소 종료
                 MontageTask->OnInterrupted.AddDynamic(this, &UFT_SilverBulletSkill::HandleChannellingInterrupted);
                 MontageTask->OnCancelled.AddDynamic(this, &UFT_SilverBulletSkill::HandleChannellingInterrupted);
                 MontageTask->ReadyForActivation();
@@ -67,7 +78,7 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
     UWorld* World = GetWorld();
     if (World)
     {
-        // 1초 동안 아무런 방해 없이 조준에 성공하면 최종 격발 함수로 토스합니다.
+        // 1초 동안 조준 성공 시 최종 격발 함수로 토스
         World->GetTimerManager().SetTimer(ChannellingTimerHandle, this, &UFT_SilverBulletSkill::FireSilverBullet, ChannellingDuration, false);
     }
     else
@@ -78,14 +89,8 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 void UFT_SilverBulletSkill::FireSilverBullet()
 {
-    if (GetWorld())
-    {
-        GetWorld()->GetTimerManager().ClearTimer(ChannellingTimerHandle);
-        ChannellingTimerHandle.Invalidate();
-    }
-
-    // 1초 채널링 조준을 성공적으로 마친 이 시점에 은빛 탄환 9초 고유 쿨타임을 정식 격발 낙인찍습니다.
-    CommitAbilityCooldown(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+    // 타이머가 만료되어 도달했으므로 핸들 장부만 깔끔하게 청소 초기화합니다.
+    ChannellingTimerHandle.Invalidate();
 
     if (CurrentActorInfo && CurrentActorInfo->AvatarActor.IsValid())
     {
@@ -119,26 +124,27 @@ void UFT_SilverBulletSkill::FireSilverBullet()
         }
     }
 
+    // 사출 완료 시 정상 종료 (bWasCancelled = false 이므로 쿨타임 유지)
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_SilverBulletSkill::HandleChannellingInterrupted()
 {
-    // CC기를 맞아 끊겼으므로 예약되어 돌고 있던 사출용 타이머 핸들을 즉시 완전 강제 소멸시킵니다.
-    // 이를 통해 취소당한 후 뒤늦게 투사체가 날아가거나 널포인터 크래시가 터지는 유령 현상을 완벽 박멸합니다.
+    // CC기를 맞아 끊겼으므로 예약 타이머를 청정하게 즉시 파쇄합니다.
     if (GetWorld() && ChannellingTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ChannellingTimerHandle);
         ChannellingTimerHandle.Invalidate();
     }
 
-    // 쿨타임 페널티 없이 취소 사인을 들고 청정 종료합니다.
+    // bWasCancelled = true 사인을 들고 조기 종료 파이프라인으로 진입 (이속 및 쿨타임 환불 처리 유도)
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+    // 어떤 경로로든 어빌리티가 닫힐 때 예외 없이 타이머를 소각하여 레이스 컨디션을 방지합니다.
     if (GetWorld() && ChannellingTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ChannellingTimerHandle);
@@ -149,6 +155,29 @@ void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, 
     if (SourceASC)
     {
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
+
+        // =========================================================================
+        // [쿨타임 무결성 환불]: 1초 채널링 완수를 못 하고 군중제어기에 끊겼다면(bWasCancelled),
+        // 선제 적용되었던 9초 우클릭 쿨타임 이펙트를 찾아내 추적 삭제 장부에서 제거합니다.
+        // =========================================================================
+        if (bWasCancelled)
+        {
+            FGameplayEffectQuery UniversalQuery;
+            TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
+
+            for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
+            {
+                const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
+                if (ActiveGE && ActiveGE->Spec.Def)
+                {
+                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
+                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
+                    {
+                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
+                    }
+                }
+            }
+        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

@@ -8,6 +8,7 @@
 #include "Engine/World.h"
 #include "Engine/OverlapResult.h"
 #include "TimerManager.h"
+#include "Abilities/Tasks/AbilityTask_WaitInputPress.h" // ◄ 콤보 연타 실시간 감시 태스크 인클루드 완착
 #include "GameplayTags/FTTags.h"
 
 UFT_AladdinUltimateAbility::UFT_AladdinUltimateAbility()
@@ -24,8 +25,30 @@ UFT_AladdinUltimateAbility::UFT_AladdinUltimateAbility()
     SetAssetTags(AssetTags);
 }
 
+// =========================================================================
+// 💡 [궁극기 자원 차단선 개통]: 게이지가 100% 미만일 때 궁극기가 강제 격발되는 
+// 자원 누수 버그를 완치하기 위해 GAS 정석 선행 검문소를 타설합니다.
+// =========================================================================
+bool UFT_AladdinUltimateAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+    const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags,
+    const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+    // 이미 콤보가 가동 중인 연타 상태(2타, 3타 지점)라면 비용 검문을 무결하게 프리패스 시켜줍니다.
+    if (ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
+    {
+        if (ActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(FTTags::FTStates::Buff::AladdinComboActive))
+        {
+            return true;
+        }
+    }
+
+    return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+}
+
 void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
     AActor* OwnerActor = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     
@@ -35,31 +58,32 @@ void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandl
         return;
     }
 
+    // 윈도우 타이머 안전 초기화
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(ComboTimeoutTimerHandle);
     }
 
-    // 콤보 윈도우 판정: 시전자 몸에 콤보 활성화 버프 태그가 없다면 최초 시전인 최초 타격 상태로 판정합니다.
+    // 콤보 활성화 상태 확인
     bool bIsFirstWish = !SourceASC->HasMatchingGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
 
     if (bIsFirstWish)
     {
-        // 최초 시전 시점에만 궁극기 게이지 자원 비용 소모를 공식 커밋합니다.
+        // 1타 격발 최초 시점에만 궁극기 전량 게이지 자원 소모 장부를 커밋 처리합니다.
         if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
         {
             EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
             return;
         }
         CurrentWishCount = 1;
+        // 콤보 가동 중 태그 장부 점등
+        SourceASC->AddLooseGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
     }
     else
     {
-        // 유효 시간 내에 재진입했다면 게이지를 추가 소모하지 않고 콤보 스택 단계만 전진시킵니다.
+        // 3초 골든타임 유효 시간 내에 연타 성공 시 스택 카운트 전진
         CurrentWishCount++;
     }
-
-    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
     if (bDrawDebugs)
     {
@@ -70,12 +94,16 @@ void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandl
         }
     }
 
+    // 전방 지니 강타 박스 트레이스 연산 실행
     ExecuteGenieSmash(OwnerActor, SourceASC, CurrentWishCount);
 
-    // 콤보 윈도우 유효 시간 및 정리 파이프라인 제어 구역
+    // =========================================================================
+    // 💡 [3단 콤보 수명주기 무결성 처리]: 1~2타 지점에서는 EndAbility를 부르지 않고,
+    // 인풋 프레스 감시 태스크를 가동해 수명선을 살려둔 채로 다음 연타 입력을 비동기 대기합니다.
+    // =========================================================================
     if (CurrentWishCount >= 3)
     {
-        // 마지막 타격 완료 분기: 최종 단계까지 모두 완수했다면 시전자 몸에서 콤보 대기 태그를 회수하고 스택을 원상태로 청소합니다.
+        // 대망의 3타 최종 마감: 콤보 태그 회수 및 수명 주기 정석 마감 마킹
         SourceASC->RemoveLooseGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
         CurrentWishCount = 0;
         
@@ -83,10 +111,7 @@ void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandl
     }
     else
     {
-        // 연사 대기 분기: 후속 타격 직전에는 시전자 몸에 다음 콤보 가능 표식 태그를 부착합니다.
-        SourceASC->AddLooseGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
-        
-        // 3초 내에 다음 입력을 하지 않아 콤보가 끊기면 자동으로 좀비 스택과 태그를 수거하는 안전 타이머를 가동합니다.
+        // 3초 내에 마우스를 다시 클릭하지 않으면 스택을 폭파 소각할 타임아웃 타이머를 예약 구동합니다.
         if (GetWorld())
         {
             GetWorld()->GetTimerManager().SetTimer(
@@ -98,14 +123,29 @@ void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandl
             );
         }
         
-        // 능력을 즉시 반환 종료시켜 주어야 키 입력 컴포넌트가 다음 연타 신호를 차단하지 않고 재진입 통로를 열어줍니다.
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        // 💡 [연타 감시망 타설]: 플레이어가 다음 입력을 누르는 순간을 실시간 포착하여 스스로를 재귀 격발시킵니다.
+        UAbilityTask_WaitInputPress* InputTask = UAbilityTask_WaitInputPress::WaitInputPress(this, true);
+        if (InputTask)
+        {
+            // 다음 연타 클릭 감지 시, 수명선이 유지된 상태로 ActivateAbility의 상단 전방 배관으로 시퀀스를 회전시킵니다.
+            InputTask->OnPress.AddDynamic(this, &UFT_AladdinUltimateAbility::OnComboInputPressed);
+            InputTask->ReadyForActivation();
+        }
+        else
+        {
+            EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        }
     }
+}
+
+void UFT_AladdinUltimateAbility::OnComboInputPressed(float TimeWaited)
+{
+    // 마우스 재연타 포착 즉시, 수명 주기가 유지된 상태에서 루프 연타 연산을 다시 가동합니다.
+    ActivateAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, nullptr);
 }
 
 void UFT_AladdinUltimateAbility::ResetComboState()
 {
-    // 안전 수거 함수: 입력 타임아웃 도달 시 백그라운드에서 유령 잔재 태그와 스택 카운트를 소멸시킵니다.
     if (GetWorld() && ComboTimeoutTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ComboTimeoutTimerHandle);
@@ -120,6 +160,9 @@ void UFT_AladdinUltimateAbility::ResetComboState()
         SourceASC->RemoveLooseGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
     }
     CurrentWishCount = 0;
+
+    // 💡 타임아웃으로 콤보가 중도 분쇄 파쇄되었다면 비로소 여기서 어빌리티 독점권을 해제 반환합니다.
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UFT_AladdinUltimateAbility::ExecuteGenieSmash(AActor* OwnerActor, UAbilitySystemComponent* SourceASC, int32 SmashIndex)
@@ -128,12 +171,10 @@ void UFT_AladdinUltimateAbility::ExecuteGenieSmash(AActor* OwnerActor, UAbilityS
 
     FVector StartLocation = OwnerActor->GetActorLocation();
     FVector ForwardVector = OwnerActor->GetActorForwardVector();
-    ForwardVector.Z = 0.f; // 지형 고저차 경사로로 인한 전방 박스 궤적의 회전 왜곡을 원천 차단합니다.
+    ForwardVector.Z = 0.f; // 고저차 왜곡 차단
     ForwardVector.Normalize();
     
     FVector BoxCenter = StartLocation + (ForwardVector * (AttackRange * 0.5f));
-    
-    // 고저차 보정 완착: 한타 교전 도중 계단이나 미세 언덕 지형에서 판정이 증발하는 현상을 막기 위해 범위를 확장합니다.
     FVector BoxHalfExtent = FVector(AttackRange * 0.5f, AttackWidth, 250.f);
     FQuat BoxOrientation = OwnerActor->GetActorQuat();
 
@@ -150,12 +191,7 @@ void UFT_AladdinUltimateAbility::ExecuteGenieSmash(AActor* OwnerActor, UAbilityS
 #endif
 
     bool bHasOverlap = OwnerActor->GetWorld()->OverlapMultiByChannel(
-        OverlapResults,
-        BoxCenter,
-        BoxOrientation,
-        ECollisionChannel::ECC_Pawn,
-        ScanBox,
-        QueryParams
+        OverlapResults, BoxCenter, BoxOrientation, ECollisionChannel::ECC_Pawn, ScanBox, QueryParams
     );
 
     if (bHasOverlap)
@@ -173,7 +209,7 @@ void UFT_AladdinUltimateAbility::ExecuteGenieSmash(AActor* OwnerActor, UAbilityS
 
                 float FinalDamage = BaseDamageValue;
                 
-                // 증강 카드 링크 연동: 최종 단계 격발 시점에 알라딘 전용 자비의 신기루 증강 카드를 보유 중이라면 대미지 배율을 주입합니다.
+                // 자비의 신기루 증강 카드 보유 상태에서 막타(3타) 적중 시 대미지 2배 증폭 주입
                 if (SmashIndex == 3 && SourceASC->HasMatchingGameplayTag(FTTags::FTAugments::Applied_Aladdin_MercyMirage))
                 {
                     FinalDamage *= 2.0f;
@@ -195,22 +231,19 @@ void UFT_AladdinUltimateAbility::ExecuteGenieSmash(AActor* OwnerActor, UAbilityS
 
 void UFT_AladdinUltimateAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 인터럽트 방어선 완료: 콤보 시전 도중에 적의 하드 CC기를 맞아 비정상 취소되면 타이머를 끄고 스택 카운트를 초기화합니다.
+    // 기절 등 하드 CC기에 노출되어 캐스팅 취소 시 타이머 및 유령 스택 완벽 소각 수거
     if (GetWorld() && ComboTimeoutTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ComboTimeoutTimerHandle);
         ComboTimeoutTimerHandle.Invalidate();
     }
 
-    if (bWasCancelled)
+    UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+    if (SourceASC)
     {
-        UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
-        if (SourceASC)
-        {
-            SourceASC->RemoveLooseGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
-        }
-        CurrentWishCount = 0;
+        SourceASC->RemoveLooseGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
     }
+    CurrentWishCount = 0;
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

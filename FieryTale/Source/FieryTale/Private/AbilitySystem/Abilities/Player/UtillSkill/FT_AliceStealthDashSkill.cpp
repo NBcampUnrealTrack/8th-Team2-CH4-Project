@@ -7,14 +7,11 @@
 #include "Components/CapsuleComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
+#include "AbilitySystemComponent.h" // ◄ ASC 상호작용 배관망을 위해 인클루드 완착
 #include "GameplayTags/FTTags.h"
 
 UFT_AliceStealthDashSkill::UFT_AliceStealthDashSkill()
-    : OriginalMaxWalkSpeed(0.0f)    
-    , OriginalCapsuleRadius(0.0f)
-    , OriginalCapsuleHalfHeight(0.0f)
-    , MovementSpeedMultiplier(1.5f)
-    , MaxDuration(2.0f)
+    : MaxDuration(2.0f)
     , TargetMeshScale(0.5f)
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -26,6 +23,7 @@ UFT_AliceStealthDashSkill::UFT_AliceStealthDashSkill()
 
     CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
+    // 활성화 기간 동안 앨리스 신체 축소 버프 태그를 확정 부여합니다.
     ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::ShrinkActive);
 }
 
@@ -33,7 +31,7 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     const FGameplayEventData* TriggerEventData)
 {
-    // 마나 자원이 없으므로 현재 15초 시프트 쿨타임 태그가 걸려있는지만 순정 GAS 관문에서 체크합니다.
+    // 1단계: 시프트 생존기 쿨타임 검문
     if (!CheckCooldown(Handle, ActorInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -42,33 +40,43 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
 
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    AFTPlayerCharacterBase* Character = ActorInfo ? Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
-    if (!Character)
+    // =========================================================================
+    // [쿨타임 완치 배관]: 대시 시전에 진입하는 즉시 CommitAbility 마스터 함수를 격발합니다.
+    // 이를 통해 시프트 Cooldown GE 장부가 오차 없이 시스템에 안착합니다.
+    // =========================================================================
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
 
-    // 이속 버그 방어선 수술: 런타임 나누기 연산 오차로 기본 속도가 증발하는 릭을 원천 차단하기 위해 가속 전 캐릭터의 순정 최대 걷기 속도 원본을 보관소에 안전하게 선제 백업합니다.
-    if (UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement())
+    AFTPlayerCharacterBase* Character = ActorInfo ? Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
+    UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+    
+    if (!Character || !SourceASC)
     {
-        OriginalMaxWalkSpeed = MoveComp->MaxWalkSpeed;
-        MoveComp->MaxWalkSpeed = OriginalMaxWalkSpeed * MovementSpeedMultiplier;
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
     }
 
-    // 기획 스펙 반영: 앨리스의 히트박스 캡슐 콜리전 축소 및 원본 수치 임시 백업 보정 구역입니다.
-    if (UCapsuleComponent* CapsuleComp = Character->GetCapsuleComponent())
+    // =========================================================================
+    // 💡 [이속 장부 파괴 릭 완치 - GAS 순정 대시 가속 라인 연동]
+    // MaxWalkSpeed 변수를 직접 조지는 원시 하드코딩을 소각하고, 다른 버프/디버프와 
+    // 정밀 가산/곱산 중첩 연산이 가능하도록 대시 가속(1.5배 증가) GE를 주입합니다.
+    // =========================================================================
+    if (DashSpeedGameplayEffectClass)
     {
-        OriginalCapsuleRadius = CapsuleComp->GetUnscaledCapsuleRadius();
-        OriginalCapsuleHalfHeight = CapsuleComp->GetUnscaledCapsuleHalfHeight();
-
-        CapsuleComp->SetCapsuleSize(OriginalCapsuleRadius * TargetMeshScale, OriginalCapsuleHalfHeight * TargetMeshScale, true);
+        FGameplayEffectSpecHandle SpeedSpecHandle = MakeOutgoingGameplayEffectSpec(DashSpeedGameplayEffectClass, GetAbilityLevel());
+        if (SpeedSpecHandle.IsValid())
+        {
+            DashSpeedActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*SpeedSpecHandle.Data.Get());
+        }
     }
     
-    // 시각적 연동: 캐릭터 메시 비주얼도 기획 스펙에 맞추어 절반 크기로 축소 스케일링합니다.
+    // 시각적 연동: 캐릭터 비주얼 메시 스케일을 기획 스펙에 맞추어 축소합니다.
     Character->SetActorScale3D(FVector(TargetMeshScale));
 
-    // 기획 스펙 반영: 무한 축소 치트를 방지하기 위해 정확한 2초 버프 지속 제한 시간 타이머를 가동합니다.
+    // 2초 버프 지속 제한 시간 타이머 가동
     UWorld* World = GetWorld();
     if (World)
     {
@@ -88,14 +96,14 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
 
 void UFT_AliceStealthDashSkill::OnShrinkBuffFinished()
 {
-    // 2초 지속 시간이 모두 정상 만료되면 표준 종료 마감 관문으로 상태를 이관합니다.
+    // 2초 지속 시간 만료 시 정상 종료 마감 처리
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머 누수 안전 해제: 능력이 닫히기 시작하면 가동 중이던 2초 지속시간 타이머 핸들을 즉시 청소 수거하고 무효화합니다.
+    // 타이머 청정 소각하여 레이스 컨디션 차단
     if (GetWorld() && ShrinkBuffDurationTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ShrinkBuffDurationTimerHandle);
@@ -103,35 +111,46 @@ void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Hand
     }
 
     AFTPlayerCharacterBase* Character = ActorInfo ? Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
+    UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+
     if (Character)
     {
-        // 이속 복구 확정 수술: 나눗셈 연산 왜곡 없이 처음에 안전 백업해 두었던 순정 원본 속도 수치 그대로 최대 걷기 속도 배관에 1대1 환원 복구시킵니다.
-        if (UCharacterMovementComponent* MoveComp = Character->GetCharacterMovement())
-        {
-            if (OriginalMaxWalkSpeed > 0.0f)
-            {
-                MoveComp->MaxWalkSpeed = OriginalMaxWalkSpeed;
-            }
-        }
-
-        // 물리 크래시 박멸 완료: 백업해 두었던 원본 정수로 캡슐 규격을 고정 초기화하여 지형에 끼이거나 캐릭터가 찌그러지는 현상을 소멸시킵니다.
-        if (UCapsuleComponent* CapsuleComp = Character->GetCapsuleComponent())
-        {
-            if (OriginalCapsuleRadius > 0.0f && OriginalCapsuleHalfHeight > 0.0f)
-            {
-                CapsuleComp->SetCapsuleSize(OriginalCapsuleRadius, OriginalCapsuleHalfHeight, true);
-            }
-        }
-        
-        // 캐릭터 메시 스케일을 다시 순정 1대1대1 규격으로 안전하게 회귀시킵니다.
+        // 캐릭터 메시 스케일을 다시 순정 1대1대1 규격으로 원상 복귀시킵니다.
         Character->SetActorScale3D(FVector(1.0f));
     }
 
-    // AOS 쿨다운 정책 완착: 신체 축소가 정상 종료되어 원래 크기로 완벽 복구된 바로 이 최종 시점에만 15초 고유 쿨타임을 발동시킵니다.
-    // 만약 적의 하드 CC기에 의해 지속시간 도중 강제 취소당한 억까 상황이라면 쿨타임 패널티 없이 리턴 복귀합니다.
-    if (!bWasCancelled)
+    if (SourceASC)
     {
-        CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
+        // 대시 가속 GE를 제거하여 속도를 원래 스탯 상태로 무결하게 환원합니다.
+        if (DashSpeedActiveHandle.IsValid())
+        {
+            SourceASC->RemoveActiveGameplayEffect(DashSpeedActiveHandle);
+            DashSpeedActiveHandle.Invalidate();
+        }
+
+        // =========================================================================
+        // [AOS 기획 사양 락인 - CC기 파쇄 시 쿨타임 환불 처리]
+        // 대시 지속 도중 적의 하드 CC기에 노출되어 강제 취소(bWasCancelled = true)되었다면,
+        // 선제 적용되었던 시프트 쿨타임 이펙트를 찾아내 삭제하여 리턴 복귀를 보장합니다.
+        // =========================================================================
+        if (bWasCancelled)
+        {
+            FGameplayEffectQuery UniversalQuery;
+            TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
+
+            for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
+            {
+                const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
+                if (ActiveGE && ActiveGE->Spec.Def)
+                {
+                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
+                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
+                    {
+                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
+                    }
+                }
+            }
+        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

@@ -9,38 +9,47 @@
 class AFTPlayerCharacterBase;
 
 /**
- * 가구야 공주 Shift 기술 - 대나무 숲의 숨결 어빌리티 시스템
+ * 가구야 공주 Shift 기술 - 대나무 숲의 숨결 어벌리티 시스템
  */
 UCLASS()
 class FIERYTALE_API UFT_KaguyaChargeSkill : public UFT_GameplayAbility
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UFT_KaguyaChargeSkill();
+    UFT_KaguyaChargeSkill();
 
-	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
-	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+    virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+    virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
-	// 연막 영역 지속 시간이 완료되었을 때 호출될 콜백 함수
-	UFUNCTION()
-	void OnChargeFinished();
+    /** 연막 영역 지속 시간이 완료되었을 때 호출될 콜백 함수 */
+    UFUNCTION()
+    void OnChargeFinished();
 
-	// 4초 유지 스펙을 정확하게 제어할 순정 타이머 핸들 변수
-	FTimerHandle BambooGroveDurationTimerHandle;
+protected:
+    /** 4초 유지 스펙을 정확하게 제어할 순정 타이머 핸들 변수 */
+    FTimerHandle BambooGroveDurationTimerHandle;
 
-	// --- 가구야 연막 고유 스펙 ---
-	/** 전술 연막 안개 영역 생성 반경 (기본 450.0f / 4.5m) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
-	float BambooGroveRadius;
+    // --- 가구야 연막 고유 스펙 ---
+    /** 전술 연막 안개 영역 생성 반경 (기본 450.0f / 4.5m) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
+    float BambooGroveRadius;
 
-	/** 연막 영역 총 유지 시간 (기본 4.0초) */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
-	float BambooGroveDuration;
+    /** 연막 영역 총 유지 시간 (기본 4.0초) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
+    float BambooGroveDuration;
 
-	// --- 연동할 GameplayEffect(GE) 라인업 ---
-	/** 연막 내부 영역 진입 시 아군들에게 주입할 은신(Invisibility) 버프 이펙트 클래스 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
-	TSubclassOf<class UGameplayEffect> ConcealmentEffectClass;
+    // =========================================================================
+    // 💡 [영역 액터 바인딩 슬롯 완착]: .cpp 소스 파일에서 SpawnActorDeferred 또는
+    // SpawnActor로 월드에 실체화할 블루프린트 영역 액터의 컨테이너 주소지입니다.
+    // =========================================================================
+    /** 에디터 연동 스펙: 안개 파티클 이펙트와 범위 콜리전 볼륨이 탑재된 영역 블루프린트 액터 클래스 */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
+    TSubclassOf<AActor> BambooGroveAreaClass;
+
+    // --- 연동할 GameplayEffect(GE) 라인업 ---
+    /** 연막 내부 영역 진입 시 아군들에게 주입할 은신(Invisibility) 버프 이펙트 클래스 */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
+    TSubclassOf<class UGameplayEffect> ConcealmentEffectClass;
 };

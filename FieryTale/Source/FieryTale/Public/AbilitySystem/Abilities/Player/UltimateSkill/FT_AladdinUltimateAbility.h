@@ -17,6 +17,12 @@ class FIERYTALE_API UFT_AladdinUltimateAbility : public UFT_UltimateGameplayAbil
 public:
     UFT_AladdinUltimateAbility();
 
+    // =========================================================================
+    // 💡 [궁극기 자원 차단선 개통]: 게이지 부족 시 시전되는 비용 누수 버그를 막고
+    // 2~3타 연타 구간은 무결하게 통과시킬 순정 GAS 선행 검문소 선언입니다.
+    // =========================================================================
+    virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
 protected:
     // 스킬 키가 눌릴 때마다 호출되는 GAS 기본 관문
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
@@ -25,10 +31,17 @@ protected:
     // 지니가 전방을 강타하는 실질적인 물리 박스 오버랩 스캔 함수
     void ExecuteGenieSmash(AActor* OwnerActor, UAbilitySystemComponent* SourceASC, int32 SmashIndex);
 
-    // ◄◄◄ [콤보 타임아웃 배관 완착] ◄◄◄
     /** 3초 콤보 제한 시간이 만료되었을 때 좀비 태그와 스택을 무조건 청소할 수거용 콜백 함수 */
     UFUNCTION()
     void ResetComboState();
+
+    // =========================================================================
+    // 💡 [연타 감시망 파이프라인 개통]: WaitInputPress 태스크가 마우스 재클릭 신호를 
+    // 실시간 포착했을 때 수명 주기를 깨우고 콤보를 이어가게 유도할 내부 동적 콜백입니다.
+    // =========================================================================
+    /** 플레이어의 2타, 3타 루프 마우스 재클릭 신호를 감지하여 순정을 이어줄 비동기 인풋 수신 함수 */
+    UFUNCTION()
+    void OnComboInputPressed(float TimeWaited);
 
 protected:
     // --- 알라딘 궁극기 고유 스펙 ---

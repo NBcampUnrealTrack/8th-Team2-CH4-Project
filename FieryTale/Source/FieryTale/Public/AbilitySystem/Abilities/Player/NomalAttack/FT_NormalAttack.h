@@ -57,7 +57,6 @@ protected:
     // =========================================================================
     // [M-2 속도 패널티 이관용 GAS 에셋 슬롯 및 핸들 장부 완착]
     // =========================================================================
-    
     /** 평타 가동 중 캐릭터에게 적용할 이동속도 배율 감산 GameplayEffect 에셋 클래스입니다. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
     TSubclassOf<class UGameplayEffect> MovementPenaltyGameplayEffectClass;
@@ -68,4 +67,11 @@ private:
 
     /** 런타임에 부여된 속도 패널티 GE를 종료 시 무결하게 걷어내기 위해 백업해두는 액티브 핸들입니다. */
     FActiveGameplayEffectHandle MovementPenaltyActiveHandle;
+
+    // =========================================================================
+    // 💡 [심볼 미해결 완치 배관]: 이 슬롯이 private 변수 장부에 명확히 박혀 있어야
+    // .cpp 파일의 몽타주 부재 예외 처리 구문이 링크 에러 없이 정상 결합됩니다.
+    // =========================================================================
+    /** 애니메이션 자산이 비어있을 때 시스템 데드락을 방어할 전용 안전 제한시간 타이머 핸들 */
+    FTimerHandle NoMontageSafetyTimerHandle;
 };

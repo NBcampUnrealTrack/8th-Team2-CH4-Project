@@ -5,6 +5,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h"
+#include "AbilitySystemComponent.h" // ◄ ASC 상호작용 배관망을 위해 인클루드 완착
 #include "GameplayTags/FTTags.h"
 
 UFT_RedRollSkill::UFT_RedRollSkill()
@@ -20,6 +21,7 @@ UFT_RedRollSkill::UFT_RedRollSkill()
 
     CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
+    // 활성화 기간(구르는 동안) 동안 빨간 망토 무적/회피 상태 태그를 확정 부여합니다.
     ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::Evading);
 }
 
@@ -27,7 +29,7 @@ void UFT_RedRollSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     const FGameplayEventData* TriggerEventData)
 {
-    // 마나 자원이 없으므로 현재 15초 시프트 쿨타임 태그가 걸려있는지만 순정 GAS 관문에서 체크합니다.
+    // 1단계: 시프트 생존기 쿨타임 검문
     if (!CheckCooldown(Handle, ActorInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -35,6 +37,16 @@ void UFT_RedRollSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     }
 
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+    // =========================================================================
+    // [쿨타임 완치 배관]: 구르기 기동에 진입하는 순간 CommitAbility 마스터 함수를 격발합니다.
+    // 이를 통해 시프트 Cooldown GE 장부가 오차 없이 시스템에 안착합니다.
+    // =========================================================================
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
 
     ACharacter* Character = ActorInfo ? Cast<ACharacter>(ActorInfo->AvatarActor.Get()) : nullptr;
     if (!Character)
@@ -77,7 +89,6 @@ void UFT_RedRollSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     else
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
     }
 }
 
@@ -110,11 +121,32 @@ void UFT_RedRollSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const
         }
     }
 
-    // AOS 쿨다운 정책 완착: 구르기 모션 이동이 완전히 완료되어 마감된 바로 이 최종 시점에만 15초 고유 쿨타임을 발동시킵니다.
-    // 만약 적의 하드 CC기에 의해 구르던 도중 강제 취소당한 상황이라면 쿨타임 패널티 없이 리턴 복귀합니다.
-    if (!bWasCancelled)
+    UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+    if (SourceASC)
     {
-        CommitAbilityCooldown(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility);
+        // =========================================================================
+        // [AOS 기획 사양 락인 - CC기 파쇄 시 쿨타임 환불 처리]
+        // 구르기 도중 적의 하드 CC기에 노출되어 강제 취소(bWasCancelled = true)되었다면,
+        // 선제 적용되었던 시프트 쿨타임 이펙트를 찾아내 삭제하여 리턴 복귀를 보장합니다.
+        // =========================================================================
+        if (bWasCancelled)
+        {
+            FGameplayEffectQuery UniversalQuery;
+            TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
+
+            for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
+            {
+                const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
+                if (ActiveGE && ActiveGE->Spec.Def)
+                {
+                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
+                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
+                    {
+                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
+                    }
+                }
+            }
+        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

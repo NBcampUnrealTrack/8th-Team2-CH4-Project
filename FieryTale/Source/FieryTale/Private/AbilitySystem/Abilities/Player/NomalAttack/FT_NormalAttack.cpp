@@ -75,13 +75,23 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
    // 무기 에셋의 메커니즘 타입(라인트레이스, 투사체, 근접)을 판별하여 타격을 격발합니다.
    ExecuteWeaponHitDetection(WeaponData, Character);
 
-   // 격발 애니메이션 몽타주가 부재할 경우, 안전 타이머를 가동하여 0.2초 뒤 어빌리티를 강제 정상 종료시킵니다.
+   // =========================================================================
+   // 💡 [애니메이션 부재 완치 배관]: 핸들 중복 오염 데드락을 방어하기 위해 전용 안전 타이머를 가동합니다.
+   // 점사형 영웅이 애니메이션 없이 쏠 때도, 탄환 사출 시퀀스를 가로막지 않고 자율 마감을 지원합니다.
+   // =========================================================================
    if (WeaponData->AttackMontage == nullptr)
    {
-       GetWorld()->GetTimerManager().SetTimer(BurstTimerHandle, [this]()
+       // 만약 다중 점사 타이머(BurstTimerHandle)가 이미 독립 구동 중이라면, 자율 마감에 일임하고 조기 탈출합니다.
+       if (GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(BurstTimerHandle))
        {
-           OnAttackMontageFinished();
-       }, 0.2f, false);
+           return;
+       }
+
+       // 단발/레이트레이스/근접 영웅인데 애니메이션이 없다면 0.1초 뒤 무결하게 어빌리티 수명 주기를 정상 마감합니다.
+       GetWorld()->GetTimerManager().SetTimer(NoMontageSafetyTimerHandle, [this]()
+       {
+           EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+       }, 0.1f, false);
        
        return;
    }
@@ -203,6 +213,12 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 
 void UFT_NormalAttack::OnAttackMontageFinished()
 {
+    // 애니메이션이 끝났더라도 다중 점사 타이머가 여전히 돌고 있다면 안전을 위해 자율 마감 처리를 기다립니다.
+    if (GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(BurstTimerHandle))
+    {
+        return;
+    }
+
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
@@ -248,14 +264,23 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
     float Delay = InWeaponData->BurstDelay;
     UClass* ProjectileClass = InWeaponData->ProjectileClass;
 
-    World->GetTimerManager().SetTimer(BurstTimerHandle, [this, World, ProjectileClass, Start, Forward, InCharacter, DamageSpecHandle, ShotCounter, MaxShots]() mutable
+    // 크래시 완전 방멸을 위한 어빌리티 인스턴스 약참조 세팅
+    TWeakObjectPtr<UFT_NormalAttack> WeakThis(this);
+
+    World->GetTimerManager().SetTimer(BurstTimerHandle, [WeakThis, World, ProjectileClass, Start, Forward, InCharacter, DamageSpecHandle, ShotCounter, MaxShots]() mutable
     {
-        if (!World || !ProjectileClass || *ShotCounter >= MaxShots)
+        // 주체가 CC 파쇄 등에 의해 이미 소멸했거나 발사 한계 수치 도달 시 점사 타이머를 클리어합니다.
+        if (!WeakThis.IsValid() || !World || !ProjectileClass || *ShotCounter >= MaxShots)
         {
             if (World)
             {
-                World->GetTimerManager().ClearTimer(BurstTimerHandle);
-                BurstTimerHandle.Invalidate();
+                World->GetTimerManager().ClearTimer(WeakThis->BurstTimerHandle);
+                WeakThis->BurstTimerHandle.Invalidate();
+            }
+            
+            if (WeakThis.IsValid())
+            {
+                WeakThis->EndAbility(WeakThis->CurrentSpecHandle, WeakThis->CurrentActorInfo, WeakThis->CurrentActivationInfo, true, false);
             }
             return;
         }
@@ -272,6 +297,14 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
         }
         
         (*ShotCounter)++;
+        
+        // 지정된 모든 탄환 점사 사출 임무 완료 순간 즉시 수명 주기를 정돈 마감합니다.
+        if (*ShotCounter >= MaxShots)
+        {
+            World->GetTimerManager().ClearTimer(WeakThis->BurstTimerHandle);
+            WeakThis->BurstTimerHandle.Invalidate();
+            WeakThis->EndAbility(WeakThis->CurrentSpecHandle, WeakThis->CurrentActorInfo, WeakThis->CurrentActivationInfo, true, false);
+        }
         
     }, Delay, true, 0.0f);
 }
@@ -344,11 +377,11 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
              {
                 SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, FinalDamage);
 
-                // 오버랩된 타깃 다중 액터 배열을 가스 표준 타깃 데이터 형식에 포장하여 대미지를 안전 전송합니다.
+                // 내부 참조 카운팅이 지원되는 TSharedPtr 구조의 생성 래퍼를 엮어 메모리 릭을 원천 진압했습니다.
                 FGameplayAbilityTargetDataHandle TargetDataHandle;
-                FGameplayAbilityTargetData_ActorArray* ActorArrayData = new FGameplayAbilityTargetData_ActorArray();
+                TSharedPtr<FGameplayAbilityTargetData_ActorArray> ActorArrayData = MakeShared<FGameplayAbilityTargetData_ActorArray>();
                 ActorArrayData->TargetActorArray.Add(HitActor);
-                TargetDataHandle.Add(ActorArrayData);
+                TargetDataHandle.Add(ActorArrayData.Get());
 
                 ApplyGameplayEffectSpecToTarget(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, SpecHandle, TargetDataHandle);
              }
@@ -359,11 +392,14 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
 
 void UFT_NormalAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 어빌리티 종료 시 작동 중이던 점사 타이머를 파쇄 클리어하여 메모리 누수를 원천 봉쇄합니다.
+    // 어빌리티 종료 시 가동 중이던 모든 점사 및 안전 타이머 핸들을 완전히 소각 수거합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(BurstTimerHandle);
         BurstTimerHandle.Invalidate();
+
+        GetWorld()->GetTimerManager().ClearTimer(NoMontageSafetyTimerHandle);
+        NoMontageSafetyTimerHandle.Invalidate();
     }
 
     // 공격 종료 타이밍에 맞춰 캐릭터 조준 이동 속도 감산 페널티(GE)를 안전하게 철거 환원합니다.

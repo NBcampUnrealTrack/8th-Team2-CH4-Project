@@ -102,4 +102,10 @@ namespace FTTags
     {
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(KillScored);
     }
+	
+    namespace FTGameplayCue
+    {
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Minion_AttackHit);
+        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Stunned);
+    }
 }

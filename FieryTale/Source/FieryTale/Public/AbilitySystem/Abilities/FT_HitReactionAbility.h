@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "FT_GameplayAbility.h"
+#include "AbilitySystem/Abilities/FT_GameplayAbility.h" // ◄ 프로젝트 순정 베이스 주소지로 정밀 교정 완착
 #include "FT_HitReactionAbility.generated.h"
 
 class UAnimMontage;
@@ -13,7 +13,7 @@ class UAnimMontage;
  * 애니메이션 경직 및 순간 제동을 집도하는 피격 반응 마스터 GA 클래스입니다.
  */
 UCLASS()
-class FIERYTALE_API UFT_HitReactionAbility : public UGameplayAbility
+class FIERYTALE_API UFT_HitReactionAbility : public UFT_GameplayAbility // ◄ UFT_GameplayAbility 상속선으로 무결성 락인
 {
 	GENERATED_BODY()
 

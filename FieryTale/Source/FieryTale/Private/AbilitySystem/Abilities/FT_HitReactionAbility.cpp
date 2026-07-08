@@ -37,11 +37,7 @@ void UFT_HitReactionAbility::ActivateAbility(const FGameplayAbilitySpecHandle Ha
         return;
     }
 
-    // =========================================================================
     // [유저 조작 영웅 vs AI 미니언 피격 제어 분기선]
-    // 플레이어가 직접 제어하는 영웅 챔피언은 조작감 유지를 위해 제동을 걸지 않으며,
-    // AI 전술 하에 움직이는 일반 미니언 개체일 때만 순간 제동(StopMovement)을 집도합니다.
-    // =========================================================================
     APawn* AvatarPawn = Cast<APawn>(AvatarActor);
     if (AvatarPawn)
     {
@@ -66,11 +62,15 @@ void UFT_HitReactionAbility::ActivateAbility(const FGameplayAbilitySpecHandle Ha
 
     if (HitMontageTask)
     {
-        // 컴파일러 환경에 따른 매크로 템플릿 치환 오류를 방지하기 위해 리플렉션 시스템 전용 동적 바인딩 함수 활용
-        HitMontageTask->OnCompleted.__Internal_AddDynamic(this, &UFT_HitReactionAbility::OnHitMontageCompletedOrInterrupted, FName(TEXT("OnHitMontageCompletedOrInterrupted")));
-        HitMontageTask->OnBlendOut.__Internal_AddDynamic(this, &UFT_HitReactionAbility::OnHitMontageCompletedOrInterrupted, FName(TEXT("OnHitMontageCompletedOrInterrupted")));
-        HitMontageTask->OnInterrupted.__Internal_AddDynamic(this, &UFT_HitReactionAbility::OnHitMontageCompletedOrInterrupted, FName(TEXT("OnHitMontageCompletedOrInterrupted")));
-        HitMontageTask->OnCancelled.__Internal_AddDynamic(this, &UFT_HitReactionAbility::OnHitMontageCompletedOrInterrupted, FName(TEXT("OnHitMontageCompletedOrInterrupted")));
+        // =========================================================================
+        // 💡 [델리게이트 바인딩 완치 완착]
+        // 엔진 컴파일 크래시를 유발하는 저수준 __Internal_AddDynamic 파이프라인을 파쇄하고,
+        // 언리얼 엔진 순정 공식 리플렉션 매크로인 'AddDynamic' 명세로 완벽히 복구 교정합니다.
+        // =========================================================================
+        HitMontageTask->OnCompleted.AddDynamic(this, &UFT_HitReactionAbility::OnHitMontageCompletedOrInterrupted);
+        HitMontageTask->OnBlendOut.AddDynamic(this, &UFT_HitReactionAbility::OnHitMontageCompletedOrInterrupted);
+        HitMontageTask->OnInterrupted.AddDynamic(this, &UFT_HitReactionAbility::OnHitMontageCompletedOrInterrupted);
+        HitMontageTask->OnCancelled.AddDynamic(this, &UFT_HitReactionAbility::OnHitMontageCompletedOrInterrupted);
         
         HitMontageTask->ReadyForActivation();
     }
