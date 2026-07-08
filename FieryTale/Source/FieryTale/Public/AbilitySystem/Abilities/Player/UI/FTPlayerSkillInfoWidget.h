@@ -101,6 +101,11 @@ private:
 	//	ASC + 어빌리티 메타데이터까지 확보돼 표시가 끝났는지 (재시도 종료 판정용)
 	bool bSkillInfoResolved = false;
 
+	//	바인딩 재시도 횟수 및 상한 — ASC/캐릭터 데이터가 끝내 오지 않는 비정상 상황(예: 비플레이어 폰)에서
+	//	무한 폴링을 막는 안전장치. 정상 구성에선 상한 도달 전에 해소된다.
+	int32 BindRetryCount = 0;
+	static constexpr int32 MaxBindRetries = 40; // 0.25s * 40 ≈ 10초
+
 	FTimerHandle BindRetryTimer;
 	FTimerHandle CooldownPollTimer;
 	FDelegateHandle CooldownTagEventHandle;

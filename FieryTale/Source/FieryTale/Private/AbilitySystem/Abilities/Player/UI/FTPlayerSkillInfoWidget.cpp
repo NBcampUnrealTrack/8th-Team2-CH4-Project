@@ -94,6 +94,13 @@ void UFTPlayerSkillInfoWidget::TryBindToOwnerASC()
 		return;
 	}
 
+	//	안전장치: 상한을 넘으면 무한 폴링을 멈춘다. (정상 구성에선 도달 전에 해소됨)
+	if (++BindRetryCount >= MaxBindRetries)
+	{
+		World->GetTimerManager().ClearTimer(BindRetryTimer);
+		return;
+	}
+
 	if (!World->GetTimerManager().IsTimerActive(BindRetryTimer))
 	{
 		World->GetTimerManager().SetTimer(
@@ -189,10 +196,22 @@ const FDataTableRowHandle* UFTPlayerSkillInfoWidget::GetSlotHandle(const FFTChar
 
 void UFTPlayerSkillInfoWidget::RefreshSkillInfo()
 {
+	//	소유 캐릭터의 CharacterData가 준비돼야 이 슬롯을 확정할 수 있다.
+	//	아직이면(복제/스폰 지연) 재시도 타이머가 다시 호출한다.
+	const AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetOwningPlayerPawn());
+	if (!Char || !Char->GetCharacterData())
+	{
+		return;
+	}
+
+	//	데이터가 확보되면 이 슬롯 해석은 확정이다. 슬롯이 비어 있어(표시할 스킬 없음)
+	//	ResolveSkillRow()가 nullptr여도 정상 상태이므로, 여기서 재시도를 종료한다. (무한 재시도 방지)
+	bSkillInfoResolved = true;
+
 	const FFTSkillMetaData* Skill = ResolveSkillRow();
 	if (!Skill)
 	{
-		//	아직 캐릭터/행이 준비되지 않았을 수 있다 — 재시도 타이머가 다시 호출한다.
+		//	이 슬롯엔 스킬이 없음 — 표시할 것 없음. (재시도는 이미 종료)
 		return;
 	}
 
@@ -205,9 +224,13 @@ void UFTPlayerSkillInfoWidget::RefreshSkillInfo()
 	{
 		SkillDescription->SetText(Skill->Description);
 	}
-	if (SkillIcon && Skill->Icon)
+	if (SkillIcon)
 	{
-		SkillIcon->SetBrushFromMaterial(Skill->Icon);
+		//	아이콘 머티리얼은 소프트 참조 — 표시하는 이 시점에만 로드한다.
+		if (UMaterialInterface* IconMaterial = Skill->Icon.LoadSynchronous())
+		{
+			SkillIcon->SetBrushFromMaterial(IconMaterial);
+		}
 	}
 
 	//	쿨다운 감시 1회 등록 — 행에 유효한 쿨다운 태그가 있고, ASC가 준비됐고, 아직 등록 전일 때만.
@@ -220,8 +243,6 @@ void UFTPlayerSkillInfoWidget::RefreshSkillInfo()
 		//	이미 쿨다운 중일 수 있으므로 현재 태그 상태로 즉시 동기화
 		OnCooldownTagChanged(ActiveCooldownTag, BoundASC->GetTagCount(ActiveCooldownTag));
 	}
-
-	bSkillInfoResolved = true;
 }
 
 void UFTPlayerSkillInfoWidget::UnbindFromASC()

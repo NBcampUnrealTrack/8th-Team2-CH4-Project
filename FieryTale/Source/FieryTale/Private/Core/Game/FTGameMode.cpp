@@ -20,6 +20,10 @@
 #include "Character/FTPlayerController.h"
 #include "Character/FTPlayerState.h"
 #include "Character/FTPlayerCharacterBase.h"
+#include "Online/FTSessionSubsystem.h"
+#include "GameFramework/GameSession.h"
+#include "Engine/GameInstance.h"
+#include "Blueprint/UserWidget.h"
 
 AFTGameMode::AFTGameMode()
 {
@@ -205,6 +209,20 @@ void AFTGameMode::NexusDestroyed(AFTNexus* DestroyedNexus)
 
 void AFTGameMode::HandleGameOver(uint8 WinningTeam)
 {
+	AFTArenaGameState* ArenaGS = GetGameState<AFTArenaGameState>();
+
+	// 재진입 방지: 넥서스 이벤트 중복/양측 파괴 등으로 두 번 호출되어도 종료 절차는 1회만 수행한다.
+	if (ArenaGS && ArenaGS->GetArenaMatchState() == EFTArenaMatchState::GameOver)
+	{
+		return;
+	}
+
+	// 매치 상태를 GameOver로 전환 (복제되어 클라이언트도 종료를 인지).
+	if (ArenaGS)
+	{
+		ArenaGS->SetArenaMatchState(EFTArenaMatchState::GameOver);
+	}
+
 	if (WinningTeam == 1)
 	{
 		UE_LOG(LogTemp, Log, TEXT("Blue Team Wins"));
@@ -213,4 +231,30 @@ void AFTGameMode::HandleGameOver(uint8 WinningTeam)
 	{
 		UE_LOG(LogTemp, Log, TEXT("Red Team Wins"));
 	}
+
+	// [뼈대] 결과 UI가 등록되지 않았으면 결과 보고 없이 세션(연결)을 해산하고 메인 레벨로 복귀한다.
+	if (!ResultWidgetClass)
+	{
+		// 1) 온라인 세션 파괴 (방 목록에서 제거)
+		if (UGameInstance* GameInstance = GetGameInstance())
+		{
+			if (UFTSessionSubsystem* Session = GameInstance->GetSubsystem<UFTSessionSubsystem>())
+			{
+				Session->LeaveSession();
+			}
+		}
+
+		// 2) 호스트가 전 클라이언트를 메인 메뉴로 돌려보내고 자신도 복귀 (연결 해산).
+		//    GameDefaultMap(L_MainMenu)로 이동한다.
+		//    TODO: LeaveSession 파괴 콜백을 기다린 뒤 이동하도록 순서 보강 (현재는 최소 뼈대).
+		if (GameSession)
+		{
+			GameSession->ReturnToMainMenuHost();
+		}
+		return;
+	}
+
+	// TODO(결과 UI): ResultWidgetClass가 지정된 경우 —
+	//   승자 정보를 GameState에 복제하고, 각 클라이언트에서 이 위젯을 생성해 결과를 표시한 뒤
+	//   확인/타이머로 세션 해산·메인 복귀로 이어지도록 확장한다. (다음 단계)
 }

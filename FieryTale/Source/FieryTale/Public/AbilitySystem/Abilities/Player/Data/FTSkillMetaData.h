@@ -35,9 +35,9 @@ struct FFTSkillMetaData : public FTableRowBase
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Display")
 	FText HoldCastDescription;
 
-	/** 스킬 슬롯에 표현될 2D 그래픽 머티리얼 주소 */
+	/** 스킬 슬롯에 표현될 2D 그래픽 머티리얼 주소 (소프트 참조 — 표시 시점에만 로드, 테이블 로드 시 전체 아이콘이 메모리에 올라오지 않게) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Visual")
-	TObjectPtr<UMaterialInterface> Icon;
+	TSoftObjectPtr<UMaterialInterface> Icon;
 
 	/** 이 스킬의 기획서 고유 재사용 대기시간 원본 수치 (UI 쿨다운 바 똬리 연산용 원자 데이터) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Design")
