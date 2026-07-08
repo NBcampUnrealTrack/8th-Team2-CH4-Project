@@ -70,6 +70,8 @@ namespace FTTags
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Channelling, "FTTags.Combat.Skill.Channelling", "스킬의 선딜레이 및 캐스팅 유지 상태를 감시하는 인터럽트용 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Target_Insignia, "FTTags.Combat.Target.Insignia", "앨리스 시계 토끼 공격에 노출된 표적의 시한성 태엽 인장 표식 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Muted, "FTTags.Combat.Structure.Muted", "포탑의 AI 자동 포격 감지 루프를 강제로 정지시키는 마비 제어 태그");
+    	
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(AnimNotify_Attack, "FTTags.Combat.AnimNotify.Attack", "애니메이션 몽타주 내 노티파이 시점에 사출되어 투사체 및 근접 공격을 격발하는 태그");
     }
 
     namespace FTObjectType
@@ -100,7 +102,7 @@ namespace FTTags
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(KillScored, "FTTags.Event.KillScored", "적 영웅 혹은 크리처 처치 달성 시 배관망에 사출되는 마스터 이벤트 태그");
     }
-	
+    
     namespace FTGameplayCue
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_AttackHit, "GameplayCue.Minion.AttackHit", "미니언 평타 적중 및 투사체 폭발 시 시각/청각 연출 격발용 큐");

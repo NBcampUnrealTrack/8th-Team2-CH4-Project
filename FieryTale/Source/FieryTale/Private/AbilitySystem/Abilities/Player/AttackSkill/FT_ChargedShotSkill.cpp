@@ -9,7 +9,7 @@
 #include "GameplayTags/FTTags.h"
 #include "Object/FT_ProjectileBase.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
-#include "Abilities/Tasks/AbilityTask_WaitInputRelease.h" // 릴리즈 감시 태스크 인클루드 완착
+#include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 
 UFT_ChargedShotSkill::UFT_ChargedShotSkill()
     : BaseDamage(50.0f)      
@@ -31,8 +31,8 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 1단계: 9초 쿨타임 검문
-    if (!CheckCooldown(Handle, ActorInfo))
+    // [GAS 예측 아키텍처 규격 확정]: 어빌리티 가동 최초 시점에 자원 원자적 선커밋 타설 완료
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
@@ -44,10 +44,7 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         return;
     }
 
-    // =========================================================================
-    // [인풋 릴리즈 감시선 개통]: 마우스 버튼을 떼는 이벤트를 비동기 추적합니다.
-    // 플레이어가 버튼을 누르고 있던 총 시간이 OnRelease 델리게이트를 통해 사출됩니다.
-    // =========================================================================
+    // [인풋 릴리즈 네트워크 복제 활성화] 조준 해제 패킷 동기화 선로 개통
     UAbilityTask_WaitInputRelease* ReleaseTask = UAbilityTask_WaitInputRelease::WaitInputRelease(this, true);
     if (ReleaseTask)
     {
@@ -60,7 +57,6 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     }
 }
 
-// 💡 [컴파일 릭 완치]: 헤더 장부와 일치하도록 float TimePressed 매개변수 파이프라인을 연결했습니다.
 void UFT_ChargedShotSkill::FireChargedShot(float TimePressed)
 {
     if (!CurrentActorInfo || !CurrentActorInfo->AvatarActor.IsValid() || !GetWorld())
@@ -70,21 +66,13 @@ void UFT_ChargedShotSkill::FireChargedShot(float TimePressed)
     }
 
     AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get());
-    UAbilitySystemComponent* SourceASC = CurrentActorInfo->AbilitySystemComponent.Get();
     bool bTriggeredVisualTask = false;
 
-    if (Character && SourceASC)
+    if (Character)
     {
-        // [기획 사양 완착]: 수동 시간 계산 장부를 들어내고, 태스크가 실측한 TimePressed를 직격 제어합니다.
+        // 💡 [1초 정밀 충전 성공 판정선]
         if (TimePressed >= 1.0f)
         {
-            // 1초 이상 풀 차징 달성 순간에 정석대로 활성화 장부 마킹 및 9초 쿨타임 GE 강제 착륙
-            if (!CommitAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo))
-            {
-                EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-                return;
-            }
-            
             if (UFT_WeaponData* WeaponData = Character->GetWeaponData())
             {
                 UWorld* World = GetWorld();
@@ -129,10 +117,47 @@ void UFT_ChargedShotSkill::FireChargedShot(float TimePressed)
                 }
             }
         }
-        // 1초 미만 불완전 차징 낙폭 분기 (패널티 제로 원점 회군)
+        // 💡 [차징 실패 낙폭 구역 - 패널티 프리 면제 환원 수선]
         else
         {
-            EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+            if (CurrentActorInfo && CurrentActorInfo->IsNetAuthority())
+            {
+                UAbilitySystemComponent* MyASC = CurrentActorInfo->AbilitySystemComponent.Get();
+                if (MyASC)
+                {
+                    // =========================================================================
+                    // 💡 [언리얼 순정 GAS 쿨타임 철거 공정 완착]:
+                    // 컴파일 에러를 유발하던 유령 API선들을 완전히 파쇄 소각하고,
+                    // 앨리스 스킬 장부에서 100% 무결성이 증명된 정석 추출 순회망을 락인합니다.
+                    // 에셋 태그든 부여 태그든 CooldownTag를 공차 없이 완전히 제거합니다.
+                    // =========================================================================
+                    FGameplayEffectQuery CooldownQuery;
+                    TArray<FActiveGameplayEffectHandle> ActiveHandles = MyASC->GetActiveEffects(CooldownQuery);
+                    TArray<FActiveGameplayEffectHandle> HandlesToRemove;
+
+                    for (const FActiveGameplayEffectHandle& Handle : ActiveHandles)
+                    {
+                        const FActiveGameplayEffect* ActiveGE = MyASC->GetActiveGameplayEffect(Handle);
+                        if (ActiveGE && ActiveGE->Spec.Def)
+                        {
+                            if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
+                                ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
+                            {
+                                HandlesToRemove.Add(Handle);
+                            }
+                        }
+                    }
+
+                    // 수집 안전 지대에서 원자적 소각 마감
+                    for (const FActiveGameplayEffectHandle& TargetHandle : HandlesToRemove)
+                    {
+                        MyASC->RemoveActiveGameplayEffect(TargetHandle);
+                    }
+                }
+            }
+            
+            // [재귀적 인터럽트 버그 박멸 완치선]: 안전한 기획적 정상 마감 처리
+            EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
             return;
         }
     }

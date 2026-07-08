@@ -13,15 +13,15 @@
 
 AFT_ProjectileBase::AFT_ProjectileBase()
 {
-    // 멀티플레이어 환경 대응: 서버에서 스폰된 투사체의 기동 궤적과 속도를 클라이언트 머신으로 정밀 복제 동기화합니다.
-    bReplicates = true;
+    // 💡 언리얼 5 순정 멀티플레이어 리플리케이션 가동 표준 명세 완착
+    SetReplicates(true);
     SetReplicateMovement(true);
 
     SphereComponent = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComponent"));
     SetRootComponent(SphereComponent);
     SphereComponent->SetSphereRadius(16.0f);
     
-    // 순정 투사체 프리셋으로 복귀: 생명체(Pawn)와는 부드럽게 오버랩 통과하고, 지형/벽과는 블록 충돌을 일으키는 순정 프로필입니다.
+    // 생명체와는 오버랩, 지형과는 블록 히트 판정을 내는 순정 프로필 락인
     SphereComponent->SetCollisionProfileName(TEXT("Projectile"));
 
     ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
@@ -33,7 +33,6 @@ AFT_ProjectileBase::AFT_ProjectileBase()
     ProjectileMovement->MaxSpeed = 1500.0f;
     ProjectileMovement->ProjectileGravityScale = 0.0f;
 
-    // 최대 수명 안전장치 적용: 공중에 가로막히거나 맵 밖으로 무한히 탈출하는 탄환들의 메모리 누수 버그를 파쇄하기 위해 5초 뒤 자동 소멸을 예약합니다.
     InitialLifeSpan = 5.0f;
 }
 
@@ -41,16 +40,16 @@ void AFT_ProjectileBase::BeginPlay()
 {
     Super::BeginPlay();
     
-    // 권한 필터링 완착: 클라이언트의 예측 오작동 및 부정 패킷 사출을 완벽 차단하기 위해, 오직 호스트/데디케이트 서버 권한 환경에서만 피격 오버랩 델리게이트를 개통합니다.
     if (HasAuthority())
     {
-       SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AFT_ProjectileBase::OnProjectileOverlap);
+        // 💡 [이중 충돌 센서 가드선 타설]: 생명체 관측용 오버랩선과 지형/벽면 충돌용 히트 선로를 동시 격발 개통합니다.
+        SphereComponent->OnComponentBeginOverlap.AddDynamic(this, &AFT_ProjectileBase::OnProjectileOverlap);
+        SphereComponent->OnComponentHit.AddDynamic(this, &AFT_ProjectileBase::OnProjectileHit);
     }
 }
 
 void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-    // 자가 피격 예외 처리: 충돌한 대상이 없거나 시전자 본인, 혹은 투사체를 사출한 인스티게이터일 경우 타격 장부 연산을 즉시 거부합니다.
     if (!OtherActor || OtherActor == GetOwner() || OtherActor == Cast<AActor>(GetInstigator()))
     {
        return;
@@ -62,7 +61,7 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
     UAbilitySystemComponent* InstigatorASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(MyInstigator);
     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor);
 
-    // 피아식별 철저 검문소: 시전자진영과 피격자진영의 게임플레이 태그(Team_Blue / Team_Red)를 실시간 대조하여 아군일 경우 대미지 없이 그대로 관통시킵니다.
+    // 피아식별 교차 검문선
     if (InstigatorASC && TargetASC)
     {
         bool bIsSameTeam = false;
@@ -84,7 +83,6 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
         }
     }
 
-    // 적중 판정 및 즉시 파쇄: 타깃의 GAS 컴포넌트 실체가 확인되면, 어빌리티 단에서 위임받은 대미지 계산서 알맹이를 주입한 뒤 투사체 액터를 월드에서 청정 소멸시킵니다.
     if (TargetASC)
     {
        if (DamageEffectSpecHandle.IsValid())
@@ -92,6 +90,33 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
           TargetASC->ApplyGameplayEffectSpecToSelf(*DamageEffectSpecHandle.Data.Get());
        }
 
-       Destroy();
+       // [고스트 유령 패킷 안락사]: 파괴 선언 직후 물리 기동과 콜리전을 전면 동결 차단하여 
+       // 클라이언트 화면에 탄환 좀비가 복제되어 날아가는 릭을 원천 분쇄합니다.
+       ExplodeAndDestroy();
     }
+}
+
+//  [지형/벽면 블록 히트 최종 보수 구역]
+void AFT_ProjectileBase::OnProjectileHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+    // 벽이나 포탑 구조물 지형에 박혔다면 연산 낭비 없이 즉각 파쇄 소각합니다.
+    ExplodeAndDestroy();
+}
+
+void AFT_ProjectileBase::ExplodeAndDestroy()
+{
+    // [원자적 강제 제동 파이프라인]
+    if (ProjectileMovement)
+    {
+        ProjectileMovement->StopMovementImmediately();
+    }
+    
+    if (SphereComponent)
+    {
+        SphereComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
+
+    // 향후 이 구역에 피격 펑 이펙트 사출용 GC(GameplayCue.Minion.AttackHit)를 얹어주면 완벽한 화면 연출 동기화가 이뤄집니다.
+
+    Destroy();
 }

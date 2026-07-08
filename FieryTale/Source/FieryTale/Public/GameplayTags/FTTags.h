@@ -72,6 +72,8 @@ namespace FTTags
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Skill_Channelling);
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Target_Insignia);
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Structure_Muted);
+    	
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(AnimNotify_Attack);
     }
 
     namespace FTObjectType
@@ -102,7 +104,7 @@ namespace FTTags
     {
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(KillScored);
     }
-	
+    
     namespace FTGameplayCue
     {
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(Minion_AttackHit);

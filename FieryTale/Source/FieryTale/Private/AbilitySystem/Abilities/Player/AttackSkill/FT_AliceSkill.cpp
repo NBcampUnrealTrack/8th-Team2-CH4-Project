@@ -6,7 +6,6 @@
 #include "Engine/World.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "AbilitySystemInterface.h" 
 #include "GameplayTags/FTTags.h"
 #include "Object/FT_ProjectileBase.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
@@ -30,13 +29,8 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // [1단계: 관문 검문] 쿨타임 상태라면 즉시 어빌리티 가동을 차단합니다.
-    if (!CheckCooldown(Handle, ActorInfo))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
-    }
-    
+    // 💡 [순정 GAS 가드선 복구]: 중복 검문을 소각하고 CommitAbility 단일 파이프라인으로 일원화하여
+    // 쿨타임과 코스트 장부를 원자적으로 검문 및 차단인(Lock-in)합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -75,8 +69,7 @@ void UFT_AliceSkill::FireClockRabbit()
     AFTPlayerCharacterBase* Character = CurrentActorInfo ? Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get()) : nullptr;
     UWorld* World = GetWorld();
 
-    // [2번째 사양 반영 완료]: WeaponData 참조 장부를 완전히 끊고, 헤더의 ClockRabbitProjectileClass를 직격 타겟팅합니다.
-    if (World && ClockRabbitProjectileClass && RabbitImpactEffectClass)
+    if (World && ClockRabbitProjectileClass && RabbitImpactEffectClass && Character)
     {
         FVector SpawnLocation = Character->GetActorLocation() + Character->GetActorForwardVector() * 50.0f + FVector(0, 0, 40.0f);
         FVector LaunchDirection = Character->GetActorForwardVector();
@@ -88,7 +81,6 @@ void UFT_AliceSkill::FireClockRabbit()
             SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
         }
 
-        // 평타 에셋이 아닌 오직 이 스킬 창에서 세팅한 전용 시계 토끼 실체 클래스를 Deferred 소환합니다.
         AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
             ClockRabbitProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         
@@ -113,6 +105,10 @@ void UFT_AliceSkill::HandleSkillInterrupted()
         
         FGameplayEffectQuery UniversalQuery;
         TArray<FActiveGameplayEffectHandle> ActiveHandles = MyASC->GetActiveEffects(UniversalQuery);
+        
+        // 💡 [메모리 컨테이너 훼손 방어선 타설]: 실시간 지우기로 루프를 폭파하지 않고,
+        // 타깃 쿨타임 핸들들만 격리 어레이에 깨끗하게 선제 수집합니다.
+        TArray<FActiveGameplayEffectHandle> HandlesToRemove;
 
         for (const FActiveGameplayEffectHandle& Handle : ActiveHandles)
         {
@@ -122,11 +118,18 @@ void UFT_AliceSkill::HandleSkillInterrupted()
                 if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
                     ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
                 {
-                    MyASC->RemoveActiveGameplayEffect(Handle);
+                    HandlesToRemove.Add(Handle);
                 }
             }
         }
+
+        // 💡 안전 구역으로 탈출한 직후 수집 장부를 기반으로 원자적 소각을 완수합니다.
+        for (const FActiveGameplayEffectHandle& TargetHandle : HandlesToRemove)
+        {
+            MyASC->RemoveActiveGameplayEffect(TargetHandle);
+        }
     }
 
+    // 인터럽트에 의한 능동 종료 명시
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
