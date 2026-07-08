@@ -139,10 +139,11 @@ AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectI
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
+	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
 
-	//	엔진의 자동 회전(컨트롤러 Yaw 추종/이동 방향 추종)을 모두 끄고, Move()/Look()에서 UpdateFacingRotation()으로 직접 제어
+	//	이동 방향과 무관하게 항상 컨트롤러(카메라) Yaw만 바라본다. CharacterMovementComponent의 표준 리플리케이션 경로를 타야
+	//	멀티플레이에서 다른 클라이언트에게도 회전이 정상 전파된다 (수동 SetActorRotation은 서버로 전달되지 않음).
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 500.f, 0.f);
 	//GetCharacterMovement()->AirControl = 0.35f;
@@ -206,8 +207,6 @@ void AFTPlayerCharacterBase::Move(const FInputActionValue& Value)
 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
-
-		UpdateFacingRotation();
 	}
 }
 
@@ -219,20 +218,7 @@ void AFTPlayerCharacterBase::Look(const FInputActionValue& Value)
 	{
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
-
-		UpdateFacingRotation();
 	}
-}
-
-void AFTPlayerCharacterBase::UpdateFacingRotation()
-{
-	if (!Controller)
-	{
-		return;
-	}
-
-	//	이동 방향과 무관하게 항상 컨트롤러(카메라) Yaw만 바라봄 — 대각선/좌우 이동은 애니메이션으로 표현
-	SetActorRotation(FRotator(0.f, Controller->GetControlRotation().Yaw, 0.f));
 }
 
 void AFTPlayerCharacterBase::OnLeftClick()
