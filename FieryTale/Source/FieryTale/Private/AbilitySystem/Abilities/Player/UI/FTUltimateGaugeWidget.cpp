@@ -224,16 +224,8 @@ void UFTUltimateGaugeWidget::HandleMaxUltimateGaugeChanged(const FOnAttributeCha
 
 void UFTUltimateGaugeWidget::RefreshGaugeDisplay()
 {
-	float ClampedPercent;
-	if (bUseTestPercent)
-	{
-		ClampedPercent = FMath::Clamp(TestPercent, 0.f, 1.f);
-	}
-	else
-	{
-		const float Percent = (CachedMaxUltimateGauge > 0.f) ? (CachedUltimateGauge / CachedMaxUltimateGauge) : 0.f;
-		ClampedPercent = FMath::Clamp(Percent, 0.f, 1.f);
-	}
+	const float Percent = (CachedMaxUltimateGauge > 0.f) ? (CachedUltimateGauge / CachedMaxUltimateGauge) : 0.f;
+	const float ClampedPercent = FMath::Clamp(Percent, 0.f, 1.f);
 
 	if (GaugeMID)
 	{

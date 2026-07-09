@@ -64,15 +64,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|UI")
 	TObjectPtr<UMaterialInterface> RoundProgressMaterial;
 
-	//	(테스트용) 체크 시 실제 ASC 값 대신 TestPercent를 표시에 사용
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|UI|Test")
-	bool bUseTestPercent = false;
-
-	//	(테스트용) bUseTestPercent가 true일 때 게이지에 표시할 비율(0~1). 디자이너/디테일 패널에서 수정하면 즉시 반영됨
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|UI|Test",
-		meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0", EditCondition = "bUseTestPercent"))
-	float TestPercent = 0.5f;
-
 	//	게이지가 100%일 때 초당 깜빡이는 횟수
 	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|UI|Blink", meta = (ClampMin = "0.1"))
 	float BlinkPulsesPerSecond = 2.0f;
