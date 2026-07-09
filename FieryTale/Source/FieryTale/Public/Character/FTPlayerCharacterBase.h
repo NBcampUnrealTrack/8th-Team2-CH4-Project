@@ -130,14 +130,7 @@ public:
 	// ASC는 PlayerState에서 가져옴
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	// [이관/폐기 보존] 구: UFT_CharacterData 포인터를 직접 참조하던 방식.
-	//UPROPERTY(ReplicatedUsing = OnRep_CharacterData, EditAnywhere, BlueprintReadWrite, Category = "FieryTale | Character")
-	//TObjectPtr<UFT_CharacterData> CharacterData;
-	//
-	//UFUNCTION()
-	//void OnRep_CharacterData();
-
-	// 신: DT_CharacterData(FFTCharacterData) 행을 가리키는 핸들. BP 인스턴스 또는 스폰 시 주입으로 지정한다.
+	// DT_CharacterData(FFTCharacterData) 행을 가리키는 핸들. BP 인스턴스 또는 스폰 시 주입으로 지정한다.
 	UPROPERTY(ReplicatedUsing = OnRep_CharacterRow, EditAnywhere, BlueprintReadWrite, Category = "FieryTale | Character", meta = (RowType = "FTCharacterData"))
 	FDataTableRowHandle CharacterRow;
 
@@ -209,8 +202,6 @@ public:
 	virtual void OnRightClick();
 	virtual void OnPressQ();
 	virtual void OnShift();
-	
-	void DebugDie(); // TODO:: 삭제 예정
 
 protected:
 

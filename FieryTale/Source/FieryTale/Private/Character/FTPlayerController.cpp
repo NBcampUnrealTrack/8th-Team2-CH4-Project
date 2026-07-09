@@ -48,12 +48,6 @@ void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const F
 		return;
 	}
 
-	// [이관/폐기 보존] 구: 소프트 UFT_CharacterData 에셋을 찾아 동기 로드.
-	//const TSoftObjectPtr<UFT_CharacterData>* SoftData = CharacterDataMap.Find(PS->GetSelectedCharacterType());
-	//if (!SoftData) { ... return; }
-	//UFT_CharacterData* CharData = SoftData->LoadSynchronous();
-	//if (!CharData) { ... return; }
-
 	if (!CharacterDataTable)
 	{
 		UE_LOG(FTPlayerController, Error, TEXT("CharacterDataTable이 설정되지 않았습니다."));
@@ -106,23 +100,6 @@ void AFTPlayerController::AssignTeam(EFTTeam InTeam)
 	}
 
 	PS->AssignTeamTag(InTeam);
-}
-
-void AFTPlayerController::OnPlayerDeath()
-{
-	if (!IsLocalController())
-	{
-		return;
-	}
-
-	if (DeathOverlayClass)
-	{
-		DeathOverlayWidgetInstance = CreateWidget<UUserWidget>(this, DeathOverlayClass);
-		if (DeathOverlayWidgetInstance)
-		{
-			DeathOverlayWidgetInstance->AddToViewport();
-		}
-	}
 }
 
 void AFTPlayerController::RequestRespawn()
@@ -281,9 +258,6 @@ void AFTPlayerController::SetupInputComponent()
 		}
 	}
 
-	// 레거시 한 줄 바인딩 — IA/IMC 에셋 없이 바로 키 연결
-	InputComponent->BindKey(EKeys::K,   IE_Pressed, this, &AFTPlayerController::DebugDie); // TODO:: 삭제 예정
-
 	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
 	{
 		EIC->BindAction(MoveAction,       ETriggerEvent::Triggered, this, &AFTPlayerController::Move);
@@ -355,21 +329,6 @@ void AFTPlayerController::OnShift()
 	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
 	{
 		Char->OnShift();
-	}
-}
-
-#if !UE_BUILD_SHIPPING
-void AFTPlayerController::DebugDie()
-{
-	Server_DebugDie();
-}
-#endif
-
-void AFTPlayerController::Server_DebugDie_Implementation()
-{
-	if (AFTPlayerCharacterBase* Char = Cast<AFTPlayerCharacterBase>(GetPawn()))
-	{
-		Char->DebugDie();
 	}
 }
 

@@ -52,7 +52,6 @@ namespace
 void AFTPlayerCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	//	[이관/폐기 보존] DOREPLIFETIME(AFTPlayerCharacterBase, CharacterData);
 	DOREPLIFETIME(AFTPlayerCharacterBase, CharacterRow);
 	DOREPLIFETIME(AFTPlayerCharacterBase, ReplicatedCharacterScale);
 }
@@ -88,12 +87,6 @@ void AFTPlayerCharacterBase::PostInitializeComponents()
 	}
 }
 
-//	[이관/폐기 보존] 구 OnRep_CharacterData.
-//void AFTPlayerCharacterBase::OnRep_CharacterData()
-//{
-//	ApplyCharacterVisuals();
-//}
-
 void AFTPlayerCharacterBase::OnRep_CharacterRow()
 {
 	ApplyCharacterVisuals();
@@ -101,17 +94,6 @@ void AFTPlayerCharacterBase::OnRep_CharacterRow()
 
 void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 {
-	//	[이관/폐기 보존] 구 UFT_CharacterData 기반 적용.
-	//if (!CharacterData)
-	//{
-	//	return;
-	//}
-	//GetCharacterMovement()->MaxWalkSpeed = CharacterData->GetDefaultMoveSpeed();
-	//if (USkeletalMesh* CharacterMesh = CharacterData->GetCharacterMesh())
-	//{
-	//	GetMesh()->SetSkeletalMesh(CharacterMesh);
-	//}
-
 	const FFTCharacterData* Data = GetCharacterData();
 	if (!Data)
 	{
@@ -221,7 +203,6 @@ const FFTCharacterData* AFTPlayerCharacterBase::GetCharacterData() const
 
 UFT_WeaponData* AFTPlayerCharacterBase::GetWeaponData() const
 {
-	//	[이관/폐기 보존] 구: return CharacterData ? CharacterData->GetWeaponData() : CurrentWeaponData;
 	if (const FFTCharacterData* Data = GetCharacterData())
 	{
 		if (Data->WeaponData)
@@ -511,13 +492,6 @@ void AFTPlayerCharacterBase::OnHealthWidgetDeadTagChanged(const FGameplayTag Tag
 	}
 }
 
-// TODO:: 사망 확인을 위한 임시코드 삭제 예정
-void AFTPlayerCharacterBase::DebugDie()
-{
-	UE_LOG(FTPlayerCharacter, Display, TEXT("Called Die For DeBugging"));
-	Die();
-}
-
 void AFTPlayerCharacterBase::NotifyControllerChanged()
 {
 	Super::NotifyControllerChanged();
@@ -578,21 +552,7 @@ void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
 					}
 				}
 
-				// [이관/폐기 보존] 구: UFT_CharacterData의 인풋 태그별 어빌리티 맵(CharacterAbilities)을 순회 부여.
-				//if (CharacterData)
-				//{
-				//	for (const TPair<FGameplayTag, TSubclassOf<UGameplayAbility>>& AbilityPair : CharacterData->GetHeroAbilities())
-				//	{
-				//		if (AbilityPair.Value)
-				//		{
-				//			FGameplayAbilitySpec Spec(AbilityPair.Value, 1, -1, this);
-				//			Spec.GetDynamicSpecSourceTags().AddTag(AbilityPair.Key);
-				//			ASC->GiveAbility(Spec);
-				//		}
-				//	}
-				//}
-
-				// 신: 캐릭터 행(FFTCharacterData)의 4개 버튼 슬롯에서 스킬을 부여.
+				// 캐릭터 행(FFTCharacterData)의 4개 버튼 슬롯에서 스킬을 부여.
 				// 버튼→InputTag는 기존 태그를 재사용한다. (LMB→NormalAttack / RMB→AttackSkill / Space→UtilSkill / R→UltimateSkill)
 				if (const FFTCharacterData* Data = GetCharacterData())
 				{
@@ -657,20 +617,6 @@ void AFTPlayerCharacterBase::OnRep_PlayerState()
 
 void AFTPlayerCharacterBase::InitializeCharacterAttribute() const
 {
-	//	[이관/폐기 보존] 구 UFT_CharacterData 기반 스탯 초기화.
-	//if (!CharacterData || !HasAuthority())
-	//{
-	//	return;
-	//}
-	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxHealthAttribute(),        CharacterData->GetDefaultMaxHealth());
-	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetHealthAttribute(),           CharacterData->GetDefaultMaxHealth());
-	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxShieldAttribute(),        CharacterData->GetDefaultMaxShield());
-	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetShieldAttribute(),           CharacterData->GetDefaultMaxShield());
-	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxMoveSpeedAttribute(),     CharacterData->GetDefaultMoveSpeed());
-	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMoveSpeedAttribute(),        CharacterData->GetDefaultMoveSpeed());
-	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetAttackPowerAttribute(),      CharacterData->GetDefaultAttackPower());
-	//ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxUltimateGaugeAttribute(), CharacterData->GetDefaultMaxUltimateGauge());
-
 	const FFTCharacterData* Data = GetCharacterData();
 	if (!Data || !HasAuthority())
 	{
