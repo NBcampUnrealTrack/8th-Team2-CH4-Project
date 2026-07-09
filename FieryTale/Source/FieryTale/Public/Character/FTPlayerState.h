@@ -47,6 +47,25 @@ public:
 	// 실제로 스폰된 캐릭터 인스턴스
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Character")
 	TObjectPtr<APawn> SpawnedCharacter;
+	
+	// 킬/데스를 올리는 함수 (서버에서만 호출)
+	void AddKill();
+	void AddDeath();
+
+	// UI에서 읽어갈 Getter
+	UFUNCTION(BlueprintPure, Category = "FieryTale|Score")
+	int32 GetKills() const { return Kills; }
+
+	UFUNCTION(BlueprintPure, Category = "FieryTale|Score")
+	int32 GetDeaths() const { return Deaths; }
+	
+protected:
+	
+	UPROPERTY(Replicated)
+	int32 Kills = 0;
+
+	UPROPERTY(Replicated)
+	int32 Deaths = 0;
 
 private:
 	// 에디터 Detail에서 현재 선택된 캐릭터 타입 확인용 (읽기 전용)

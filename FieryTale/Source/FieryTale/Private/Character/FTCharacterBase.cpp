@@ -13,7 +13,7 @@ AFTCharacterBase::AFTCharacterBase(const FObjectInitializer& ObjectInitializer)
 	PrimaryActorTick.bCanEverTick = false;
 }
 
-void AFTCharacterBase::Die()
+void AFTCharacterBase::Die(AController* KillerController)
 {
 	// Dead 태그로 중복 사망 처리를 차단하고, 어빌리티 발동 차단(ActivationBlockedTags)과
 	// 클라이언트 상태 표시(OnDeadTagChanged)를 위해 서버·클라 양쪽에 태그를 전파한다.
@@ -33,7 +33,7 @@ void AFTCharacterBase::Die()
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 
-	OnCharacterDied.Broadcast(this);
+	OnCharacterDied.Broadcast(this, KillerController);
 
 	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 	{

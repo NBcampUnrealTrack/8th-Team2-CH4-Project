@@ -35,6 +35,16 @@ void AFTPlayerState::AssignTeamTag(EFTTeam InTeam)
 	ApplyTeamTag();
 }
 
+void AFTPlayerState::AddKill()
+{
+	if (HasAuthority()) Kills++;
+}
+
+void AFTPlayerState::AddDeath()
+{
+	if (HasAuthority()) Deaths++;
+}
+
 void AFTPlayerState::OnRep_Team()
 {
 	ApplyTeamTag();
@@ -66,5 +76,7 @@ void AFTPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AFTPlayerState, Team);
 	DOREPLIFETIME(AFTPlayerState, SelectedCharacterType);
 	DOREPLIFETIME(AFTPlayerState, PlayerIndex);
+	DOREPLIFETIME(AFTPlayerState, Kills);
+	DOREPLIFETIME(AFTPlayerState, Deaths);
 }
 

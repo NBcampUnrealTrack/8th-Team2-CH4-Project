@@ -171,7 +171,19 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
             {
                 if (BaseChar->HasAuthority())
                 {
-                    BaseChar->Die();
+                    // 🌟 1. 대미지 이펙트를 가한 주체(Instigator)의 컨트롤러를 추적합니다.
+                    AController* KillerController = nullptr;
+                    if (Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent())
+                    {
+                        AActor* InstigatorActor = Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent()->GetAvatarActor();
+                        if (APawn* InstigatorPawn = Cast<APawn>(InstigatorActor))
+                        {
+                            KillerController = InstigatorPawn->GetController();
+                        }
+                    }
+
+                    // 🌟 2. 찾은 가해자 컨트롤러를 Die 함수에 실어서 보냅니다!
+                    BaseChar->Die(KillerController);
                 }
             }
         }

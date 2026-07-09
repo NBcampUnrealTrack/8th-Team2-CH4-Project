@@ -160,7 +160,7 @@ private:
 	void OnChatPressed();
 
 	UFUNCTION()
-	void HandleCharacterDeath(AFTCharacterBase* DiedCharacter);
+	void HandleCharacterDeath(AFTCharacterBase* DiedCharacter, AController* KillerController);
 	void OnDeadTagChanged(const FGameplayTag Tag, int32 NewCount);
 	
 public:

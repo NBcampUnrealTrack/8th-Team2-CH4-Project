@@ -22,6 +22,7 @@
 #include "Lobby/FTLobbyWidget.h"
 #include "FieryTaleLog.h"
 #include "Camera/CameraActor.h"
+#include "Core/Game/FTArenaGameState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Lobby/FTLobbyGameMode.h"
 #include "UI/FTResultWidget.h"
@@ -381,19 +382,41 @@ UFTHUDLayoutSubsystem* AFTPlayerController::GetHUDLayoutSubsystem() const
 	return LocalPlayer ? LocalPlayer->GetSubsystem<UFTHUDLayoutSubsystem>() : nullptr;
 }
 
-void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter)
+void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter, AController* KillerController)
 {
 	// 서버권한에서만 동작함
-	if (!HasAuthority())
-	{
-		return;
-	}
+	if (!HasAuthority()) return;
+	
+	FString KillerName = KillerController ? KillerController->GetName() : TEXT("Unknown (nullptr)");
+	UE_LOG(LogTemp, Warning, TEXT("💀 [사망 판정] 피해자: %s | 가해자: %s"), *GetName(), *KillerName);
 	
 	if (DiedCharacter == GetPawn())
 	{
-		// 일정시간 후에 Respawn되도록 핸들러를 추가함
-		
-		// 이미 작동중인 리스폰 타이머가 있는 경우 중복 실행 방지
+		// 🌟 1. 나의 데스(Death) 1 증가
+		AFTPlayerState* VictimPS = GetPlayerState<AFTPlayerState>();
+		if (VictimPS)
+		{
+			VictimPS->AddDeath();
+			
+			// 🌟 2. 가해자 팀에게 팀 스코어(Team Kill) 추가
+			if (AFTArenaGameState* GS = GetWorld()->GetGameState<AFTArenaGameState>())
+			{
+				// 내가 블루면 레드에게 점수를, 내가 레드면 블루에게 점수를 줍니다.
+				EFTTeam KillerTeam = (VictimPS->GetTeam() == EFTTeam::Blue) ? EFTTeam::Red : EFTTeam::Blue;
+				GS->AddTeamScore(KillerTeam);
+			}
+		}
+
+		// 🌟 3. 가해자(Killer)의 개인 킬(Kill) 1 증가
+		if (KillerController && KillerController != this)
+		{
+			if (AFTPlayerState* KillerPS = KillerController->GetPlayerState<AFTPlayerState>())
+			{
+				KillerPS->AddKill();
+			}
+		}
+
+		// 리스폰 타이머 처리 (기존 로직 유지)
 		if (GetWorld()->GetTimerManager().IsTimerActive(RespawnTimerHandle))
 		{
 			return;
@@ -406,7 +429,6 @@ void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter)
 			RespawnDelay, 
 			false
 		);
-	
 	}
 }
 

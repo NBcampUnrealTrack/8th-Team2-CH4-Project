@@ -15,6 +15,9 @@ void AFTArenaGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AFTArenaGameState, CurrentMatchState);
+	DOREPLIFETIME(AFTArenaGameState, BlueTeamKills);
+	DOREPLIFETIME(AFTArenaGameState, RedTeamKills);
+	
 }
 
 void AFTArenaGameState::SetArenaMatchState(EFTArenaMatchState NewState)
@@ -23,6 +26,15 @@ void AFTArenaGameState::SetArenaMatchState(EFTArenaMatchState NewState)
 	{
 		CurrentMatchState = NewState;
 		OnRep_CurrentMatchState();
+	}
+}
+
+void AFTArenaGameState::AddTeamScore(EFTTeam ScoringTeam)
+{
+	if (HasAuthority())
+	{
+		if (ScoringTeam == EFTTeam::Blue) BlueTeamKills++;
+		else if (ScoringTeam == EFTTeam::Red) RedTeamKills++;
 	}
 }
 
