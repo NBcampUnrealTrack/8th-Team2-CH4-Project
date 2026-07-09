@@ -1,20 +1,15 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Copyright Epic Games, Inc. All Rights Reserved.
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "AbilitySystemInterface.h"
+#include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
 #include "FTTowerBase.generated.h"
 
-class UBoxComponent;
-class UStaticMeshComponent;
-class UGeometryCollectionComponent;
 class UFT_AbilitySystemComponent;
 class UFT_AttributeSet;
-class UDataTable;
-class USoundBase;
-class UParticleSystem;
 
 UCLASS(Abstract)
 class FIERYTALE_API AFTTowerBase : public AActor, public IAbilitySystemInterface
@@ -22,50 +17,34 @@ class FIERYTALE_API AFTTowerBase : public AActor, public IAbilitySystemInterface
 	GENERATED_BODY()
 
 public:
-	AFTTowerBase(); // 생성자
+	AFTTowerBase(); // 구조물 기초 속성 할당용 부모 생성자 선언
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override; // GAS 접근용 인터페이스 오버라이드
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override; // 멀티플레이 변수 복제 등록용 필수 함수
 
-	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override; // 어빌리티 시스템 컴포넌트 주소 반환 인터페이스
-
-protected:
-	virtual void BeginPlay() override; // 액터 초기화 기동 루틴
-
-	void OnHealthChanged(const struct FOnAttributeChangeData& Data); // 내구도 속성 변동 콜백 함수
-
-	void StartDestruction(); // 독립 카오스 파쇄 시퀀스 개시 함수
-
-	virtual FGameplayTag GetTeamTag() const { return FGameplayTag(); } // 하위 진영 태그 반환 가상 함수
-	virtual FGameplayTag GetStructureTag() const { return FGameplayTag(); } // 하위 구조물 고유 태그 반환 가상 함수
-	virtual float GetDefaultMaxHealth() const { return 1000.f; } // 디폴트 내구도 반환 가상 함수
-	virtual void NotifyDestroyed() {} // 파생 클래스 특화 통보용 가상 함수
+	void OnHealthChanged(const FOnAttributeChangeData& Data); // 자식 클래스의 델리게이트 접근 권한 에러를 해결하기 위해 public으로 개방된 콜백 함수
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> TurretMesh; // 최상위 루트 외형 담당 스태틱 메시
+	virtual void BeginPlay() override; // 데이터베이스 및 GAS 세팅 초기화 루틴
+	
+	UFUNCTION()
+	virtual void OnRep_IsDestroyed(); // 클라이언트 동기화의 핵심인 상태 변수 복제 알림 함수
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UBoxComponent> CollisionBox; // 루트 하위에 귀속되는 투사체 피격 박스 콜리전
+	virtual void PerformDestructionEffects() {} // 1P/2P 양쪽 화면에서 실제 시각 연출을 가동할 가상 함수
+	virtual void NotifyGameMode() {} // 오직 1P 서버에서만 점수와 승패를 통보할 가상 함수
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UGeometryCollectionComponent> DebrisMesh; // 독립 분쇄 연출을 보장받는 카오스 지오메트리 컬렉션
+	virtual FGameplayTag GetTeamTag() const { return FGameplayTag(); } // 하위 클래스 진영 태그 반환 통로
+	virtual FGameplayTag GetStructureTag() const { return FGameplayTag(); } // 하위 클래스 객체 태그 반환 통로
+	virtual float GetDefaultMaxHealth() const { return 1000.f; } // 하위 클래스 기본 체력 반환 통로
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
+	TObjectPtr<UFT_AbilitySystemComponent> AbilitySystemComponent; // 데미지 처리 및 태그 관리용 네이티브 ASC
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
-	TObjectPtr<UFT_AbilitySystemComponent> AbilitySystemComponent; // GAS ASC 인스턴스
+	TObjectPtr<UFT_AttributeSet> AttributeSet; // 체력 보관용 스탯 세트
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS")
-	TObjectPtr<UFT_AttributeSet> AttributeSet; // 체력 스탯 어트리뷰트 세트
+	UPROPERTY(ReplicatedUsing = OnRep_IsDestroyed)
+	bool bIsDestroyed; // true로 바뀌는 순간 모든 클라이언트 화면에서 붕괴 연출을 동시 발동시키는 네트워크 변수
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
-	TObjectPtr<UDataTable> TowerDataTable; // 스탯 데이터 테이블 시트 보관 슬롯
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
-	FName DataRowName; // 데이터 테이블 행 추적 이름
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
-	TObjectPtr<USoundBase> DestructionSound; // 파괴 시점 효과음 오디오 소스
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
-	TObjectPtr<UParticleSystem> DestructionEffect; // 파괴 시점 폭발 파티클 소스
-
-	bool bIsDying = false; // 파괴 제어 중복 진입 방어용 플래그
-	float MaxDyingTime = 5.f; // 메모리 자동 완전 소거 대기 수명 타임
+	bool bIsDying; // 서버에서 파괴 로직이 두 번 겹쳐 실행되는 것을 막는 로컬 락 플래그
 };

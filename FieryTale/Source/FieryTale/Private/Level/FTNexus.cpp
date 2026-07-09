@@ -1,49 +1,97 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #include "Level/FTNexus.h"
+#include "Components/StaticMeshComponent.h"
+#include "GeometryCollection/GeometryCollectionComponent.h"
 #include "UI/Health/FTHealthWidgetComponent.h"
 #include "GameplayTags/FTTags.h"
+#include "Engine/DataTable.h"
+#include "Level/FTStructureData.h"
+#include "AbilitySystem/FT_AbilitySystemComponent.h"
+#include "AbilitySystem/FT_AttributeSet.h"
+#include "Kismet/GameplayStatics.h"
 #include "Core/Game/FTGameMode.h"
 #include "Engine/World.h"
 
 AFTNexus::AFTNexus()
 {
-    NexusTeam = EFTNexusTeam::None; // 진영 상태 초기 비지정 정의
+	NexusMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("NexusMesh")); // 원본 본진 외형 생성
+	SetRootComponent(NexusMesh); // 최상위 루트로 고정
+	NexusMesh->SetCollisionProfileName(TEXT("BlockAllGeneric")); // 기본 물리 차단 부여
+
+	DebrisMesh = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("DebrisMesh")); // 카오스 파편 객체 생성
+	DebrisMesh->SetupAttachment(NexusMesh); // 본진 외형 하위에 부착
+
+	NexusTeam = EFTNexusTeam::NoneTeam; // 초기 에러 방지용 진영 할당
 }
 
 void AFTNexus::BeginPlay()
 {
-    Super::BeginPlay(); // 부모 초기화 루틴 실행
+	float TargetMaxHealth = 5000.0f; // 본진 전용 백업 초기 체력 세팅
+	
+	if (NexusDataTable && !DataRowName.IsNone())
+	{
+		if (FFTStructureData* RowData = NexusDataTable->FindRow<FFTStructureData>(DataRowName, TEXT("")))
+		{
+			TargetMaxHealth = RowData->MaxHealth; // 블루프린트에 등록된 시트 데이터로 체력 수치 완전 덮어쓰기
+		}
+	}
 
-    if (UFTHealthWidgetComponent* HealthWidgetComp = FindComponentByClass<UFTHealthWidgetComponent>())
-    {
-        HealthWidgetComp->UpdateASCBinding(); // UI 화이트아웃 무력화 위젯 동기화 강제 가동
-    }
+	if (AttributeSet && AbilitySystemComponent)
+	{
+		AttributeSet->InitMaxHealth(TargetMaxHealth); // 확보된 시트 체력을 GAS 최대치에 세팅
+		AttributeSet->InitHealth(TargetMaxHealth); // 확보된 시트 체력을 GAS 현재치에 세팅
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AFTTowerBase::OnHealthChanged); // 공통 권한 개방을 통한 리스너 정상 부착
+	}
+
+	Super::BeginPlay(); // 기초 베이스 연동
+
+	if (UFTHealthWidgetComponent* HealthWidgetComp = FindComponentByClass<UFTHealthWidgetComponent>())
+	{
+		HealthWidgetComp->UpdateASCBinding(); // 넥서스 고유 UI 동기화 강제 지시
+	}
 }
 
 FGameplayTag AFTNexus::GetTeamTag() const
 {
-    return (NexusTeam == EFTNexusTeam::BlueTeam) ? FTTags::FTFaction::Team_Blue : FTTags::FTFaction::Team_Red; // 팀 식별 태그 선별 반환
+	return (NexusTeam == EFTNexusTeam::BlueTeam) ? FTTags::FTFaction::Team_Blue : FTTags::FTFaction::Team_Red; // 설정된 진영 태그 필터링 반환
 }
 
 FGameplayTag AFTNexus::GetStructureTag() const
 {
-    return FTTags::FTObjectType::Structure_Nexus; // 본진 식별 고유 태그 반환
+	return FTTags::FTObjectType::Structure_Nexus; // 본진 객체 식별용 고유 태그 반환
 }
 
-void AFTNexus::NotifyDestroyed()
+void AFTNexus::PerformDestructionEffects()
 {
-    if (UFTHealthWidgetComponent* HealthWidgetComp = FindComponentByClass<UFTHealthWidgetComponent>())
-    {
-        HealthWidgetComp->SetVisibility(false); // 게이지 렌더링 즉각 소거
-    }
+	if (AbilitySystemComponent) AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTCombat::Structure_Muted); // 무력화 태그 삽입
 
-    OnNexusDestroyed(); // 블루프린트 연출 시퀀스 동기화 신호 전달
+	if (UFTHealthWidgetComponent* HealthWidgetComp = FindComponentByClass<UFTHealthWidgetComponent>()) HealthWidgetComp->SetVisibility(false); // 1P/2P 화면에서 체력바 UI 즉각 소거
 
-    if (UWorld* World = GetWorld())
-    {
-        if (AFTGameMode* GameMode = World->GetAuthGameMode<AFTGameMode>())
-        {
-            GameMode->NexusDestroyed(this); // 게임모드 인스턴스에GameOver 매치 마감 연동 통보
-        }
-    }
+	if (NexusMesh)
+	{
+		NexusMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 메쉬 겹침 에러 차단을 위해 원본 외형 콜리전 소거
+		NexusMesh->SetVisibility(false); // 기존 신전 메쉬 렌더링 전면 은닉
+	}
+
+	if (DebrisMesh)
+	{
+		DebrisMesh->SetVisibility(true); // 숨겨둔 카오스 조각 파편 렌더링 활성화
+		DebrisMesh->SetSimulatePhysics(true); // 언리얼 물리 엔진에 파편 시뮬레이션 계산 개방 지시
+	}
+
+	if (DestructionSound) UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation()); // 위치 기반 파괴 사운드 재생
+	if (DestructionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation()); // 방향 기반 폭발 이펙트 재생
+
+	OnNexusDestroyed(); // 1P와 2P의 블루프린트 그래프로 파괴 신호를 발송하여 카오스 매니저 노드 동시 가동
+}
+
+void AFTNexus::NotifyGameMode()
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (AFTGameMode* GameMode = World->GetAuthGameMode<AFTGameMode>())
+		{
+			GameMode->NexusDestroyed(this); // 오직 1P 서버 환경에서만 매치 종료 룰 연산을 위해 통보 발송
+		}
+	}
 }
