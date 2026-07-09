@@ -7,6 +7,7 @@
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "AbilitySystem/FT_AttributeSet.h"
 #include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
 #include "Character/FTPlayerCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -43,6 +44,15 @@ bool UFT_NormalAttack::CanActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+   // 좀비 타이머 선제 파쇄 가드선: 새로운 예측 사격 세션이 시작되면 이전 세션의 잔재를 완전히 소각합니다
+   if (GetWorld())
+   {
+       GetWorld()->GetTimerManager().ClearTimer(BurstTimerHandle);
+       BurstTimerHandle.Invalidate();
+       GetWorld()->GetTimerManager().ClearTimer(NoMontageSafetyTimerHandle);
+       NoMontageSafetyTimerHandle.Invalidate();
+   }
+
    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
     
    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -74,11 +84,6 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
    if (WeaponData->AttackMontage == nullptr)
    {
-       if (GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(BurstTimerHandle))
-       {
-           return;
-       }
-
        GetWorld()->GetTimerManager().SetTimer(NoMontageSafetyTimerHandle, [this]()
        {
            EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
@@ -127,7 +132,25 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 {
     if (!InWeaponData || !InCharacter || !GetWorld()) return;
 
-    FVector End = Start + (Forward * InWeaponData->AttackRange);
+    // 실전 탄도 동기화: 시전자의 WeaponSpread 속성값을 실시간 인양하여 전방 Forward 벡터에 무작위 회전 반경을 정밀 계산하여 주입합니다
+    FVector FinalForward = Forward;
+    UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
+    if (MyASC)
+    {
+        const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
+        if (AttributeSet)
+        {
+            const float CurrentSpread = AttributeSet->GetWeaponSpread();
+            if (CurrentSpread > 0.0f)
+            {
+                // 원형 난수 매핑 방식을 활용한 정밀 에임 탄퍼짐 편차 유도
+                const float ConeHalfAngleRadius = FMath::DegreesToRadians(CurrentSpread);
+                FinalForward = FMath::VRandCone(Forward, ConeHalfAngleRadius);
+            }
+        }
+    }
+
+    FVector End = Start + (FinalForward * InWeaponData->AttackRange);
     
     FHitResult HitResult;
     FCollisionQueryParams QueryParams;
@@ -147,33 +170,22 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
     if (bHit && HitResult.GetActor())
     {
        AActor* HitActor = HitResult.GetActor();
-        
-       UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
        UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
        
        if (MyASC && TargetASC)
        {
            bool bIsSameTeam = false;
-           
-           if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && 
-               TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
-           {
-               bIsSameTeam = true;
-           }
-           else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && 
-                    TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
-           {
-               bIsSameTeam = true;
-           }
+           if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsSameTeam = true;
+           else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsSameTeam = true;
            
            if (bIsSameTeam)
            {
+               EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
                return;
            }
        }
 
        float FinalDamage = InWeaponData->BaseDamage;
-
        if (InWeaponData->bAllowHeadshot)
        {
           if (HitResult.BoneName.ToString().Contains(TEXT("head")) || HitResult.BoneName.ToString().Contains(TEXT("neck")))
@@ -184,7 +196,7 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 
        if (!BaseDamageEffectClass) return;
 
-       FGameplayEffectContextHandle EffectContext = GetAbilitySystemComponentFromActorInfo()->MakeEffectContext();
+       FGameplayEffectContextHandle EffectContext = MyASC->MakeEffectContext();
        EffectContext.AddSourceObject(InCharacter);
        FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
        
@@ -197,39 +209,42 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
     }
 }
 
-void UFT_NormalAttack::OnAttackMontageFinished()
-{
-    if (GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(BurstTimerHandle))
-    {
-        return;
-    }
-
-    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-}
-
 void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPlayerCharacterBase* InCharacter, const FVector& Start, const FVector& Forward)
 {
     if (!InWeaponData || !InCharacter || !GetWorld() || !BaseDamageEffectClass) return;
 
-#if !UE_BUILD_SHIPPING
-    FVector ArrowEnd = Start + (Forward * 150.f);
-    DrawDebugDirectionalArrow(GetWorld(), Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
-#endif
-
     if (!InWeaponData->ProjectileClass) return;
 
     UWorld* World = GetWorld();
-    
-    FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
-    if (DamageSpecHandle.IsValid())
-    {
-        DamageSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, InWeaponData->BaseDamage);
-    }
 
     if (InWeaponData->ProjectilesPerShot <= 1)
     {
-        FTransform SpawnTransform(Forward.Rotation(), Start);
+        FVector FinalForward = Forward;
+        if (UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo())
+        {
+            const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
+            if (AttributeSet && AttributeSet->GetWeaponSpread() > 0.0f)
+            {
+                FinalForward = FMath::VRandCone(Forward, FMath::DegreesToRadians(AttributeSet->GetWeaponSpread()));
+            }
+        }
+
+#if !UE_BUILD_SHIPPING
+        FVector ArrowEnd = Start + (FinalForward * 150.f);
+        DrawDebugDirectionalArrow(World, Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
+#endif
+
+        FTransform SpawnTransform(FinalForward.Rotation(), Start);
+        FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
+        if (DamageSpecHandle.IsValid())
+        {
+            DamageSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, InWeaponData->BaseDamage);
+        }
         
+        // GAS 예측 수명선 마감: 빈 타깃 핸들을 생성하여 생성된 대미지 스펙을 GAS 시스템에 명시적으로 제출, 예측 릭을 완치합니다
+        FGameplayAbilityTargetDataHandle EmptyTargetDataHandle;
+        ApplyGameplayEffectSpecToTarget(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, DamageSpecHandle, EmptyTargetDataHandle);
+
         AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
             InWeaponData->ProjectileClass, SpawnTransform, InCharacter, InCharacter, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         
@@ -248,31 +263,60 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
 
     TWeakObjectPtr<UFT_NormalAttack> WeakThis(this);
 
-    World->GetTimerManager().SetTimer(BurstTimerHandle, [WeakThis, World, ProjectileClass, Start, Forward, InCharacter, DamageSpecHandle, ShotCounter, MaxShots]() mutable
+    World->GetTimerManager().SetTimer(BurstTimerHandle, [WeakThis, World, ProjectileClass, Start, Forward, InCharacter, ShotCounter, MaxShots]() mutable
     {
-        if (!WeakThis.IsValid() || !World || !ProjectileClass || *ShotCounter >= MaxShots)
+        if (!WeakThis.IsValid() || !WeakThis->IsActive() || !World || !ProjectileClass || *ShotCounter >= MaxShots)
         {
             if (World && WeakThis.IsValid())
             {
                 World->GetTimerManager().ClearTimer(WeakThis->BurstTimerHandle);
                 WeakThis->BurstTimerHandle.Invalidate();
-            }
-            
-            if (WeakThis.IsValid())
-            {
-                WeakThis->EndAbility(WeakThis->CurrentSpecHandle, WeakThis->CurrentActorInfo, WeakThis->CurrentActivationInfo, true, false);
+                
+                if (WeakThis->IsActive())
+                {
+                    WeakThis->EndAbility(WeakThis->CurrentSpecHandle, WeakThis->CurrentActorInfo, WeakThis->CurrentActivationInfo, true, false);
+                }
             }
             return;
         }
 
-        FTransform SpawnTransform(Forward.Rotation(), Start);
+        FVector FinalForward = Forward;
+        UAbilitySystemComponent* MyASC = WeakThis->GetAbilitySystemComponentFromActorInfo();
+        if (MyASC)
+        {
+            const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
+            if (AttributeSet && AttributeSet->GetWeaponSpread() > 0.0f)
+            {
+                FinalForward = FMath::VRandCone(Forward, FMath::DegreesToRadians(AttributeSet->GetWeaponSpread()));
+            }
+        }
+
+#if !UE_BUILD_SHIPPING
+        FVector ArrowEnd = Start + (FinalForward * 150.f);
+        DrawDebugDirectionalArrow(World, Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
+#endif
+
+        FTransform SpawnTransform(FinalForward.Rotation(), Start);
         
+        FGameplayEffectSpecHandle DynamicSpecHandle = WeakThis->MakeOutgoingGameplayEffectSpec(WeakThis->BaseDamageEffectClass, WeakThis->GetAbilityLevel());
+        
+        if (DynamicSpecHandle.IsValid())
+        {
+            AFTPlayerCharacterBase* PlayerChar = Cast<AFTPlayerCharacterBase>(InCharacter);
+            float BaseDamage = (PlayerChar && PlayerChar->GetWeaponData()) ? PlayerChar->GetWeaponData()->BaseDamage : 0.0f;
+            DynamicSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
+        }
+
+        // 점사 내부 예측 데이터 최종 결착: 매 점사 틱마다 생성되는 동적 스펙 역시 정순 제출 배관을 완벽히 타설합니다
+        FGameplayAbilityTargetDataHandle DynamicTargetDataHandle;
+        WeakThis->ApplyGameplayEffectSpecToTarget(WeakThis->CurrentSpecHandle, WeakThis->CurrentActorInfo, WeakThis->CurrentActivationInfo, DynamicSpecHandle, DynamicTargetDataHandle);
+
         AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
             ProjectileClass, SpawnTransform, InCharacter, InCharacter, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         
         if (Projectile)
         {
-            Projectile->DamageEffectSpecHandle = DamageSpecHandle;
+            Projectile->DamageEffectSpecHandle = DynamicSpecHandle;
             Projectile->FinishSpawning(SpawnTransform);
         }
         
@@ -282,10 +326,24 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
         {
             World->GetTimerManager().ClearTimer(WeakThis->BurstTimerHandle);
             WeakThis->BurstTimerHandle.Invalidate();
-            WeakThis->EndAbility(WeakThis->CurrentSpecHandle, WeakThis->CurrentActorInfo, WeakThis->CurrentActivationInfo, true, false);
+            
+            if (WeakThis->IsActive())
+            {
+                WeakThis->EndAbility(WeakThis->CurrentSpecHandle, WeakThis->CurrentActorInfo, WeakThis->CurrentActivationInfo, true, false);
+            }
         }
         
     }, Delay, true, 0.0f);
+}
+
+void UFT_NormalAttack::OnAttackMontageFinished()
+{
+    if (GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(BurstTimerHandle))
+    {
+        return;
+    }
+
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayerCharacterBase* InCharacter)
@@ -315,11 +373,7 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
        UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
        if (!MyASC) return;
 
-       // [네트워크 원격 패킷 최적화]: 한 번의 통신으로 광역 타격을 집도할 순정 마스터 핸들을 단 한 개 선제 조성합니다.
        FGameplayAbilityTargetDataHandle TargetDataHandle;
-       
-       // [댕글링 릭 원천 분쇄 완치]: 임시 로직 스코프 힙에서 소멸되던 로컬 포인터를 파쇄하고, 
-       // 언리얼 GAS 순정 메모리 관리 규격에 명시적으로 부합하도록 raw 메모리를 직접 할당합니다.
        FGameplayAbilityTargetData_ActorArray* ActorArrayData = new FGameplayAbilityTargetData_ActorArray();
 
        for (const FOverlapResult& Result : OverlapResults)
@@ -329,7 +383,6 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
 
           UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
           
-          // 근접 피아식별 교차 필터
           if (TargetASC)
           {
               bool bIsSameTeam = false;
@@ -351,14 +404,11 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
               }
           }
 
-          // 피아식별을 정상 통과한 유효 타깃 액터들만 순정 배열 장부에 차곡차곡 가산 적재합니다.
           ActorArrayData->TargetActorArray.Add(HitActor);
        }
 
-       //  유효 타깃이 최소 1명 이상 검출된 경우에만 원자적 패킷 사출을 진행합니다.
        if (ActorArrayData->TargetActorArray.Num() > 0)
        {
-           // 핸들에 힙 메모리 소유권을 완벽히 이관합니다. (스마트 포인터 장부가 내부에서 책임지고 자동 소멸 수거를 수행합니다.)
            TargetDataHandle.Add(ActorArrayData);
 
            FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
@@ -370,7 +420,6 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
        }
        else
        {
-           //  타깃이 없다면 메모리 누수가 발생하지 않도록 할당했던 할당지를 클린 청소합니다.
            delete ActorArrayData;
        }
     }
@@ -389,9 +438,11 @@ void UFT_NormalAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const
 
     if (ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
     {
+        UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
+
         if (MovementPenaltyActiveHandle.IsValid())
         {
-            ActorInfo->AbilitySystemComponent->RemoveActiveGameplayEffect(MovementPenaltyActiveHandle);
+            SourceASC->RemoveActiveGameplayEffect(MovementPenaltyActiveHandle);
             MovementPenaltyActiveHandle.Invalidate();
         }
     }
