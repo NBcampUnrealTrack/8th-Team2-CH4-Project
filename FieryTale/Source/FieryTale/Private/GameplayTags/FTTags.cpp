@@ -16,7 +16,7 @@ namespace FTTags
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(NormalAttack, "FTTags.Abilities.NormalAttack", "LMB 일반 평타 공격 입력 매핑 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(AttackSkill, "FTTags.Abilities.AttackSkill", "RMB 보조 공격 및 강공격 기술 매핑 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(UtilSkill, "FTTags.Abilities.UtilSkill", "Shift 이동 및 생존 유틸 기술 매핑 태그");
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(UltimateSkill, "FTTags.Abilities.UltimateSkill", "Q 궁극기 활성화 입력 매핑 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(UltimateSkill, "FTTags.FTAbilities.UltimateSkill", "Q 궁극기 활성화 입력 매핑 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(ActivateOnGiven, "FTTags.Abilities.ActivateOnGiven", "부여 시 즉시 가동되는 패시브 능력 식별 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_Attack, "FTTags.Abilities.Minion.Attack", "미니언 공격 태그");
     }
