@@ -7,6 +7,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Character/FTCharacterBase.h"
+#include "GameplayTags/FTTags.h"
 
 UFT_AttributeSet::UFT_AttributeSet()
 {
@@ -96,25 +97,27 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
             {
                 if (UAbilitySystemComponent* InstigatorASC = Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent())
                 {
-                    // 💡 [최종 버그 해결선]: 들어온 이펙트 자체에 궁극기 판정 태그가 박혀있는지 정밀 검문합니다.
-                    // 프로젝트의 태그 매핑 규칙(FTTags 혹은 공용 계층) 양단을 모두 안전망으로 확인합니다.
-                    bool bIsUltimateDamage = Data.EffectSpec.Def->GetAssetTags().HasTag(FGameplayTag::RequestGameplayTag(TEXT("FTTags.FTAbilities.UltimateSkill"))) || 
-                                             Data.EffectSpec.Def->GetAssetTags().HasTag(FGameplayTag::RequestGameplayTag(TEXT("FTTags.Abilities.UltimateSkill")));
+                    //  [수급 이중 꼬임 완치 가드선]: 
+                    // 1. 대미지 GE 에셋 자체에 태그가 박혀 있거나 (AssetTags)
+                    // 2. 이 대미지 스펙을 발행한 주체(궁극기 어빌리티 등)가 동적으로 부여한 태그(GrantedTags) 양단을 모두 검문합니다.
+                    bool bIsUltimateDamage = Data.EffectSpec.Def->GetAssetTags().HasTag(FTTags::FTAbilities::UltimateSkill) || 
+                                             Data.EffectSpec.DynamicGrantedTags.HasTag(FTTags::FTAbilities::UltimateSkill);
 
-                    // 💡 궁극기로 가한 대미지가 아닐 때만 게이지를 정직하게 채워줍니다!
+                    //  궁극기로 가한 대미지가 확실히 아닐 때만 게이지를 충전합니다.
                     if (!bIsUltimateDamage)
                     {
                         const UFT_AttributeSet* InstigatorAttributeSet = Cast<UFT_AttributeSet>(InstigatorASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
-                        
+            
                         if (InstigatorAttributeSet)
                         {
-                            // 💡 기획 밸런스 셋업: 대미지 100당 궁극기 2.5% 충전 사양으로 배율을 정상화합니다. (0.5f -> 0.025f)
-                            const float UltimateChargeMultiplier = 0.5f;
+                            // 기획 밸런스 셋업 배율 반영 (대미지 100당 궁극기 2.5% 충전 사양)
+                            const float UltimateChargeMultiplier = 0.5f; 
                             const float UltimateBonus = ActualDamageApplied * UltimateChargeMultiplier;
 
                             float CurrentSourceUlt = InstigatorAttributeSet->GetUltimateGauge();
                             float NewSourceUlt = FMath::Clamp<float>(CurrentSourceUlt + UltimateBonus, 0.0f, InstigatorAttributeSet->GetMaxUltimateGauge());
 
+                            // 스탯 소유주(공격자)의 오리지널 스탯 장부에 안전하게 주입
                             InstigatorASC->SetNumericAttributeBase(GetUltimateGaugeAttribute(), NewSourceUlt);
                         }
                     }
