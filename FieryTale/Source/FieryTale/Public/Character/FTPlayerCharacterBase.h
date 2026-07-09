@@ -13,6 +13,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UTimelineComponent;
 class UCurveFloat;
+class UFTHealthWidgetComponent;
 struct FInputActionValue;
 struct FFTCharacterData;
 
@@ -30,7 +31,16 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 	/** Follow camera */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FollowCamera;
-	
+
+	//	머리 위 체력바 — PostInitializeComponents에서 C++이 직접 만들어 부착한다(BP 컴포넌트 트리에 손대지 않음).
+	UPROPERTY(BlueprintReadOnly, Category = UI, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UFTHealthWidgetComponent> HealthWidgetComponent;
+
+	//	HealthWidgetComponent에 실제로 표시할 위젯 블루프린트. BP_FTPlayerCharacterBase의 Class Defaults에서
+	//	지정한다 — 컴포넌트 트리가 아니라 단순 프로퍼티라 이름 충돌/고아 오버라이드 문제가 없다.
+	UPROPERTY(EditDefaultsOnly, Category = UI)
+	TSoftClassPtr<UUserWidget> HealthWidgetClass;
+
 	// TODO:: GetWeaponData시 CharacterData->GetWeaponData(); 따로 필드에 이 값을 갖고 있을 필요성이 있는가?
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Weapon", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UFT_WeaponData> CurrentWeaponData;
@@ -55,6 +65,24 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 
 	//	카메라 연출의 기준/복귀 목표 FOV — 생성자에서 FollowCamera 초기값으로 설정된다.
 	float DefaultFov = 90.f;
+
+	//	CameraBoom의 최초 SocketOffset — BeginPlay에서 캐싱해두고, ResetCameraLocation의 복귀 목표로 쓴다.
+	FVector DefaultCameraSocketOffset = FVector::ZeroVector;
+
+	//	CameraBoom의 최초 TargetArmLength — BeginPlay에서 캐싱해두고, SetCameraDistanceScale의 배율 기준값으로 쓴다.
+	//	SocketOffset은 카메라 거리에서 차지하는 비중이 작아(기본 450 vs 오프셋 수십), 캐릭터 축소에 맞춰 카메라를
+	//	"똑같은 상대 거리"로 당기려면 실제 거리를 결정하는 ArmLength 자체를 배율로 조절해야 한다.
+	float DefaultCameraArmLength = 450.f;
+
+	//	체력바 위젯의 기본 축소 배율(모델 원본 크기 기준) — PostInitializeComponents에서 HealthWidgetComponent의
+	//	RelativeScale3D로 적용된다. SetCharacterScale(모델 Scale)과 곱해져 항상 "기본 배율 × 현재 모델 배율"로
+	//	재계산되므로, 반복 축소/확대에도 값이 누적되지 않는다.
+	UPROPERTY(EditDefaultsOnly, Category = UI)
+	float HealthWidgetBaseScale = 0.25f;
+
+	//	캡슐 상단 기준 체력바 추가 높이 오프셋.
+	UPROPERTY(EditDefaultsOnly, Category = UI)
+	float HealthWidgetZOffset = 30.f;
 
 	//	캡슐/메시 축소·확대(SetCharacterScale) 연출의 기준값 — ApplyCharacterVisuals에서 메시를 확정 배치한 직후 캐싱된다.
 	//	모든 스케일 변경은 이 기본값에 배율을 곱하는 절대 계산 방식이라, 중첩 호출되어도 누적 오차 없이 항상 같은 결과로 복원된다.
@@ -89,6 +117,7 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 	UCurveFloat* GetOrBuildFovCurve(TObjectPtr<UCurveFloat>& CurveCache, const TArray<FVector2D>& Keys);
 
 	virtual void BeginPlay() override;
+	virtual void PostInitializeComponents() override;
 
 public:
 	AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
@@ -141,6 +170,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Camera")
 	void ResetCameraFov(float Duration = 0.2f);
 
+	//	CameraBoom의 SocketOffset을 외부에서 넘겨준 위치로 즉시 변경한다. (예: 캐릭터 크기 축소 시 줌인 연출)
+	UFUNCTION(BlueprintCallable, Category = "FieryTale | Camera")
+	void SetCameraLocation(const FVector& NewLocation);
+
+	//	CameraBoom의 SocketOffset을 BeginPlay 시점에 저장해둔 최초 위치(DefaultCameraSocketOffset)로 되돌린다.
+	UFUNCTION(BlueprintCallable, Category = "FieryTale | Camera")
+	void ResetCameraLocation();
+
+	//	CameraBoom의 TargetArmLength를 "최초 길이 * Scale"로 조절한다. 캐릭터가 Scale배로 작아질 때 함께 호출하면
+	//	카메라도 같은 비율로 가까워져, 화면상 상대 거리(체감 크기)가 축소 전과 동일하게 유지된다.
+	UFUNCTION(BlueprintCallable, Category = "FieryTale | Camera")
+	void SetCameraDistanceScale(float Scale);
+
+	//	SetCameraDistanceScale(1.f)와 동일 — CameraBoom의 TargetArmLength를 최초 길이로 되돌린다.
+	UFUNCTION(BlueprintCallable, Category = "FieryTale | Camera")
+	void ResetCameraDistanceScale();
+
 	//	캡슐 콜리전과 메시를 DefaultCapsuleRadius/HalfHeight, DefaultMeshRelativeScale/Location 기준으로
 	//	Scale배 만큼 동시에 축소/확대한다. 캡슐은 항상 SetCapsuleSize로만 조절하고 액터 자체는 스케일하지 않아,
 	//	루트(캡슐)에 스케일이 이중으로 곱해져 메시가 바닥 아래로 파고드는 문제를 원천적으로 방지한다.
@@ -175,4 +221,13 @@ protected:
 
 	// 초기 혹은 Respawn 단계에서 CharacterData에 의거하여 Attribute 값 초기화
 	void InitializeCharacterAttribute() const;
+
+	//	Dead 태그는 복제되는 GameplayTag라 각 클라이언트에서 로컬로 이 콜백이 호출된다.
+	//	Revive()는 서버에서만 실행되므로(ExecuteRespawn이 HasAuthority 체크), 원격 클라이언트에서도
+	//	체력바가 다시 보이게 하려면 여기서(태그 해제 시점) 처리해야 한다.
+	void OnHealthWidgetDeadTagChanged(const FGameplayTag Tag, int32 NewCount);
+
+	//	위 델리게이트의 등록/해제를 핸들로 명시 관리한다(RemoveAll(this) 대신). PossessedBy/OnRep_PlayerState가
+	//	여러 번 불릴 수 있어, 재등록 전 이 핸들로만 정확히 이전 바인딩을 제거해 중복 등록을 막는다.
+	FDelegateHandle HealthWidgetDeadTagEventHandle;
 };

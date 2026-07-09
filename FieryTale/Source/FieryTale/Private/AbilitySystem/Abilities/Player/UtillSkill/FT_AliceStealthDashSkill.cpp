@@ -42,7 +42,7 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
 
     AFTPlayerCharacterBase* Character = ActorInfo ? Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
-    
+
     if (!Character || !SourceASC)
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -61,6 +61,9 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
 
     // 신체 축소: 캡슐과 메시를 기본값 기준으로 일관되게 축소하기 위해 CharacterBase가 소유한 단일 진입점을 구동합니다.
     Character->SetCharacterScale(TargetMeshScale);
+
+    // 카메라 거리 보정: 축소 연출과 별개로 카메라 거리를 같은 배율로 당겨, 축소 전과 동일한 상대 거리(체감 크기)를 유지시킵니다.
+    Character->SetCameraDistanceScale(TargetMeshScale);
 
     // 버프 지속 제한 시간 타이머 가동을 통해 수명을 관리합니다.
     UWorld* World = GetWorld();
@@ -103,6 +106,9 @@ void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Hand
     {
         // 신체 스케일을 CharacterBase가 캐싱해 둔 오리지널 기본값 기준으로 무결하게 원복합니다.
         Character->ResetCharacterScale();
+
+        // 카메라 거리도 BeginPlay 시점의 최초 길이로 원복 (스케일 원복과 독립적으로 동작)
+        Character->ResetCameraDistanceScale();
     }
 
     if (SourceASC)
@@ -119,7 +125,7 @@ void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Hand
         {
             FGameplayTagContainer TargetCooldownTags;
             TargetCooldownTags.AddTag(CooldownTag);
-            
+
             // 엔진 공식 순정 팩토리 함수인 MakeQuery_MatchAnyEffectTags 제어선으로 단일화하여 무기 스왑이나 강제 인터럽트 시 발생하는 먹통 결함을 원천 진압합니다.
             FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyEffectTags(TargetCooldownTags);
             SourceASC->RemoveActiveEffects(CooldownQuery);

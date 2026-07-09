@@ -54,6 +54,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Character")
 	TObjectPtr<UDataTable> CharacterDataTable;
 
+	// 실제로 스폰할 캐릭터 클래스. BP 서브클래스(BP_FTPlayerCharacterBase 등)를 지정하면 Turret처럼
+	// BP Details 패널에서 컴포넌트/위젯 클래스를 코드 수정 없이 구성할 수 있다.
+	// 비어있으면 SpawnCharacter()에서 AFTPlayerCharacterBase::StaticClass()로 폴백한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Character")
+	TSubclassOf<AFTPlayerCharacterBase> CharacterClassToSpawn;
+
 	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 클래스. 정식에는 삭제 예정
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> DeathOverlayClass;

@@ -70,8 +70,13 @@ void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const F
 
 	// Deferred Spawn: BeginPlay 이전에 CharacterRow 주입
 	const FTransform SpawnTransform(SpawnRotation, InSpawnLocation);
+	TSubclassOf<AFTPlayerCharacterBase> ClassToSpawn = CharacterClassToSpawn;
+	if (!ClassToSpawn)
+	{
+		ClassToSpawn = AFTPlayerCharacterBase::StaticClass();
+	}
 	AFTPlayerCharacterBase* NewChar = GetWorld()->SpawnActorDeferred<AFTPlayerCharacterBase>(
-		AFTPlayerCharacterBase::StaticClass(),
+		ClassToSpawn,
 		SpawnTransform,
 		this,
 		nullptr,

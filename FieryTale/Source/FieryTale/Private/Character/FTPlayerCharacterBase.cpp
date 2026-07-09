@@ -20,6 +20,8 @@
 #include "Engine/SkeletalMesh.h"
 #include "Components/TimelineComponent.h"
 #include "Curves/CurveFloat.h"
+#include "UI/Health/FTHealthWidgetComponent.h"
+#include "Blueprint/UserWidget.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerCharacter);
 
@@ -59,6 +61,31 @@ void AFTPlayerCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 	ApplyCharacterVisuals();
+
+	if (CameraBoom)
+	{
+		DefaultCameraSocketOffset = CameraBoom->SocketOffset;
+		DefaultCameraArmLength = CameraBoom->TargetArmLength;
+	}
+}
+
+void AFTPlayerCharacterBase::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	//	체력바는 BP 컴포넌트 트리에 손대지 않고 C++이 직접 만들어 붙인다 — HealthWidgetClass/
+	//	HealthWidgetBaseScale/HealthWidgetZOffset은 BP_FTPlayerCharacterBase의 Class Defaults에서
+	//	단순 프로퍼티로 지정한다(컴포넌트 이름 충돌/고아 오버라이드 문제 자체가 발생하지 않음).
+	HealthWidgetComponent = NewObject<UFTHealthWidgetComponent>(this, TEXT("HealthWidgetComponent"));
+	HealthWidgetComponent->SetupAttachment(RootComponent);
+	HealthWidgetComponent->RegisterComponent();
+	HealthWidgetComponent->SetRelativeScale3D(FVector(HealthWidgetBaseScale));
+	HealthWidgetComponent->AdditionalZOffset = HealthWidgetZOffset;
+
+	if (UClass* WidgetClass = HealthWidgetClass.LoadSynchronous())
+	{
+		HealthWidgetComponent->SetWidgetClass(WidgetClass);
+	}
 }
 
 //	[이관/폐기 보존] 구 OnRep_CharacterData.
@@ -316,6 +343,32 @@ void AFTPlayerCharacterBase::ResetCameraFov(float Duration)
 	PlayCameraFovEffect(DefaultFov, Duration);
 }
 
+void AFTPlayerCharacterBase::SetCameraLocation(const FVector& NewLocation)
+{
+	if (CameraBoom)
+	{
+		CameraBoom->SocketOffset = NewLocation;
+	}
+}
+
+void AFTPlayerCharacterBase::ResetCameraLocation()
+{
+	SetCameraLocation(DefaultCameraSocketOffset);
+}
+
+void AFTPlayerCharacterBase::SetCameraDistanceScale(float Scale)
+{
+	if (CameraBoom)
+	{
+		CameraBoom->TargetArmLength = DefaultCameraArmLength * Scale;
+	}
+}
+
+void AFTPlayerCharacterBase::ResetCameraDistanceScale()
+{
+	SetCameraDistanceScale(1.f);
+}
+
 void AFTPlayerCharacterBase::SetCharacterScale(float Scale)
 {
 	if (HasAuthority())
@@ -350,6 +403,13 @@ void AFTPlayerCharacterBase::ApplyCharacterScaleVisual(float Scale)
 	{
 		MeshComp->SetRelativeScale3D(DefaultMeshRelativeScale * Scale);
 		MeshComp->SetRelativeLocation(FVector(DefaultMeshRelativeLocation.X, DefaultMeshRelativeLocation.Y, DefaultMeshRelativeLocation.Z * Scale));
+	}
+
+	//	HealthWidgetComponent는 RootComponent(캡슐)에 붙어있고 Root 자체는 스케일을 갖지 않으므로(위 주석 참고),
+	//	위젯의 RelativeScale3D를 Scale로 절대 대입해도 이중 곱셈 없이 캐릭터 축소/확대 비율을 그대로 반영한다.
+	if (HealthWidgetComponent)
+	{
+		HealthWidgetComponent->SetRelativeScale3D(FVector(HealthWidgetBaseScale * Scale));
 	}
 }
 
@@ -437,6 +497,20 @@ void AFTPlayerCharacterBase::Revive()
 	InitializeCharacterAttribute();
 }
 
+void AFTPlayerCharacterBase::OnHealthWidgetDeadTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	//	태그가 제거된 순간(NewCount == 0)만 처리 — 부여될 때(사망)는 위젯 쪽에서 이미 처리한다.
+	if (NewCount > 0 || !HealthWidgetComponent)
+	{
+		return;
+	}
+
+	if (UUserWidget* Widget = HealthWidgetComponent->GetUserWidgetObject())
+	{
+		Widget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+}
+
 // TODO:: 사망 확인을 위한 임시코드 삭제 예정
 void AFTPlayerCharacterBase::DebugDie()
 {
@@ -451,6 +525,12 @@ void AFTPlayerCharacterBase::NotifyControllerChanged()
 	const bool bIsLocal = IsLocallyControlled();
 	CameraBoom->SetActive(bIsLocal);
 	FollowCamera->SetActive(bIsLocal);
+
+	// 내 캐릭터는 HUD에 체력이 이미 표시되므로, 머리 위 체력바는 다른 플레이어 캐릭터에만 보이도록 숨긴다.
+	if (HealthWidgetComponent)
+	{
+		HealthWidgetComponent->SetVisibility(!bIsLocal, true);
+	}
 }
 
 
@@ -467,7 +547,23 @@ void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
 		{
 			// 1. GAS 액터 정보 등록 (Owner: PlayerState, Avatar: 캐릭터 본체)
 			ASC->InitAbilityActorInfo(PS, this);
-            
+
+			// BeginPlay 시점엔 아직 PlayerState가 붙기 전이라 HealthWidgetComponent의 자체 ASC 바인딩이
+			// 실패해 있으므로, Possess가 확정된 지금 다시 바인딩한다.
+			if (HealthWidgetComponent)
+			{
+				HealthWidgetComponent->InitializeWithAbilitySystem(ASC);
+			}
+
+			// Dead 태그 해제(부활) 이벤트 구독 — 서버에서 등록되지만, 태그 자체가 복제되므로
+			// 콜백은 이 태그를 보는 모든 클라이언트에서 각자 로컬로 호출된다.
+			if (HealthWidgetDeadTagEventHandle.IsValid())
+			{
+				ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved).Remove(HealthWidgetDeadTagEventHandle);
+			}
+			HealthWidgetDeadTagEventHandle = ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
+				.AddUObject(this, &AFTPlayerCharacterBase::OnHealthWidgetDeadTagChanged);
+
 			// 2. 서버 권한 하에 초기화 수행
 			if (HasAuthority())
 			{
@@ -540,6 +636,21 @@ void AFTPlayerCharacterBase::OnRep_PlayerState()
 		if (ASC)
 		{
 			ASC->InitAbilityActorInfo(PS, this);
+
+			// 클라이언트에서도 동일하게 PlayerState 복제 완료 시점에 재바인딩한다.
+			if (HealthWidgetComponent)
+			{
+				HealthWidgetComponent->InitializeWithAbilitySystem(ASC);
+			}
+
+			// PossessedBy는 서버에서만 호출되므로, 각 클라이언트에서도 여기서 동일하게 구독해야
+			// 원격 클라이언트 화면에서도 부활 시 체력바가 다시 보인다.
+			if (HealthWidgetDeadTagEventHandle.IsValid())
+			{
+				ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved).Remove(HealthWidgetDeadTagEventHandle);
+			}
+			HealthWidgetDeadTagEventHandle = ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
+				.AddUObject(this, &AFTPlayerCharacterBase::OnHealthWidgetDeadTagChanged);
 		}
 	}
 }
