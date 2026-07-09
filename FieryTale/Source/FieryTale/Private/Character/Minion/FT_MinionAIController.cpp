@@ -28,7 +28,7 @@ AFT_MinionAIController::AFT_MinionAIController()
         SightConfig->PeripheralVisionAngleDegrees = 90.f; // 전방 180도 전체를 커버하는 광폭 시야각
         SightConfig->SetMaxAge(3.f);             // 감지된 기억의 유효 수명
         
-        // 피아식별 태그를 우리가 C++ 내부에서 필터링하므로, 엔진 기본 소속 분류는 전량 개방합니다.
+        // 피아식별 태그를 C++ 내부에서 정밀 필터링하므로, 엔진 기본 소속 분류는 전량 개방합니다.
         SightConfig->DetectionByAffiliation.bDetectEnemies = true;
         SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
         SightConfig->DetectionByAffiliation.bDetectFriendlies = true;

@@ -5,7 +5,7 @@
 #include "Components/SphereComponent.h"
 
 AFT_WayPoint::AFT_WayPoint()
-	: ArrivalRadius(150.0f) // 💡 [C++ 정순 초기화 완착]: 변수 주소지에 기저 반경(150유닛)을 선제 락인합니다.
+	: ArrivalRadius(150.0f) // [C++ 정순 초기화 완착]: 변수 주소지에 기저 도달 반경(150유닛)을 선제 락인합니다.
 {
 	PrimaryActorTick.bCanEverTick = false;
 
@@ -17,7 +17,7 @@ AFT_WayPoint::AFT_WayPoint()
 	EditorVisualizerSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	EditorVisualizerSphere->SetCollisionProfileName(TEXT("NoCollision"));
     
-	// 💡 초기화가 완료된 순정 기저 수치를 컴포넌트에 안전하게 동기화 투사합니다.
+	// 초기화가 완료된 순정 기저 수치를 컴포넌트에 안전하게 동기화 투사합니다.
 	EditorVisualizerSphere->SetSphereRadius(ArrivalRadius);
     
 	// 인게임 플레이 도중에는 화면에서 보이지 않도록 순정 하이드 처리합니다.
@@ -29,7 +29,7 @@ void AFT_WayPoint::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
-	// 디자이너가 마우스로 ArrivalRadius 값을 변경할 때 실시간으로 구체 크기가 변하도록 연동합니다.
+	// 디자이너가 에디터에서 ArrivalRadius 값을 변경할 때 실시간으로 뷰포트 내 구체 크기가 변하도록 연동합니다.
 	const FName PropertyName = (PropertyChangedEvent.Property != nullptr) ? PropertyChangedEvent.Property->GetFName() : NAME_None;
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(AFT_WayPoint, ArrivalRadius))
 	{

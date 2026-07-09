@@ -3,27 +3,27 @@
 
 #include "AbilitySystem/Abilities/Player/UtillSkill/FT_AliceStealthDashSkill.h"
 #include "Character/FTPlayerCharacterBase.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "Components/CapsuleComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
-#include "AbilitySystemComponent.h" // ◄ ASC 상호작용 배관망을 위해 인클루드 완착
+#include "AbilitySystemComponent.h"
 #include "GameplayTags/FTTags.h"
 
 UFT_AliceStealthDashSkill::UFT_AliceStealthDashSkill()
     : MaxDuration(2.0f)
     , TargetMeshScale(0.5f)
 {
+    // 인스턴싱 정책 및 network 실행 정책을 로컬 예측 규격으로 확정합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
+    // 어빌리티 고유 자산 태그 등록 및 쿨타임 추적용 태그 매핑을 수행합니다.
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::UtilSkill);
     SetAssetTags(AssetTags);
 
     CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
-    // 활성화 기간 동안 앨리스 신체 축소 버프 태그를 확정 부여합니다.
+    // 활성화 기간 동안 앨리스 신체 축소 버프 태그를 소유 태그로 확정 부여합니다.
     ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::ShrinkActive);
 }
 
@@ -31,19 +31,9 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     const FGameplayEventData* TriggerEventData)
 {
-    // 1단계: 시프트 생존기 쿨타임 검문
-    if (!CheckCooldown(Handle, ActorInfo))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
-    }
-
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // =========================================================================
-    // [쿨타임 완치 배관]: 대시 시전에 진입하는 즉시 CommitAbility 마스터 함수를 격발합니다.
-    // 이를 통해 시프트 Cooldown GE 장부가 오차 없이 시스템에 안착합니다.
-    // =========================================================================
+    // 자원 커밋 일원화: 불필요한 중복 검문소를 폐쇄하고 CommitAbility 단일 파이프라인으로 일원화하여 대시 시전 시점에 자원을 원자적으로 확정합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -59,11 +49,7 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
         return;
     }
 
-    // =========================================================================
-    // 💡 [이속 장부 파괴 릭 완치 - GAS 순정 대시 가속 라인 연동]
-    // MaxWalkSpeed 변수를 직접 조지는 원시 하드코딩을 소각하고, 다른 버프/디버프와
-    // 정밀 가산/곱산 중첩 연산이 가능하도록 대시 가속(1.5배 증가) GE를 주입합니다.
-    // =========================================================================
+    // 이속 장부 파괴 릭 완치: MaxWalkSpeed 변수를 직접 변경하는 하드코딩을 배제하고 GAS 순정 가산/곱산 중첩 연산이 가능하도록 대시 가속 이펙트를 주입합니다.
     if (DashSpeedGameplayEffectClass)
     {
         FGameplayEffectSpecHandle SpeedSpecHandle = MakeOutgoingGameplayEffectSpec(DashSpeedGameplayEffectClass, GetAbilityLevel());
@@ -73,10 +59,10 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
         }
     }
 
-    // 신: 캡슐/메시를 기본값 기준으로 일관되게 축소 — CharacterBase가 소유한 단일 진입점 
+    // 신체 축소: 캡슐과 메시를 기본값 기준으로 일관되게 축소하기 위해 CharacterBase가 소유한 단일 진입점을 구동합니다.
     Character->SetCharacterScale(TargetMeshScale);
 
-    // 2초 버프 지속 제한 시간 타이머 가동
+    // 버프 지속 제한 시간 타이머 가동을 통해 수명을 관리합니다.
     UWorld* World = GetWorld();
     if (World)
     {
@@ -96,14 +82,14 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
 
 void UFT_AliceStealthDashSkill::OnShrinkBuffFinished()
 {
-    // 2초 지속 시간 만료 시 정상 종료 마감 처리
+    // 지속 시간 정상 만료에 의한 클린 마감 분기입니다.
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머 청정 소각하여 레이스 컨디션 차단
+    // 메모리 누수 방지: 런타임 수명선 보장용 지속 시간 타이머 장부를 청정 소각합니다.
     if (GetWorld() && ShrinkBuffDurationTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ShrinkBuffDurationTimerHandle);
@@ -115,41 +101,28 @@ void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Hand
 
     if (Character)
     {
-        // 캡슐/메시를 CharacterBase가 캐싱한 기본값 기준으로 원복합니다 
+        // 신체 스케일을 CharacterBase가 캐싱해 둔 오리지널 기본값 기준으로 무결하게 원복합니다.
         Character->ResetCharacterScale();
     }
 
     if (SourceASC)
     {
-        // 대시 가속 GE를 제거하여 속도를 원래 스탯 상태로 무결하게 환원합니다.
+        // 대시 가속 GE를 완벽히 해제하여 캐릭터 이동 속도를 원래 스탯 상태로 안전하게 환원합니다.
         if (DashSpeedActiveHandle.IsValid())
         {
             SourceASC->RemoveActiveGameplayEffect(DashSpeedActiveHandle);
             DashSpeedActiveHandle.Invalidate();
         }
 
-        // =========================================================================
-        // [AOS 기획 사양 락인 - CC기 파쇄 시 쿨타임 환불 처리]
-        // 대시 지속 도중 적의 하드 CC기에 노출되어 강제 취소(bWasCancelled = true)되었다면,
-        // 선제 적용되었던 시프트 쿨타임 이펙트를 찾아내 삭제하여 리턴 복귀를 보장합니다.
-        // =========================================================================
+        // 네트워크 동기화 쿨타임 환불: 대시 지속 도중 하드 CC기나 상태이상으로 강제 캔슬된 경우 예측적으로 돌아가던 쿨타임 이펙트를 즉각 회수합니다.
         if (bWasCancelled)
         {
-            FGameplayEffectQuery UniversalQuery;
-            TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
-
-            for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
-            {
-                const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
-                if (ActiveGE && ActiveGE->Spec.Def)
-                {
-                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
-                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
-                    {
-                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
-                    }
-                }
-            }
+            FGameplayTagContainer TargetCooldownTags;
+            TargetCooldownTags.AddTag(CooldownTag);
+            
+            // 엔진 공식 순정 팩토리 함수인 MakeQuery_MatchAnyEffectTags 제어선으로 단일화하여 무기 스왑이나 강제 인터럽트 시 발생하는 먹통 결함을 원천 진압합니다.
+            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyEffectTags(TargetCooldownTags);
+            SourceASC->RemoveActiveEffects(CooldownQuery);
         }
     }
 

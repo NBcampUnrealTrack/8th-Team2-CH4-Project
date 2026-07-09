@@ -5,23 +5,25 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h"
-#include "AbilitySystemComponent.h" // ◄ ASC 상호작용 배관망을 위해 인클루드 완착
+#include "AbilitySystemComponent.h"
 #include "GameplayTags/FTTags.h"
 
 UFT_RedRollSkill::UFT_RedRollSkill()
     : RollSpeed(1500.0f)     
     , RollDuration(0.35f)    
 {
+    // 인스턴싱 정책 및 네트워크 실행 정책을 로컬 예측 규격으로 확정합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
+    // 어빌리티 고유 자산 태그 등록 및 쿨타임 추적용 태그 매핑을 수행합니다.
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::UtilSkill);
     SetAssetTags(AssetTags);
 
     CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
-    // 활성화 기간(구르는 동안) 동안 빨간 망토 무적/회피 상태 태그를 확정 부여합니다.
+    // 활성화 기간 동안 빨간 망토 무적/회피 상태 태그를 소유 태그로 확정 부여합니다.
     ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::Evading);
 }
 
@@ -29,19 +31,9 @@ void UFT_RedRollSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     const FGameplayEventData* TriggerEventData)
 {
-    // 1단계: 시프트 생존기 쿨타임 검문
-    if (!CheckCooldown(Handle, ActorInfo))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
-    }
-
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // =========================================================================
-    // [쿨타임 완치 배관]: 구르기 기동에 진입하는 순간 CommitAbility 마스터 함수를 격발합니다.
-    // 이를 통해 시프트 Cooldown GE 장부가 오차 없이 시스템에 안착합니다.
-    // =========================================================================
+    // 자원 커밋 일원화: 불필요한 중복 검문소를 폐쇄하고 CommitAbility 단일 파이프라인으로 일원화하여 구르기 시점 자원을 원자적으로 확정합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -124,28 +116,15 @@ void UFT_RedRollSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
-        // =========================================================================
-        // [AOS 기획 사양 락인 - CC기 파쇄 시 쿨타임 환불 처리]
-        // 구르기 도중 적의 하드 CC기에 노출되어 강제 취소(bWasCancelled = true)되었다면,
-        // 선제 적용되었던 시프트 쿨타임 이펙트를 찾아내 삭제하여 리턴 복귀를 보장합니다.
-        // =========================================================================
+        // 네트워크 동기화 쿨타임 환불: 구르기 지속 도중 하드 CC기나 상태이상으로 강제 캔슬된 경우 예측적으로 돌아가던 시프트 쿨타임 이펙트를 즉각 회수합니다.
         if (bWasCancelled)
         {
-            FGameplayEffectQuery UniversalQuery;
-            TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
-
-            for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
-            {
-                const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
-                if (ActiveGE && ActiveGE->Spec.Def)
-                {
-                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
-                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
-                    {
-                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
-                    }
-                }
-            }
+            FGameplayTagContainer TargetCooldownTags;
+            TargetCooldownTags.AddTag(CooldownTag);
+            
+            // 엔진 공식 순정 팩토리 함수인 MakeQuery_MatchAnyEffectTags 제어선으로 단일화하여 무기 스왑이나 강제 인터럽트 시 발생하는 먹통 결함을 원천 진압합니다.
+            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyEffectTags(TargetCooldownTags);
+            SourceASC->RemoveActiveEffects(CooldownQuery);
         }
     }
 

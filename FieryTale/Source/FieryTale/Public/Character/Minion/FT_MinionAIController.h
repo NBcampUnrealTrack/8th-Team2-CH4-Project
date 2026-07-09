@@ -26,14 +26,15 @@ protected:
 	UFUNCTION()
 	virtual void OnMinionPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 
-	// [블랙보드 에셋 슬롯]
+	// 블랙보드 에셋 자산 데이터 슬롯
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | AI")
 	TObjectPtr<UBlackboardData> MinionBlackboardAsset;
 
-	// [순정 AI 색적 컴포넌트 슬롯 - 네이밍 상속 충돌 버그 보수 완착]
+	// 순정 AI 색적 컴포넌트 슬롯 (상속 변수 네이밍 충돌 버그 보수 완착)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | AI")
 	TObjectPtr<UAIPerceptionComponent> MinionPerceptionComponent;
 
+	// 시각 센서 정밀 속성 설정 데이터 슬롯
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | AI")
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;
 };

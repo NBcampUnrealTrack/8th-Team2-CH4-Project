@@ -14,16 +14,18 @@
 UFT_KaguyaBulwarkAbility::UFT_KaguyaBulwarkAbility()
     : MaxDuration(4.0f)
 {
+    // 인스턴싱 및 네트워크 실행 정책을 로컬 예측 규격으로 확정합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
+    // 어빌리티 고유 자산 태그 등록 및 쿨타임 추적용 태그 매핑을 수행합니다.
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::AttackSkill);
     SetAssetTags(AssetTags);
     
     CooldownTag = FTTags::FTStates::Cooldown::RightClick;
 
-    // 활성화 기간 동안 가구야 반격 가드 태세 태그를 확정 부여합니다.
+    // 활성화 기간 동안 가구야 반격 가드 태세 태그를 소유 태그로 확정 부여합니다.
     ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::CounterReady);
 }
 
@@ -33,16 +35,7 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 1단계: 우클릭 쿨타임 검문
-    if (!CheckCooldown(Handle, ActorInfo))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
-    }
-
-    // =========================================================================
-    // [쿨타임 완치 배관]: 방벽이 전개되는 확실한 시점에 CommitAbility 마스터 함수를 격발합니다.
-    // =========================================================================
+    // [자원 커밋 일원화]: 불필요한 중복 검문소를 폐쇄하고 CommitAbility 단일 파이프라인으로 일원화하여 자원을 원자적으로 확정합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -58,10 +51,10 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
         return;
     }
 
-    // 채널링 감시 태그 가동
+    // 채널링 상태 감시를 위한 루즈 게임플레이 태그를 가동합니다.
     SourceASC->AddLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
     
-    // 이동속도 저하 페널티 GE 주입
+    // 무기 교전 시 기동성 제어를 위한 이동속도 저하 페널티 게임플레이 이펙트를 적용합니다.
     if (MovementPenaltyGameplayEffectClass)
     {
         FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(MovementPenaltyGameplayEffectClass, GetAbilityLevel());
@@ -71,7 +64,7 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
         }
     }
 
-    // 가드 모션 애니메이션 몽타주 가동
+    // 가드 모션 애니메이션 몽타주 비동기 재생 태스크를 구동합니다.
     UFT_WeaponData* WeaponData = Character->GetWeaponData();
     if (WeaponData && WeaponData->AttackMontage)
     {
@@ -80,13 +73,14 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
         if (MontageTask)
         {
-            // 애니메이션이 끝나도 EndAbility를 호출하지 않고 태세 유지를 위해 홀딩합니다.
+            // 애니메이션이 끝나도 입력 홀딩 상태 유지를 위해 OnCompleted 처리를 배제하고 인터럽트/캔슬 콜백만 바인딩합니다.
             MontageTask->OnInterrupted.AddDynamic(this, &UFT_KaguyaBulwarkAbility::OnGuardInterrupted);
             MontageTask->OnCancelled.AddDynamic(this, &UFT_KaguyaBulwarkAbility::OnGuardInterrupted);
             MontageTask->ReadyForActivation();
         }
     }
 
+    // 최대 지속 시간에 도달 시 자동으로 방벽을 해제하기 위한 수명 타이머를 타설합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().SetTimer(
@@ -101,11 +95,13 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
 void UFT_KaguyaBulwarkAbility::ExpireBulwark()
 {
+    // 지속 시간 정상 만료에 의한 클린 마감 분기입니다.
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_KaguyaBulwarkAbility::OnGuardInterrupted()
 {
+    // 피격 피동 캔슬 또는 무기 스왑 인터럽트에 의한 강제 종료 분기입니다. (bWasCancelled = true)
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
@@ -113,7 +109,7 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머 청정 소각
+    // 메모리 누수 방지: 런타임 수명선 보장용 지속 시간 타이머 장부를 안전하게 소각합니다.
     if (GetWorld() && BulwarkDurationTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(BulwarkDurationTimerHandle);
@@ -123,7 +119,7 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
-        // 채널링 및 이속 페널티 이펙트 장부 원점 제거
+        // 채널링 감시 태그 및 이동속도 저하 페널티 이펙트 장부를 원점 철거합니다.
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
         
         if (MovementPenaltyActiveHandle.IsValid())
@@ -132,34 +128,15 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
             MovementPenaltyActiveHandle.Invalidate();
         }
 
-        // CC기 취소 분기 시 선제 적용된 쿨타임 태그가 있다면 무결하게 환불 복구합니다.
+        // [네트워크 동기화 쿨타임 환불]: CC기나 상태이상으로 중간에 캔슬된 경우 쿨타임 쿼리 수선선 적용
         if (bWasCancelled)
         {
-            FGameplayEffectQuery UniversalQuery;
-            TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
-
-            // [메모리 컨테이너 무결성 타설망]:
-            // 실시간 제거 루프를 파쇄하고 제거 대상 타깃 핸들들만 격리 어레이에 깨끗하게 선제 수집합니다.
-            TArray<FActiveGameplayEffectHandle> HandlesToRemove;
-
-            for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
-            {
-                const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
-                if (ActiveGE && ActiveGE->Spec.Def)
-                {
-                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
-                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
-                    {
-                        HandlesToRemove.Add(GEPipeHandle);
-                    }
-                }
-            }
-
-            // 안전 구역 탈출 직후 수집 장부를 기반으로 원자적 소각을 완수하여 서버 크래시를 차단합니다.
-            for (const FActiveGameplayEffectHandle& TargetHandle : HandlesToRemove)
-            {
-                SourceASC->RemoveActiveGameplayEffect(TargetHandle);
-            }
+            FGameplayTagContainer TargetCooldownTags;
+            TargetCooldownTags.AddTag(CooldownTag);
+            
+            // 엔진 순정 표준 쿼리 배관인 MakeQuery_MatchAnyOwningTags로 교체하여 피격 캔슬 시 사격 및 방어 먹통 결함을 원천 진압합니다.
+            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
+            SourceASC->RemoveActiveEffects(CooldownQuery);
         }
     }
     

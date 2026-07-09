@@ -14,7 +14,7 @@ AFT_MinionSpawner::AFT_MinionSpawner()
 {
     PrimaryActorTick.bCanEverTick = false;
     
-    // 언리얼 5 순정 리플리케이션 가동 표준 명세로 락인
+    // 언리얼 5 순정 멀티플레이어 리플리케이션 가동 표준 명세로 락인합니다.
     SetReplicates(true);
 }
 
@@ -22,7 +22,7 @@ void AFT_MinionSpawner::BeginPlay()
 {
     Super::BeginPlay();
     
-    // [주권 검문소 가드선]: 오직 권한 하에 있는 주권 서버(Server)만 웨이브 타이머를 개통 구동합니다.
+    // 주권 검문소 가드선: 오직 권한 하에 있는 주권 서버(Server)만 미니언 웨이브 생성 타이머를 개통 구동합니다.
     if (HasAuthority() && GetWorld())
     {
         GetWorld()->GetTimerManager().SetTimer(
@@ -40,13 +40,13 @@ void AFT_MinionSpawner::TriggerMinionWave()
 {
     if (!GetWorld() || !InitialWayPoint || !MasterMinionClass) return;
 
-    // [레이스 컨디션 가드벽]: 이전 웨이브 사출 파이프라인이 아직 가동 중(큐가 남음)이라면,
+    // 레이스 컨디션 가드벽: 이전 웨이브 사출 파이프라인이 아직 가동 중(큐가 남음)이라면,
     // 데이터를 강제 덮어쓰기 소각하지 않고 안전하게 큐의 뒤에 가산 스택으로 누적하여 누수를 방지합니다.
     bool bIsAlreadySpawning = GetWorld()->GetTimerManager().IsTimerActive(SequentialSpawnTimerHandle);
 
     TArray<UFT_MinionData*> NewWaveQueue;
 
-    // 이번 웨이브에 투입될 전술 자산 장부 패킹
+    // 이번 웨이브에 투입될 근접 및 원거리 미니언 전술 자산 장부를 패킹합니다.
     if (MeleeMinionData)
     {
         for (int32 i = 0; i < MeleeMinionCount; ++i)
@@ -65,10 +65,10 @@ void AFT_MinionSpawner::TriggerMinionWave()
 
     if (NewWaveQueue.Num() > 0)
     {
-        // 마스터 전역 큐에 원자적으로 패킷 병합 이관
+        // 마스터 전역 큐에 원자적으로 패킷 병합 이관을 완료합니다.
         ActiveDataQueue.Append(NewWaveQueue);
 
-        // [비동기 에셋 프리로드 파이프라인] 동일 자산 중복 로드 연산 제로 최적화
+        // 비동기 에셋 프리로드 파이프라인: 동일 자산 중복 로드 연산을 제로로 최적화하기 위해 고유 경로만 수집합니다.
         TArray<FSoftObjectPath> AssetsToLoad;
         for (UFT_MinionData* Data : NewWaveQueue)
         {
@@ -82,7 +82,7 @@ void AFT_MinionSpawner::TriggerMinionWave()
         {
             FStreamableManager& StreamableManager = UAssetManager::GetStreamableManager();
             
-            // 사출 회로가 이미 돌아가고 있다면 로드만 백그라운드로 돌리고 타이머 재점화는 기각합니다.
+            // 사출 회로가 이미 돌아가고 있다면 에셋 파일 로드만 백그라운드로 예약 처리하고 타이머 중복 점화는 기각합니다.
             if (!bIsAlreadySpawning)
             {
                 StreamableManager.RequestAsyncLoad(AssetsToLoad, FStreamableDelegate::CreateUObject(this, &AFT_MinionSpawner::StartSequentialSpawn));
@@ -102,7 +102,7 @@ void AFT_MinionSpawner::StartSequentialSpawn()
 {
     if (!GetWorld()) return;
 
-    // 안전망 검문: 중복 타이머 점화 필터링
+    // 안전망 검문: 중복 순차 스폰 타이머 점화를 필터링합니다.
     if (GetWorld()->GetTimerManager().IsTimerActive(SequentialSpawnTimerHandle)) return;
 
     GetWorld()->GetTimerManager().SetTimer(
@@ -132,6 +132,7 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
     FRotator SpawnRotation = GetActorRotation();
     FTransform SpawnTransform(SpawnRotation, SpawnLocation);
     
+    // 비동기 스폰 완료 후 정밀 설정을 위해 지연 스폰 파이프라인을 격발합니다.
     AFT_MinionCharacterBase* SpawnedMinion = GetWorld()->SpawnActorDeferred<AFT_MinionCharacterBase>(
         MasterMinionClass, 
         SpawnTransform, 
@@ -142,13 +143,13 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
     
     if (SpawnedMinion)
     {
-        // 1단계: 마스터 팀 진영 태그 및 조립용 데이터 에셋 하달
+        // 1단계: 마스터 팀 진영 태그(SpawnerTeamTag) 및 조립용 데이터 에셋 하달
         SpawnedMinion->SetMinionDataAndTeam(TargetData, SpawnerTeamTag);
         
         // 2단계: AOS 전선 진격을 위한 최초 공성 거점(웨이포인트) 주소지 확정 낙인
         SpawnedMinion->SetCurrentTargetWayPoint(InitialWayPoint);
         
-        // 3단계: 월드 완착 선언 및 GAS 인프라/AI 사고 회로 수동 정밀 가동 명령 사출
+        // 3단계: 월드 완착 선언 및 GAS 인프라, AI 비헤이비어 사고 회로 수동 정밀 가동 명령 사출
         SpawnedMinion->FinishSpawning(SpawnTransform);
         SpawnedMinion->LaunchMinionInfrastructure();
     }

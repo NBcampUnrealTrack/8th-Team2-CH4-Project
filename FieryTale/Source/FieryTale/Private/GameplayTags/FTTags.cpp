@@ -32,7 +32,7 @@ namespace FTTags
         namespace Debuff
         {
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Stunned, "FTTags.State.Debuff.Stunned", "모든 행동 및 스킬 입력이 잠기는 기절 상태이상 태그");
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Rooted, "FTTags.State.Debuff.Rooted", "조준과 사격은 가능하나 이동만 차단되는 속박 상태이상 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Rooted, "FTTags.State.Debuff.Rooted", "조준 and 사격은 가능하나 이동만 차단되는 속박 상태이상 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Taunted, "FTTags.State.Debuff.Taunted", "가구야 공주에게 도발되어 대상을 강제 조준 및 추격하는 상태이상 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Slow, "FTTags.State.Debuff.Slow", "이동 속도를 대폭 감산시키는 둔화 디버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Bleeding, "FTTags.State.Debuff.Bleeding", "늑대 발톱 공격에 노출되어 들어오는 실시간 지속 출혈 피해 태그");
@@ -40,7 +40,7 @@ namespace FTTags
 
         namespace Buff
         {
-            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Invincible, "FTTags.State.Buff.Invincible", "모든 피해량과 CC 연산을 일체 무력화하는 무적 상태 버프 태그");
+            UE_DEFINE_GAMEPLAY_TAG_COMMENT(Invincible, "FTTags.State.Buff.Invincible", "모든 피해량 and CC 연산을 일체 무력화하는 무적 상태 버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Invisibility, "FTTags.State.Buff.Invisibility", "적의 조준선 크로스헤어 활성화를 차단하고 미니맵 노출을 지우는 은신 버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Flying, "FTTags.State.Buff.Flying", "알라딘 마법 양탄자 탑승 및 이동 속도 감산 비행 버프 태그");
             UE_DEFINE_GAMEPLAY_TAG_COMMENT(Evading, "FTTags.State.Buff.Evading", "구르기 무적 판정 및 대나무 안개 범위 진입 시 부여되는 회피 기동 버프 태그");
@@ -70,7 +70,7 @@ namespace FTTags
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Skill_Channelling, "FTTags.Combat.Skill.Channelling", "스킬의 선딜레이 및 캐스팅 유지 상태를 감시하는 인터럽트용 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Target_Insignia, "FTTags.Combat.Target.Insignia", "앨리스 시계 토끼 공격에 노출된 표적의 시한성 태엽 인장 표식 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Structure_Muted, "FTTags.Combat.Structure.Muted", "포탑의 AI 자동 포격 감지 루프를 강제로 정지시키는 마비 제어 태그");
-    	
+        
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(AnimNotify_Attack, "FTTags.Combat.AnimNotify.Attack", "애니메이션 몽타주 내 노티파이 시점에 사출되어 투사체 및 근접 공격을 격발하는 태그");
     }
 

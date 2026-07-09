@@ -5,14 +5,12 @@
 #include "GameplayEffectExecutionCalculation.h"
 #include "GameplayTags/FTTags.h"
 
-// =========================================================================
-//  [순정 GAS 속성 캡처 구조체 정밀 수선]
+// [순정 GAS 속성 캡처 구조체 정밀 수선]
 // 런타임 스냅샷 백업 및 멀티스레드 환경에서 메모리 왜곡 릭을 방지하기 위해 
 // 속성 정의 장부와 캡처 정의를 정석대로 구조체 내부에 완착시킵니다.
-// =========================================================================
 struct FT_DamageStatCapture
 {
-    DECLARE_ATTRIBUTE_CAPTUREDEF(Damage); // ◄ DamageDef와 DamageProperty를 자동 생성하는 순정 매크로
+    DECLARE_ATTRIBUTE_CAPTUREDEF(Damage); // DamageDef와 DamageProperty를 자동 생성하는 순정 매크로
 
     FT_DamageStatCapture()
     {
@@ -60,14 +58,12 @@ void UGEEC_Damage::Execute_Implementation(const FGameplayEffectCustomExecutionPa
     }
 
     const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
-
-    // [C-1 버그 박멸 라인 완착]
+    
     // 영웅들의 평타 및 데이터 에셋, 미니언들의 공격 패턴들이 사출한 네이티브 대미지 태그 주소지로부터 기획 수치를 오차 없이 수신합니다.
     float BaseDamage = FMath::Max<float>(Spec.GetSetByCallerMagnitude(FTTags::FTCombat::Damage, false, 0.0f), 0.0f);
     
     // --- 향후 밸런싱 및 계산식 확장 구역 (방어력 감산 연산, 치명타 가산 배율, 증강 카드 가중치 등) ---
     float FinalCalculatedDamage = BaseDamage;
-    // -----------------------------------------------------------------------------------------
 
     // [정석 아키텍처 이관 수술 최종 확인]
     // 댕글링 크래시를 유발하는 DamageProperty 포인터를 소각하고,
@@ -75,7 +71,7 @@ void UGEEC_Damage::Execute_Implementation(const FGameplayEffectCustomExecutionPa
     if (FinalCalculatedDamage > 0.0f)
     {
         ExecutionOutputs.AddOutputModifier(FGameplayModifierEvaluatedData(
-            DamageStatCapture().DamageDef.AttributeToCapture, // ◄ 구조적 메모리 릭 완치선
+            DamageStatCapture().DamageDef.AttributeToCapture, // 구조적 메모리 릭 완치선
             EGameplayModOp::Additive, 
             FinalCalculatedDamage
         ));

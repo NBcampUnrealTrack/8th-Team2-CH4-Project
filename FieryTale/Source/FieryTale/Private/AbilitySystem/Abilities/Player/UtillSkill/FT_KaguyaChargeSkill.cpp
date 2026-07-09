@@ -6,23 +6,25 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
-#include "AbilitySystemComponent.h" // ◄ ASC 상호작용 배관망을 위해 인클루드 완착
+#include "AbilitySystemComponent.h"
 #include "GameplayTags/FTTags.h"
 
 UFT_KaguyaChargeSkill::UFT_KaguyaChargeSkill()
     : BambooGroveRadius(450.0f)
     , BambooGroveDuration(4.0f)
 {
+    // 인스턴싱 정책 및 네트워크 실행 정책을 로컬 예측 규격으로 확정합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
+    // 어빌리티 고유 자산 태그 등록 및 쿨타임 추적용 태그 매핑을 수행합니다.
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::UtilSkill); 
     SetAssetTags(AssetTags);
 
     CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
 
-    // 활성화 기간 동안 영역 전개 중 버프 태그를 확정 부여합니다.
+    // 활성화 기간 동안 영역 전개 중 버프 태그를 소유 태그로 확정 부여합니다.
     ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::BambooGroveDeploying);
 }
 
@@ -30,19 +32,9 @@ void UFT_KaguyaChargeSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
     const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
     const FGameplayEventData* TriggerEventData)
 {
-    // 1단계: 시프트 생존기 쿨타임 검문
-    if (!CheckCooldown(Handle, ActorInfo))
-    {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        return;
-    }
-
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // =========================================================================
-    // [쿨타임 완치 배관]: 안개 전개에 진입하는 순간 CommitAbility 마스터 함수를 격발합니다.
-    // 이를 통해 시프트 Cooldown GE 장부가 오차 없이 시스템에 안착합니다.
-    // =========================================================================
+    // 자원 커밋 일원화: 불필요한 중복 검문소를 폐쇄하고 CommitAbility 단일 파이프라인으로 일원화하여 영역 전개 시점에 자원을 원자적으로 확정합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -62,10 +54,7 @@ void UFT_KaguyaChargeSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
         FVector SpawnLocation = Character->GetActorLocation();
         FRotator SpawnRotation = Character->GetActorRotation();
 
-        // =========================================================================
-        // [영역 액터 가동 파이프라인 개통]: 에디터 슬롯(BambooGroveAreaClass) 검문선 타설
-        // 에디터에서 전술 안개 영역 블루프린트 액터가 정상 바인딩되어 있다면 월드에 소환합니다.
-        // =========================================================================
+        // 영역 액터 가동 파이프라인 개통: 에디터 슬롯 검문선 타설 및 블루프린트 영역 액터 월드 소환을 처리합니다.
         if (BambooGroveAreaClass)
         {
             FActorSpawnParameters SpawnParams;
@@ -73,12 +62,11 @@ void UFT_KaguyaChargeSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
             SpawnParams.Instigator = Character;
             SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-            // 💡 추후 이 소환된 영역 액터 내부에 BambooGroveRadius와 BambooGroveDuration을 전달하여 
-            // 시각적 파티클 크기와 콜리전 볼륨 범위가 동기화되도록 연동하시면 청정합니다.
+            // 추후 이 소환된 영역 액터 내부에 BambooGroveRadius와 BambooGroveDuration을 전달하여 시각적 파티클 크기와 콜리전 볼륨 범위가 동기화되도록 연동하시면 청정합니다.
             World->SpawnActor<AActor>(BambooGroveAreaClass, SpawnLocation, SpawnRotation, SpawnParams);
         }
 
-        // 4초 전술 안개 영역 유지 타이머 가동
+        // 지속 제한 시간 타이머 가동을 통해 영역 버프의 수명을 제어합니다.
         World->GetTimerManager().SetTimer(
             BambooGroveDurationTimerHandle,
             this,
@@ -95,14 +83,14 @@ void UFT_KaguyaChargeSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 void UFT_KaguyaChargeSkill::OnChargeFinished()
 {
-    // 4초 지속 시간 만료 시 정상 종료 마감 처리
+    // 지속 시간 정상 만료에 의한 클린 마감 분기입니다.
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_KaguyaChargeSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머 청정 소각하여 레이스 컨디션 차단
+    // 메모리 누수 방지: 런타임 수명선 보장용 지속 시간 타이머 장부를 청정 소각합니다.
     if (GetWorld() && BambooGroveDurationTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(BambooGroveDurationTimerHandle);
@@ -112,28 +100,15 @@ void UFT_KaguyaChargeSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, 
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
-        // =========================================================================
-        // [AOS 기획 사양 락인 - CC기 파쇄 시 쿨타임 환불 처리]
-        // 안개 전개 도중 적의 하드 CC기에 노출되어 강제 취소(bWasCancelled = true)되었다면,
-        // 선제 적용되었던 시프트 쿨타임 이펙트를 찾아내 삭제하여 리턴 복귀를 보장합니다.
-        // =========================================================================
+        // 네트워크 동기화 쿨타임 환불: 영역 전개 도중 하드 CC기나 상태이상으로 강제 캔슬된 경우 예측적으로 돌아가던 시프트 쿨타임 이펙트를 즉각 회수합니다.
         if (bWasCancelled)
         {
-            FGameplayEffectQuery UniversalQuery;
-            TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
-
-            for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
-            {
-                const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
-                if (ActiveGE && ActiveGE->Spec.Def)
-                {
-                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
-                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
-                    {
-                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
-                    }
-                }
-            }
+            FGameplayTagContainer TargetCooldownTags;
+            TargetCooldownTags.AddTag(CooldownTag);
+            
+            // 엔진 공식 순정 팩토리 함수인 MakeQuery_MatchAnyEffectTags 제어선으로 단일화하여 무기 스왑이나 강제 인터럽트 시 발생하는 먹통 결함을 원천 진압합니다.
+            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyEffectTags(TargetCooldownTags);
+            SourceASC->RemoveActiveEffects(CooldownQuery);
         }
     }
 

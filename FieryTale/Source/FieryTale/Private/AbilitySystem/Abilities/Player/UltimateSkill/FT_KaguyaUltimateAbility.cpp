@@ -13,6 +13,7 @@
 
 UFT_KaguyaUltimateAbility::UFT_KaguyaUltimateAbility()
 {
+    // 본체 개체별 독립적인 상태 추적 및 판정을 위해 인스턴싱 정책을 확정합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
@@ -27,14 +28,12 @@ UFT_KaguyaUltimateAbility::UFT_KaguyaUltimateAbility()
 
 void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    // =========================================================================
-    // 💡 [1단계: 부모 가드선 최상단 전진 배치 - 버그 완전 박멸선]
-    // Super를 최상단으로 복구하여 부모의 코스트 직접 소각 및 궁극기 판정 태그
-    // 동 동기화 선로를 완벽하게 선제 고착합니다. 이로써 타격 시 100 리필 릭이 완전 소각됩니다.
-    // =========================================================================
+    // [1단계]: 부모 가드선 최상단 전진 배치
+    // Super를 최상단으로 복구하여 부모의 코스트 직접 소각 및 궁극기 판정 태그 동기화 선로를 완벽하게 선제 고착합니다.
+    // 이로써 타격 시 게이지가 다시 리필되는 자원 누수 버그가 원천 소각됩니다.
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // [2단계] 자원 소모 및 선행 조건 검문
+    // [2단계]: 자원 소모 및 선행 조건 검문을 통과시킵니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -60,7 +59,7 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
         GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("Kaguya Ultimate: 달의 군대여 이 땅의 혼란을 가라앉히소서."));
     }
 
-    // [3단계] 자신 중심 12미터 광역 오버랩 스캔 가동
+    // [3단계]: 자신 중심의 광역 원형 오버랩 스캔을 가동합니다.
     FVector KaguyaLocation = OwnerActor->GetActorLocation();
     TArray<FOverlapResult> OverlapResults;
     FCollisionShape ScanSphere = FCollisionShape::MakeSphere(AscensionRadius);
@@ -87,21 +86,23 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
         
         const bool bHasAuthority = IsPredictingClient() == false;
 
+        // 대미지 가산 및 군중 제어(CC) 인장 연산은 서버의 권한 오너쉽 권역에서만 안전하게 실행되도록 필터링합니다.
         if (bHasOverlap && bHasAuthority)
         {
             for (const FOverlapResult& Result : OverlapResults)
             {
                 AActor* TargetActor = Result.GetActor();
-                // 💡 [액세스 위반 크래시 완전 완치]: 포인터 생존 유효성을 1차 검문합니다.
+                // 액세스 위반 크래시 완전 완치: 포인터 생존 유효성을 엄격하게 사전 검문합니다.
                 if (!IsValid(TargetActor)) continue;
 
                 UAbilitySystemComponent* TargetASC = TargetActor->GetComponentByClass<UAbilitySystemComponent>();
                 if (TargetASC)
                 {
-                    // 피아 식별 필터 레이어
+                    // 피아 식별 필터 레이어를 가동하여 아군 타격 피해를 완벽히 격리 차단합니다.
                     if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
                     if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
                     
+                    // 1) 기반 대미지 적용 이펙트 연산 전파
                     if (DamageGameplayEffectClass)
                     {
                         FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffectClass, GetAbilityLevel());
@@ -112,20 +113,20 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
                         }
                     }
 
-                    // 포탑 및 넥서스 등 구조체 면역 필터
+                    // 포탑 및 넥서스 등 고정형 월드 구조체 면역 필터를 타설합니다.
                     bool bIsStructure = TargetASC->HasMatchingGameplayTag(FTTags::FTObjectType::Structure_Turret) || 
                                         TargetASC->HasMatchingGameplayTag(FTTags::FTObjectType::Structure_Nexus);
 
-                    // 💡 구조물이 아닌 일반 생명체(플레이어, 미니언) 캐릭터일 때만 CC 연산 파이프라인을 전개합니다.
+                    // 구조물이 아닌 일반 생명체(플레이어, 미니언) 캐릭터 레이어일 때만 강력한 강제 인장 및 디버프 연산을 가동합니다.
                     if (!bIsStructure)
                     {
-                        // 2) 중심부 강제 인장 (Pull Mechanism - 서버에서 다이렉트 연산 전파)
+                        // 2) 중심부 강제 인장 물리 제어 (Pull Mechanism)
                         ACharacter* TargetCharacter = Cast<ACharacter>(TargetActor);
                         if (IsValid(TargetCharacter))
                         {
                             FVector TargetLocation = TargetCharacter->GetActorLocation();
                             FVector PullDirection = (KaguyaLocation - TargetLocation);
-                            PullDirection.Z = 0.f; // Z축 물리 왜곡 차단
+                            PullDirection.Z = 0.f; // Z축 변위 고정으로 물리 연산 왜곡 파괴를 차단합니다.
                             
                             float Distance = PullDirection.Size();
                             
@@ -137,14 +138,13 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
                                 CalculatedForce = FMath::Clamp(CalculatedForce, 300.0f, 2500.0f);
 
                                 FVector LaunchVelocity = PullDirection * CalculatedForce;
-                                LaunchVelocity.Z = 100.f; // 중앙 에어본 인장 유도
+                                LaunchVelocity.Z = 100.f; // 중앙 집결부 에어본 인장을 정밀하게 유도합니다.
 
                                 TargetCharacter->LaunchCharacter(LaunchVelocity, true, true);
                             }
                         }
 
-                        // 3) 2초간 80% 전술 둔화 디버프 주입
-                        // 💡 [이동속도 릭 차단]: 구조체 면역 필터 내부로 정순 격리 결착하여 연산 오염을 차단합니다.
+                        // 3) 전술 이동 속도 둔화 디버프 주입 (이속 릭 완벽 차단)
                         if (SlowDebuffEffectClass)
                         {
                             FGameplayEffectSpecHandle SlowSpecHandle = MakeOutgoingGameplayEffectSpec(SlowDebuffEffectClass, GetAbilityLevel());
@@ -159,17 +159,16 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
         }
     }
 
-    // 단발성 즉시 격발 스킬이므로 시퀀스 무결 마감 종료
+    // 단발성 즉시 격발 기술이므로 연산 직후 시퀀스를 클린 마감 종료 처리합니다.
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
 }
 
 void UFT_KaguyaUltimateAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 💡 [자가 수급 전선 초기화 마감]:
-    // 어빌리티 해제 파이프라인에서 부모가 동적으로 얹어두었던 느슨한 태그를 완전히 소각합니다.
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
+        // 자가 수급 전선 초기화 마감: 어빌리티 수명 해제 파이프라인에서 시전 중 장착해 두었던 느슨한 태그를 완벽히 회수 철거합니다.
         SourceASC->RemoveLooseGameplayTag(FTTags::FTAbilities::UltimateSkill);
     }
 
