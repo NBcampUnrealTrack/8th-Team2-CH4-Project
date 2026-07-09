@@ -59,16 +59,17 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
 void UFT_ChargedShotSkill::FireChargedShot(float TimePressed)
 {
-    if (!CurrentActorInfo || !CurrentActorInfo->AvatarActor.IsValid() || !GetWorld())
+    if (!CurrentActorInfo || !CurrentActorInfo->AvatarActor.IsValid() || !CurrentActorInfo->AbilitySystemComponent.IsValid() || !GetWorld())
     {
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
         return;
     }
 
     AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get());
+    UAbilitySystemComponent* MyASC = CurrentActorInfo->AbilitySystemComponent.Get();
     bool bTriggeredVisualTask = false;
 
-    if (Character)
+    if (Character && MyASC)
     {
         // 💡 [1초 정밀 충전 성공 판정선]
         if (TimePressed >= 1.0f)
@@ -120,40 +121,32 @@ void UFT_ChargedShotSkill::FireChargedShot(float TimePressed)
         // 💡 [차징 실패 낙폭 구역 - 패널티 프리 면제 환원 수선]
         else
         {
-            if (CurrentActorInfo && CurrentActorInfo->IsNetAuthority())
+            // =========================================================================
+            // 💡 [네트워크 동기화 쿨타임 환불 릭 수정]:
+            // IsNetAuthority 가드를 제거하여 클라이언트 화면에서도 예측적으로 돌던 
+            // 우클릭 쿨타임 이펙트 장부를 완벽하게 실시간 동시 파쇄 마감합니다.
+            // =========================================================================
+            FGameplayEffectQuery CooldownQuery;
+            TArray<FActiveGameplayEffectHandle> ActiveHandles = MyASC->GetActiveEffects(CooldownQuery);
+            TArray<FActiveGameplayEffectHandle> HandlesToRemove;
+
+            for (const FActiveGameplayEffectHandle& Handle : ActiveHandles)
             {
-                UAbilitySystemComponent* MyASC = CurrentActorInfo->AbilitySystemComponent.Get();
-                if (MyASC)
+                const FActiveGameplayEffect* ActiveGE = MyASC->GetActiveGameplayEffect(Handle);
+                if (ActiveGE && ActiveGE->Spec.Def)
                 {
-                    // =========================================================================
-                    // 💡 [언리얼 순정 GAS 쿨타임 철거 공정 완착]:
-                    // 컴파일 에러를 유발하던 유령 API선들을 완전히 파쇄 소각하고,
-                    // 앨리스 스킬 장부에서 100% 무결성이 증명된 정석 추출 순회망을 락인합니다.
-                    // 에셋 태그든 부여 태그든 CooldownTag를 공차 없이 완전히 제거합니다.
-                    // =========================================================================
-                    FGameplayEffectQuery CooldownQuery;
-                    TArray<FActiveGameplayEffectHandle> ActiveHandles = MyASC->GetActiveEffects(CooldownQuery);
-                    TArray<FActiveGameplayEffectHandle> HandlesToRemove;
-
-                    for (const FActiveGameplayEffectHandle& Handle : ActiveHandles)
+                    if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
+                        ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
                     {
-                        const FActiveGameplayEffect* ActiveGE = MyASC->GetActiveGameplayEffect(Handle);
-                        if (ActiveGE && ActiveGE->Spec.Def)
-                        {
-                            if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
-                                ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
-                            {
-                                HandlesToRemove.Add(Handle);
-                            }
-                        }
-                    }
-
-                    // 수집 안전 지대에서 원자적 소각 마감
-                    for (const FActiveGameplayEffectHandle& TargetHandle : HandlesToRemove)
-                    {
-                        MyASC->RemoveActiveGameplayEffect(TargetHandle);
+                        HandlesToRemove.Add(Handle);
                     }
                 }
+            }
+
+            // 수집 안전 지대에서 원자적 소각 마감 (서버/클라이언트 클린 전파)
+            for (const FActiveGameplayEffectHandle& TargetHandle : HandlesToRemove)
+            {
+                MyASC->RemoveActiveGameplayEffect(TargetHandle);
             }
             
             // [재귀적 인터럽트 버그 박멸 완치선]: 안전한 기획적 정상 마감 처리

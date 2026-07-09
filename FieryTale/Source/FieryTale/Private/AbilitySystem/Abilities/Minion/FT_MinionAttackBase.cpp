@@ -23,8 +23,6 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // [조기 철수선 안전망 교정]: 자원 소모 및 코스트 검증 실패 시,
-    // 자가 소멸 과정에서 상위 마스터 클래스의 해제 장부가 누락되지 않도록 EndAbility 정석 라인으로 배관을 전환합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -58,18 +56,20 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     }
 
     // 2단계: 게임플레이 이벤트 수신 대기 태스크 병렬 가동
-    UAbilityTask_WaitGameplayEvent* WaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+    // 💡 [좀비 태스크 방어선]: 안전한 소각 청소를 위해 로컬 변수가 아닌 헤더에 선언된 
+    // 멤버 변수(ActiveWaitEventTask)에 주소를 확실히 결착합니다.
+    ActiveWaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
         this, 
-        FTTags::FTCombat::AnimNotify_Attack, // ◄ 마스터 태그 장부와 100% 동기화 안착
+        FTTags::FTCombat::AnimNotify_Attack, 
         nullptr, 
         false, 
         false
     );
 
-    if (WaitEventTask)
+    if (ActiveWaitEventTask)
     {
-        WaitEventTask->EventReceived.AddDynamic(this, &UFT_MinionAttackBase::OnMontageTargetedEvent);
-        WaitEventTask->ReadyForActivation();
+        ActiveWaitEventTask->EventReceived.AddDynamic(this, &UFT_MinionAttackBase::OnMontageTargetedEvent);
+        ActiveWaitEventTask->ReadyForActivation();
     }
 }
 
@@ -83,11 +83,11 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     
     if (!AIC || !MyASC || !DamageEffectClass) return;
 
-    // 브레인 포커스 대상 인양
+    // 브레인 포커스 대상 인양 후 즉시 댕글링 포인터 검문
     AActor* TargetActor = AIC->GetFocusActor();
-    if (!TargetActor) return;
+    if (!IsValid(TargetActor)) return; // 💡 IsValid를 통해 메모리 파괴 여부까지 2중 방어
 
-    // [오버킬/타깃 유효성 가드선]: 공격 모션 도중 타깃이 사망했는지 ASC 장부를 열어 선제 검문합니다.
+    // [오버킬/타깃 유효성 가드선]
     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
     if (TargetASC && TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
     {
@@ -110,6 +110,8 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
         if (World)
         {
             FVector SpawnLocation = AvatarChar->GetActorLocation() + FVector(0, 0, 50);
+            
+            // 💡 [액세스 위반 크래시 완전 완치]: 검증이 완료된 TargetActor 명세를 안전선 타설 후 인양합니다.
             FVector TargetCenterLocation = TargetActor->GetActorLocation() + FVector(0, 0, 50);
             FVector LaunchDirection = (TargetCenterLocation - SpawnLocation).GetSafeNormal();
             
@@ -145,6 +147,13 @@ void UFT_MinionAttackBase::OnMontageCompletedOrCancelled()
 
 void UFT_MinionAttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 부모 관문으로 이관되어 내부에 상주하던 모든 병렬 태스크를 원자적으로 완벽 수거 소각합니다.
+    // 💡 [태스크 메모리 누수 청정 소각]:
+    // 어빌리티가 종료될 때 상주 중이던 비동기 이벤트 태스크를 명시적으로 파쇄 마감합니다.
+    if (ActiveWaitEventTask)
+    {
+        ActiveWaitEventTask->EndTask();
+        ActiveWaitEventTask = nullptr;
+    }
+
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

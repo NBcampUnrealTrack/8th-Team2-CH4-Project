@@ -40,8 +40,6 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
     // =========================================================================
     // [쿨타임 완치 배관]: 채널링 진입 시점에 CommitAbility 마스터 함수를 가동합니다.
-    // 이를 통해 우클릭 Cooldown GE 장부가 굳건하게 잠기기 시작합니다.
-    // 만약 중간에 CC기를 맞아 취소된다면 EndAbility에서 무결하게 환불 처리합니다.
     // =========================================================================
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
@@ -89,7 +87,6 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 void UFT_SilverBulletSkill::FireSilverBullet()
 {
-    // 타이머가 만료되어 도달했으므로 핸들 장부만 깔끔하게 청소 초기화합니다.
     ChannellingTimerHandle.Invalidate();
 
     if (CurrentActorInfo && CurrentActorInfo->AvatarActor.IsValid())
@@ -130,7 +127,6 @@ void UFT_SilverBulletSkill::FireSilverBullet()
 
 void UFT_SilverBulletSkill::HandleChannellingInterrupted()
 {
-    // CC기를 맞아 끊겼으므로 예약 타이머를 청정하게 즉시 파쇄합니다.
     if (GetWorld() && ChannellingTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ChannellingTimerHandle);
@@ -144,7 +140,6 @@ void UFT_SilverBulletSkill::HandleChannellingInterrupted()
 void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 어떤 경로로든 어빌리티가 닫힐 때 예외 없이 타이머를 소각하여 레이스 컨디션을 방지합니다.
     if (GetWorld() && ChannellingTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ChannellingTimerHandle);
@@ -156,14 +151,14 @@ void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, 
     {
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
 
-        // =========================================================================
-        // [쿨타임 무결성 환불]: 1초 채널링 완수를 못 하고 군중제어기에 끊겼다면(bWasCancelled),
-        // 선제 적용되었던 9초 우클릭 쿨타임 이펙트를 찾아내 추적 삭제 장부에서 제거합니다.
-        // =========================================================================
         if (bWasCancelled)
         {
             FGameplayEffectQuery UniversalQuery;
             TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
+
+            // 💡 [메모리 컨테이너 무결성 타설망]
+            // 실시간 소각 루프를 파쇄하고, 제거 대상 핸들들을 안전 구역 격리 어레이에 수집합니다.
+            TArray<FActiveGameplayEffectHandle> HandlesToRemove;
 
             for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
             {
@@ -173,9 +168,15 @@ void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, 
                     if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
                         ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
                     {
-                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
+                        HandlesToRemove.Add(GEPipeHandle);
                     }
                 }
+            }
+
+            // 안전 루프 탈출 후 원자적으로 소각을 완수하여 메모리 폭사를 완벽히 진압합니다.
+            for (const FActiveGameplayEffectHandle& TargetHandle : HandlesToRemove)
+            {
+                SourceASC->RemoveActiveGameplayEffect(TargetHandle);
             }
         }
     }

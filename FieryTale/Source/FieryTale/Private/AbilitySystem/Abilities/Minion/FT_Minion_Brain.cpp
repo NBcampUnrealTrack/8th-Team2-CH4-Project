@@ -56,15 +56,8 @@ void UFT_Minion_Brain::ExecuteAILogic()
         return;
     }
 
-    // =========================================================================
-    // 💡 [실시간 하드 CC기 가드선 배관 개통]
-    // 어빌리티가 켜진 상태에서 런타임 도중 기절(Stunned) 등의 제어 불가 태그가 
-    // 내 ASC 장부에 안착했다면, 이번 틱 사고 연산을 전면 소멸 거부합니다.
-    // 이 방어선 덕분에 기절 중에 미니언이 평타를 연사하는 버그가 완전 멸균됩니다.
-    // =========================================================================
     if (MyASC->HasMatchingGameplayTag(FTTags::FTStates::Debuff::Stunned))
     {
-        // 상태 이상 중일 때는 이동 관성을 즉시 파쇄 제동합니다.
         if (AAIController* AIC = Cast<AAIController>(AvatarChar->GetController()))
         {
             AIC->StopMovement();
@@ -78,19 +71,16 @@ void UFT_Minion_Brain::ExecuteAILogic()
     UBlackboardComponent* BB = AIC->GetBlackboardComponent();
     if (!BB) return;
 
-    // 현재 길찾기 이동 컴포넌트의 가동 상태를 역추적합니다.
     UPathFollowingComponent* PathFollowComp = AIC->GetPathFollowingComponent();
-
     AActor* BestTarget = Cast<AActor>(BB->GetValueAsObject(TEXT("TargetEnemy")));
 
-    if (BestTarget)
+    if (IsValid(BestTarget))
     {
         AIC->SetFocus(BestTarget);
         float DistanceToTarget = FVector::Dist(AvatarChar->GetActorLocation(), BestTarget->GetActorLocation());
 
         if (DistanceToTarget <= AttackAcceptanceRadius)
         {
-            // [교전 상태 전환]: 사거리 진입 시 물리 무빙 급제동 후 평타 사출
             AIC->StopMovement();
             
             FGameplayTagContainer AttackTags;
@@ -101,14 +91,18 @@ void UFT_Minion_Brain::ExecuteAILogic()
         else
         {
             // =========================================================================
-            // [최적화 가드벽 - 추격 무빙 리패싱 제한 최종 완치]
+            // 💡 [최적화 가드벽 - 추격 무빙 리패싱 맹점 정밀 완치]
+            // 에셋 포커스 비교의 허점을 파쇄하고, 내비게이션 컴포넌트가 현재 추격 중인 
+            // 실제 패스 최종 목적지와 타깃의 실시간 좌표를 피타고라스 오차 범위로 대조합니다.
             // =========================================================================
             bool bAlreadyMovingToTarget = false;
             if (PathFollowComp && PathFollowComp->GetStatus() == EPathFollowingStatus::Moving)
             {
-                // 언리얼 순정 정석 패스: AI가 현재 포커싱하여 추격 중인 대상 액터가 
-                // 블랙보드의 BestTarget과 일치한다면 중복 길찾기 명령을 스킵합니다.
-                if (AIC->GetFocusActor() == BestTarget)
+                FVector CurrentDest = PathFollowComp->GetPathDestination();
+                FVector TargetLoc = BestTarget->GetActorLocation();
+
+                // 타깃이 이동 틱 오차 범위(예: 30cm) 내에 여전히 머물러 있다면 중복 Move 명령을 청정 스킵합니다.
+                if (CurrentDest.Equals(TargetLoc, 30.0f))
                 {
                     bAlreadyMovingToTarget = true;
                 }
@@ -151,19 +145,13 @@ void UFT_Minion_Brain::ExecuteAILogic()
             }
         }
 
-        // =========================================================================
-        // 💡 [최적화 가드벽 - 라인 복귀 리패싱 제한 완치 완착]
-        // =========================================================================
         FVector NextLineLocation = BB->GetValueAsVector(TEXT("LineWaypoint"));
         if (!NextLineLocation.IsZero())
         {
             bool bAlreadyMovingToLoc = false;
             if (PathFollowComp && PathFollowComp->GetStatus() == EPathFollowingStatus::Moving)
             {
-                // 언리얼 순정 API: PathFollowingComponent 내부에서 현재 기동 중인 최종 목적지 좌표 벡터를 안전하게 인양합니다.
                 FVector CurrentDest = PathFollowComp->GetPathDestination();
-                
-                // FVector 고유의 오차 범위 비교 함수인 Equals를 활용하여 정밀 대조합니다.
                 if (CurrentDest.Equals(NextLineLocation, 10.0f))
                 {
                     bAlreadyMovingToLoc = true;
@@ -185,10 +173,24 @@ AActor* UFT_Minion_Brain::InternalScanBestTarget(AFTCharacterBase* AvatarChar, c
 
 void UFT_Minion_Brain::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 수명 마감 시 월드 정기 타이머 핸들을 깨끗하게 수거 청소합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(AIExecuteTimerHandle);
+    }
+
+    // 💡 [사망/종료 시 브레인 정화 완착]:
+    // 미니언이 사망 판정을 받았거나 브레인이 닫힐 때, AI 컨트롤러가 잡고 있던 
+    // 잔여 조준(Focus) 수식어를 강제 해제하여 시체 시선 고정 버그를 청정 소각합니다.
+    if (ActorInfo && ActorInfo->AvatarActor.IsValid())
+    {
+        if (AFTCharacterBase* AvatarChar = Cast<AFTCharacterBase>(ActorInfo->AvatarActor.Get()))
+        {
+            if (AAIController* AIC = Cast<AAIController>(AvatarChar->GetController()))
+            {
+                AIC->ClearFocus(EAIFocusPriority::Gameplay);
+                AIC->StopMovement();
+            }
+        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

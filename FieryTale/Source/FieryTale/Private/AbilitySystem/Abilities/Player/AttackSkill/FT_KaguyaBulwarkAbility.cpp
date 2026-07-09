@@ -42,7 +42,6 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
     // =========================================================================
     // [쿨타임 완치 배관]: 방벽이 전개되는 확실한 시점에 CommitAbility 마스터 함수를 격발합니다.
-    // 이를 통해 우클릭 Cooldown GE 장부가 굳건하게 잠기기 시작합니다.
     // =========================================================================
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
@@ -81,18 +80,13 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
         if (MontageTask)
         {
-            //  애니메이션이 끝나도 EndAbility를 호출하지 않고 태세 유지를 위해 홀딩합니다.
-            // 만약 하드 CC를 맞아 애니메이션이 파쇄(Interrupted)당했을 때만 조기 종료 파이프라인을 태웁니다.
+            // 애니메이션이 끝나도 EndAbility를 호출하지 않고 태세 유지를 위해 홀딩합니다.
             MontageTask->OnInterrupted.AddDynamic(this, &UFT_KaguyaBulwarkAbility::OnGuardInterrupted);
             MontageTask->OnCancelled.AddDynamic(this, &UFT_KaguyaBulwarkAbility::OnGuardInterrupted);
             MontageTask->ReadyForActivation();
         }
     }
 
-    // =========================================================================
-    // [타이머 안전 우회 개통]: EndAbility 직격 호출 크래시 릭을 소각하고,
-    // 4초 뒤 청정하게 수명 주기를 마감할 전용 콜백 함수(ExpireBulwark)를 바인딩합니다.
-    // =========================================================================
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().SetTimer(
@@ -107,13 +101,11 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
 void UFT_KaguyaBulwarkAbility::ExpireBulwark()
 {
-    // 4초 지속시간 만료 시 정상 종료 처리
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_KaguyaBulwarkAbility::OnGuardInterrupted()
 {
-    // 가드 도중 기절 등 하드 CC기에 노출되면 방벽을 즉시 취소 종료합니다.
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
@@ -146,6 +138,10 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
             FGameplayEffectQuery UniversalQuery;
             TArray<FActiveGameplayEffectHandle> ActiveHandles = SourceASC->GetActiveEffects(UniversalQuery);
 
+            // [메모리 컨테이너 무결성 타설망]:
+            // 실시간 제거 루프를 파쇄하고 제거 대상 타깃 핸들들만 격리 어레이에 깨끗하게 선제 수집합니다.
+            TArray<FActiveGameplayEffectHandle> HandlesToRemove;
+
             for (const FActiveGameplayEffectHandle& GEPipeHandle : ActiveHandles)
             {
                 const FActiveGameplayEffect* ActiveGE = SourceASC->GetActiveGameplayEffect(GEPipeHandle);
@@ -154,13 +150,18 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
                     if (ActiveGE->Spec.Def->GetAssetTags().HasTagExact(CooldownTag) || 
                         ActiveGE->Spec.Def->GetGrantedTags().HasTagExact(CooldownTag))
                     {
-                        SourceASC->RemoveActiveGameplayEffect(GEPipeHandle);
+                        HandlesToRemove.Add(GEPipeHandle);
                     }
                 }
+            }
+
+            // 안전 구역 탈출 직후 수집 장부를 기반으로 원자적 소각을 완수하여 서버 크래시를 차단합니다.
+            for (const FActiveGameplayEffectHandle& TargetHandle : HandlesToRemove)
+            {
+                SourceASC->RemoveActiveGameplayEffect(TargetHandle);
             }
         }
     }
     
-    // 💡 CommitAbilityCooldown 호출 구문은 상단 CommitAbility가 처리하므로 중복 배관을 과감히 소각합니다.
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

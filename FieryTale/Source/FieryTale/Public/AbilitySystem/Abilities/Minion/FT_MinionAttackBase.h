@@ -37,6 +37,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Attack | GAS")
     TSubclassOf<UGameplayEffect> DamageEffectClass;
     
+    UPROPERTY()
+    class UAbilityTask_WaitGameplayEvent* ActiveWaitEventTask;
+    
     /** 
      * 원거리 미니언일 경우 사출할 투사체 블루프린트 자산 슬롯 
      * 근접 미니언은 에디터에서 None으로 비워두면 즉시 타격 연산으로 자동 분기됩니다.

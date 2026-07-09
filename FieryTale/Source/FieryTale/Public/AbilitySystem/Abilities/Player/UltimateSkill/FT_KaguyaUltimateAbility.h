@@ -42,4 +42,7 @@ protected:
 	/** 적들에게 2초간 80% 이동 속도 감산을 주입할 슬로우 디버프 이펙트 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
 	TSubclassOf<class UGameplayEffect> SlowDebuffEffectClass;
+	
+	// 💡 글로벌 궁극기 자원 전선 초기화를 위해 마스터 EndAbility를 오버라이드 선언합니다.
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 };

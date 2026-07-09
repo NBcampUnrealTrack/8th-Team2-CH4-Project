@@ -24,18 +24,23 @@ UFT_WolfRoarAbility::UFT_WolfRoarAbility()
 
 void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    // [1단계] 마스터 베이스 게이지 소모 및 검증 관문 격발
+    // =========================================================================
+    // 💡 [1단계: 부모 가드선 최상단 전진 배치 - 버그 완전 박멸선]
+    // Super를 최상단으로 복구하여 부모의 코스트 직접 소각 및 궁극기 판정 태그
+    // 동 동기화 선로를 완벽하게 선제 고착합니다. 이로써 타격 시 100 리필 릭이 완전 소각됩니다.
+    // =========================================================================
+    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+    // [2단계] 마스터 베이스 게이지 소모 및 검증 관문 격발
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
 
-    Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
     AActor* OwnerActor = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
-    if (!OwnerActor || !SourceASC)
+    if (!IsValid(OwnerActor) || !SourceASC)
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
@@ -48,8 +53,6 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 
     // =========================================================================
     // 💡 [서버 주권 연산 레이어 완전 격리]
-    // 수치 변조 및 실질 디버프 주입은 순정 C++ HasAuthority() 검문선 내부에 가두어
-    // 데디케이트 서버 환경에서의 무결성 패킷 동기화를 이룩합니다.
     // =========================================================================
     if (HasAuthority(&ActivationInfo))
     {
@@ -64,58 +67,62 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         FCollisionQueryParams QueryParams;
         QueryParams.AddIgnoredActor(OwnerActor);
 
-        bool bHasOverlap = GetWorld()->OverlapMultiByChannel(
-            OverlapResults,
-            StartLocation,
-            FQuat::Identity,
-            ECollisionChannel::ECC_Pawn, 
-            ScanSphere,
-            QueryParams
-        );
-
-        if (bHasOverlap)
+        if (GetWorld())
         {
-            float DotThreshold = FMath::Cos(FMath::DegreesToRadians(ConeAngle * 0.5f));
+            bool bHasOverlap = GetWorld()->OverlapMultiByChannel(
+                OverlapResults,
+                StartLocation,
+                FQuat::Identity,
+                ECollisionChannel::ECC_Pawn, 
+                ScanSphere,
+                QueryParams
+            );
 
-            for (const FOverlapResult& Result : OverlapResults)
+            if (bHasOverlap)
             {
-                AActor* TargetActor = Result.GetActor();
-                if (!TargetActor) continue;
+                float DotThreshold = FMath::Cos(FMath::DegreesToRadians(ConeAngle * 0.5f));
 
-                FVector TargetDirection = (TargetActor->GetActorLocation() - StartLocation);
-                TargetDirection.Z = 0.f; // 2층 지형 수평 보정
-                TargetDirection.Normalize();
-
-                float CurrentDot = FVector::DotProduct(ForwardVector, TargetDirection);
-
-                // 부채꼴 시야각 외각 대상 필터링 탈출
-                if (CurrentDot < DotThreshold) continue;
-
-                UAbilitySystemComponent* TargetASC = TargetActor->GetComponentByClass<UAbilitySystemComponent>();
-                if (TargetASC)
+                for (const FOverlapResult& Result : OverlapResults)
                 {
-                    // AOS 피아식별 안전망 가동 (팀킬 방지)
-                    if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
-                    if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
+                    AActor* TargetActor = Result.GetActor();
+                    // 💡 [액세스 위반 크래시 완전 완치]: 포인터 생존 유효성을 먼저 검문합니다.
+                    if (!IsValid(TargetActor)) continue;
 
-                    // 1) 대미지 이펙트 사출
-                    if (DamageGameplayEffectClass)
+                    FVector TargetDirection = (TargetActor->GetActorLocation() - StartLocation);
+                    TargetDirection.Z = 0.f; // 2층 지형 수평 보정
+                    TargetDirection.Normalize();
+
+                    float CurrentDot = FVector::DotProduct(ForwardVector, TargetDirection);
+
+                    // 부채꼴 시야각 외각 대상 필터링 탈출
+                    if (CurrentDot < DotThreshold) continue;
+
+                    UAbilitySystemComponent* TargetASC = TargetActor->GetComponentByClass<UAbilitySystemComponent>();
+                    if (TargetASC)
                     {
-                        FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffectClass, GetAbilityLevel());
-                        if (DamageSpecHandle.IsValid())
+                        // AOS 피아식별 안전망 가동 (팀킬 방지)
+                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
+                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
+
+                        // 1) 대미지 이펙트 사출
+                        if (DamageGameplayEffectClass)
                         {
-                            DamageSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamageValue);
-                            TargetASC->ApplyGameplayEffectSpecToSelf(*DamageSpecHandle.Data.Get());
+                            FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffectClass, GetAbilityLevel());
+                            if (DamageSpecHandle.IsValid())
+                            {
+                                DamageSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamageValue);
+                                TargetASC->ApplyGameplayEffectSpecToSelf(*DamageSpecHandle.Data.Get());
+                            }
                         }
-                    }
 
-                    // 2) 군중 제어 속박(Root) 디버프 주입
-                    if (RootGameplayEffectClass)
-                    {
-                        FGameplayEffectSpecHandle RootSpecHandle = MakeOutgoingGameplayEffectSpec(RootGameplayEffectClass, GetAbilityLevel());
-                        if (RootSpecHandle.IsValid())
+                        // 2) 군중 제어 속박(Root) 디버프 주입
+                        if (RootGameplayEffectClass)
                         {
-                            TargetASC->ApplyGameplayEffectSpecToSelf(*RootSpecHandle.Data.Get());
+                            FGameplayEffectSpecHandle RootSpecHandle = MakeOutgoingGameplayEffectSpec(RootGameplayEffectClass, GetAbilityLevel());
+                            if (RootSpecHandle.IsValid())
+                            {
+                                TargetASC->ApplyGameplayEffectSpecToSelf(*RootSpecHandle.Data.Get());
+                            }
                         }
                     }
                 }
@@ -124,4 +131,17 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
     }
     
     EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+}
+
+void UFT_WolfRoarAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+    // 💡 [자가 수급 전선 초기화 마감]:
+    // 어빌리티 해제 파이프라인에서 부모가 동적으로 얹어두었던 느슨한 태그를 완전히 소각합니다.
+    UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+    if (SourceASC)
+    {
+        SourceASC->RemoveLooseGameplayTag(FTTags::FTAbilities::UltimateSkill);
+    }
+
+    Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

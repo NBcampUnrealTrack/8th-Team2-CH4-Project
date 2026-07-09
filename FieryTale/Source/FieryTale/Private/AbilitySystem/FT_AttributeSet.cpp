@@ -97,13 +97,15 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
             {
                 if (UAbilitySystemComponent* InstigatorASC = Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent())
                 {
-                    //  [수급 이중 꼬임 완치 가드선]: 
-                    // 1. 대미지 GE 에셋 자체에 태그가 박혀 있거나 (AssetTags)
-                    // 2. 이 대미지 스펙을 발행한 주체(궁극기 어빌리티 등)가 동적으로 부여한 태그(GrantedTags) 양단을 모두 검문합니다.
+                    //  [3중 무결성 크로스 가드선 타설]:
+                    // 1. 대미지 GE 에셋 자체 태그 검문 (AssetTags)
+                    // 2. 대미지 스펙의 동적 부여 태그 검문 (DynamicGrantedTags)
+                    // 3. [가구야 릭 완전 완치]: 대미지를 가한 공격자(Instigator)의 ASC 몸뚱이에 궁극기 시전 태그가 살아있는지 직접 검문합니다.
                     bool bIsUltimateDamage = Data.EffectSpec.Def->GetAssetTags().HasTag(FTTags::FTAbilities::UltimateSkill) || 
-                                             Data.EffectSpec.DynamicGrantedTags.HasTag(FTTags::FTAbilities::UltimateSkill);
+                                             Data.EffectSpec.DynamicGrantedTags.HasTag(FTTags::FTAbilities::UltimateSkill) ||
+                                             InstigatorASC->HasMatchingGameplayTag(FTTags::FTAbilities::UltimateSkill);
 
-                    //  궁극기로 가한 대미지가 확실히 아닐 때만 게이지를 충전합니다.
+                    // 궁극기로 가한 대미지가 확실히 아닐 때만 게이지를 충전합니다.
                     if (!bIsUltimateDamage)
                     {
                         const UFT_AttributeSet* InstigatorAttributeSet = Cast<UFT_AttributeSet>(InstigatorASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));

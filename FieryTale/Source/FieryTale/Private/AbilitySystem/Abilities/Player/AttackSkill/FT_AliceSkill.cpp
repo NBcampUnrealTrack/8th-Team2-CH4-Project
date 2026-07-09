@@ -58,6 +58,8 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     // 시계 토끼 환영(독립 투사체) 사출 격발
     FireClockRabbit();
     
+    // 💡 [레이스 컨디션 안전 우회선]: 비주얼 태스크가 생성되지 않았더라도 즉시 꺼버리지 않고 
+    // 최소한의 동기화 프레임을 확보한 뒤 클린 마감합니다.
     if (!bHasVisualTask)
     {
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
@@ -103,11 +105,11 @@ void UFT_AliceSkill::HandleSkillInterrupted()
     {
         UAbilitySystemComponent* MyASC = CurrentActorInfo->AbilitySystemComponent.Get();
         
+        // 💡 [네트워크 동기화 쿨타임 환불 릭 수정]:
+        // LocalPredicted 정책에 의거하여, 시전자가 CC기를 맞아 캔슬되었을 때 서버와 클라이언트 양단에서
+        // 예측적으로 돌던 우클릭 쿨타임 이펙트 장부를 완벽하게 동시 소각 마감합니다.
         FGameplayEffectQuery UniversalQuery;
         TArray<FActiveGameplayEffectHandle> ActiveHandles = MyASC->GetActiveEffects(UniversalQuery);
-        
-        // 💡 [메모리 컨테이너 훼손 방어선 타설]: 실시간 지우기로 루프를 폭파하지 않고,
-        // 타깃 쿨타임 핸들들만 격리 어레이에 깨끗하게 선제 수집합니다.
         TArray<FActiveGameplayEffectHandle> HandlesToRemove;
 
         for (const FActiveGameplayEffectHandle& Handle : ActiveHandles)
@@ -123,13 +125,12 @@ void UFT_AliceSkill::HandleSkillInterrupted()
             }
         }
 
-        // 💡 안전 구역으로 탈출한 직후 수집 장부를 기반으로 원자적 소각을 완수합니다.
         for (const FActiveGameplayEffectHandle& TargetHandle : HandlesToRemove)
         {
             MyASC->RemoveActiveGameplayEffect(TargetHandle);
         }
     }
 
-    // 인터럽트에 의한 능동 종료 명시
+    // 인터럽트에 의한 능동 종료 명시 (bWasCancelled = true)
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }

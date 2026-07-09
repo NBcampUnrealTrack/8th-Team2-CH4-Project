@@ -20,6 +20,12 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
 protected:
+	// 💡 [자원 사이클 초기화 배관 안착]: 
+	// 어빌리티 종료 시 부모 클래스가 시전자에게 심어둔 궁극기 동적 플래그를 
+	// 클린하게 수거 청소하기 위해 마스터 EndAbility 가상 함수를 선언합니다.
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+
+protected:
 	// --- 늑대 포효 물리 판정 스펙 ---
 	/** 늑대 포효 부채꼴 중심 사거리 수치 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Wolf Spec")
