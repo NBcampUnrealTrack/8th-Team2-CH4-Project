@@ -143,10 +143,11 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 		}
 
 	}
-	/*if (UClass* AnimBPClass = Data->AnimClass.LoadSynchronous())
+	
+	if (UClass* AnimBPClass = Data->AnimClass.LoadSynchronous())
 	{
 		GetMesh()->SetAnimInstanceClass(AnimBPClass);
-	}*/
+	}
 }
 
 AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer)
