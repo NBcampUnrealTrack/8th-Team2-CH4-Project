@@ -76,13 +76,13 @@ void AFTNexus::PerformDestructionEffects()
 	if (DebrisMesh)
 	{
 		DebrisMesh->SetVisibility(true); // 숨겨둔 카오스 조각 파편 렌더링 활성화
-		DebrisMesh->SetSimulatePhysics(true); // 언리얼 물리 엔진에 파편 시뮬레이션 계산 개방 지시
+		DebrisMesh->SetSimulatePhysics(true); // 복구 완료: 캐시 매니저가 조각들을 통제할 수 있도록 카오스 물리 스레드 재개방
 	}
 
 	if (DestructionSound) UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation()); // 위치 기반 파괴 사운드 재생
 	if (DestructionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation()); // 방향 기반 폭발 이펙트 재생
 
-	OnNexusDestroyed(); // 1P와 2P의 블루프린트 그래프로 파괴 신호를 발송하여 카오스 매니저 노드 동시 가동
+	OnNexusDestroyed(); // 블루프린트단에 캐시 애니메이션 트리거 신호 발송
 }
 
 void AFTNexus::NotifyGameMode()
