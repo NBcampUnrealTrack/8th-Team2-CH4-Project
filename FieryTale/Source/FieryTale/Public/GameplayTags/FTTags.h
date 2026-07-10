@@ -107,7 +107,25 @@ namespace FTTags
     
     namespace FTGameplayCue
     {
+        // 미니언 히트
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(Minion_AttackHit);
+    	// 공용 디버프 
         UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Stunned);
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Rooted);
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Taunted);
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Slow);
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Knockback);
+    	
+    	//앨리스 
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Alice_AttackHit);
+    	
+    	//카구야
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Kaguya_AttackHit);
+    	
+    	//빨간 망토
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(RedHood_AttackHit);
+    	
+    	//알라딘
+    	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Aladdin_AttackHit);
     }
 }
