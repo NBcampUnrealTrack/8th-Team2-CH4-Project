@@ -102,10 +102,29 @@ namespace FTTags
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(KillScored, "FTTags.Event.KillScored", "적 영웅 혹은 크리처 처치 달성 시 배관망에 사출되는 마스터 이벤트 태그");
     }
-    
-    namespace FTGameplayCue
-    {
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_AttackHit, "FTTags.FTGameplayCue.Minion.AttackHit", "미니언 평타 적중 및 투사체 폭발 시 시각/청각 연출 격발용 큐");
-       UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Stunned, "FTTags.FTGameplayCue.Debuff.Stunned", "기절 상태 지속 시간 동안 머리 위에 루핑 이펙트를 부착하는 상태 큐");
-    }
+	
+}
+
+namespace GameplayCue
+{
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_AttackHit, "GameplayCue.Minion.AttackHit", "미니언 평타 적중 및 투사체 폭발 시 시각/청각 연출 격발용 큐");
+
+	// 공용 디버프 
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Stunned, "GameplayCue.Debuff.Stunned", "기절: 모든 행동이 불가능해지는 상태이상 디버프 태그");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Rooted, "GameplayCue.Debuff.Rooted", "속박: 이동이 불가능해지는 상태이상 디버프 태그");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Taunted, "GameplayCue.Debuff.Taunted", "도발: 시선이 강제 고정되며 스킬 사용이 불가능해지는 상태이상 디버프 태그");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Slow, "GameplayCue.Debuff.Slow", "둔화: 이동 속도가 감소하는 상태이상 디버프 태그");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Knockback, "GameplayCue.Debuff.Knockback", "넉백: 중심부에서 바깥쪽으로 밀려나는 상태이상 디버프 태그");
+
+	// 앨리스 
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_AttackHit, "GameplayCue.Alice.AttackHit", "앨리스 기본 공격(로얄 카드) 적중 시 발생하는 이벤트 태그");
+
+	// 카구야
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Kaguya_AttackHit, "GameplayCue.Kaguya.AttackHit", "가구야 기본 공격(죽절격) 적중 시 발생하는 이벤트 태그");
+
+	// 빨간 망토
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(RedHood_AttackHit, "GameplayCue.RedHood.AttackHit", "빨간 망토 기본 공격(사냥꾼의 유산) 적중 시 발생하는 이벤트 태그");
+
+	// 알라딘
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aladdin_AttackHit, "GameplayCue.Aladdin.AttackHit", "알라딘 기본 공격(램프의 불꽃) 적중 시 발생하는 이벤트 태그");
 }

@@ -127,7 +127,7 @@ void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Hand
             TargetCooldownTags.AddTag(CooldownTag);
 
             // 엔진 공식 순정 팩토리 함수인 MakeQuery_MatchAnyEffectTags 제어선으로 단일화하여 무기 스왑이나 강제 인터럽트 시 발생하는 먹통 결함을 원천 진압합니다.
-            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyEffectTags(TargetCooldownTags);
+            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
             SourceASC->RemoveActiveEffects(CooldownQuery);
         }
     }
