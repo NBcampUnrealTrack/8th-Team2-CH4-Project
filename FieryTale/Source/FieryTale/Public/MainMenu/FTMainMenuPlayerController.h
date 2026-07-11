@@ -17,5 +17,5 @@ class FIERYTALE_API AFTMainMenuPlayerController : public APlayerController
 	virtual void BeginPlay() override;
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<class UFTMainMenuWidget> MainMenuWidgetClass;
+	TSubclassOf<class UFTMainMenu> MainMenuClass;
 };

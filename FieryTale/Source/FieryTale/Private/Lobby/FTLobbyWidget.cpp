@@ -33,6 +33,10 @@ void UFTLobbyWidget::NativeConstruct()
 	{
 		Btn_StartGame->OnClicked.AddDynamic(this, &UFTLobbyWidget::OnStartGameClicked);
 	}
+	if (Btn_ReturnToMain)
+	{
+		Btn_ReturnToMain->OnClicked.AddDynamic(this, &UFTLobbyWidget::OnReturnToMainClicked);
+	}
 }
 
 void UFTLobbyWidget::NativeDestruct()
@@ -183,6 +187,16 @@ void UFTLobbyWidget::OnReadyStateChanged()
 			Text_ReadyStatus->SetText(FText::FromString(TEXT("상태: 대기 중...")));
 			Text_ReadyStatus->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 		}
+	}
+}
+
+void UFTLobbyWidget::OnReturnToMainClicked()
+{
+	if (LobbyPC)
+	{
+		// 버튼이 여러 번 눌리는 것을 방지
+		Btn_ReturnToMain->SetIsEnabled(false); 
+		LobbyPC->LeaveLobby();
 	}
 }
 

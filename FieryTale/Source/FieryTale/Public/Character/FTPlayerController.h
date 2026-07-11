@@ -181,6 +181,10 @@ public:
 	// 서버가 클라이언트에게 결과창을 띄우라고 지시하는 RPC
 	UFUNCTION(Client, Reliable)
 	void Client_ShowResultUI(uint8 WinningTeam);
+	
+	// 로비 퇴장 및 메인 메뉴 복귀 함수
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Lobby")
+	void LeaveLobby();
 
 protected:
 	UFUNCTION(Server, Reliable)

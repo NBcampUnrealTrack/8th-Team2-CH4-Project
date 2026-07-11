@@ -2,25 +2,25 @@
 
 
 #include "MainMenu/FTMainMenuPlayerController.h"
-#include "MainMenu/FTMainMenuWidget.h"
+#include "MainMenu/FTMainMenu.h"
 
 void AFTMainMenuPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
 	// 로컬 플레이어일 때만 생성
-	if (IsLocalPlayerController() && MainMenuWidgetClass)
+	if (IsLocalPlayerController() && MainMenuClass)
 	{
-		UFTMainMenuWidget* MainMenuWidget = CreateWidget<UFTMainMenuWidget>(this, MainMenuWidgetClass);
-		if (MainMenuWidget)
+		UFTMainMenu* MainMenu = CreateWidget<UFTMainMenu>(this, MainMenuClass);
+		if (MainMenu)
 		{
-			MainMenuWidget->AddToViewport();
+			MainMenu->AddToViewport();
 
 			bShowMouseCursor = true;
 
 			// UI 입력 모드로 설정
 			FInputModeUIOnly InputModeData;
-			InputModeData.SetWidgetToFocus(MainMenuWidget->TakeWidget());
+			InputModeData.SetWidgetToFocus(MainMenu->TakeWidget());
 			InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 			SetInputMode(InputModeData);
 		}
