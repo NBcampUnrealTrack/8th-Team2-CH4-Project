@@ -32,7 +32,8 @@ void AFTPlayerState::CopyProperties(APlayerState* PlayerState)
 void AFTPlayerState::AssignTeamTag(EFTTeam InTeam)
 {
 	Team = InTeam;
-	ApplyTeamTag();
+	bTeamAssigned = true; // false→true는 항상 실제 변화이므로, 이 값을 트리거로 삼아 클라이언트 RepNotify를 보장한다
+	ApplyTeamTag(); // 서버(Authority) 자신은 OnRep을 안 타므로 여기서 바로 적용
 }
 
 void AFTPlayerState::AddKill()
@@ -45,12 +46,12 @@ void AFTPlayerState::AddDeath()
 	if (HasAuthority()) Deaths++;
 }
 
-void AFTPlayerState::OnRep_Team()
+void AFTPlayerState::OnRep_TeamAssigned()
 {
-	ApplyTeamTag();
+	ApplyTeamTag(); // 이 시점엔 Team 값도 이미 서버가 배정한 최종값으로 도착해 있다
 }
 
-void AFTPlayerState::ApplyTeamTag() const
+void AFTPlayerState::ApplyTeamTag()
 {
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	if (!ASC)
@@ -66,6 +67,10 @@ void AFTPlayerState::ApplyTeamTag() const
 		: FTTags::FTFaction::Team_Red;
 
 	ASC->AddLooseGameplayTag(TeamTag);
+
+	// 팀 태그 확정을 기다리던 체력바 위젯들에게 통지하고, 1회성 신호이므로 즉시 비운다
+	OnTeamTagReady.Broadcast();
+	OnTeamTagReady.Clear();
 }
 
 void AFTPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -74,6 +79,7 @@ void AFTPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	
 	DOREPLIFETIME(AFTPlayerState, SpawnedCharacter);
 	DOREPLIFETIME(AFTPlayerState, Team);
+	DOREPLIFETIME(AFTPlayerState, bTeamAssigned);
 	DOREPLIFETIME(AFTPlayerState, SelectedCharacterType);
 	DOREPLIFETIME(AFTPlayerState, PlayerIndex);
 	DOREPLIFETIME(AFTPlayerState, Kills);

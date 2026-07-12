@@ -498,8 +498,12 @@ void AFTPlayerController::OnRep_PlayerState()
 			ArenaHUDWidgetInstance = CreateWidget<UUserWidget>(this, ArenaHUDWidget);
 			if (ArenaHUDWidgetInstance) ArenaHUDWidgetInstance->AddToViewport();
 		}
-		
+
 		UE_LOG(LogTemp, Log, TEXT("[PlayerController] 전장 클라이언트 UI 및 입력 모드 복구 완료!"));
+
+		// PlayerState 조회가 막 가능해졌음을 대기 중이던 체력바 위젯들에게 통지하고, 1회성 신호이므로 즉시 비운다
+		OnPlayerStateReady.Broadcast();
+		OnPlayerStateReady.Clear();
 	}
 }
 

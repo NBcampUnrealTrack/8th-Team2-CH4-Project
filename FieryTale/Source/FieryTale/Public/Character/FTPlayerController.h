@@ -24,6 +24,10 @@ enum class EFTTeam : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(FTPlayerController, Log, All);
 
+// 로컬 소유 클라이언트에서 이 컨트롤러의 PlayerState 참조가 막 유효해졌을 때 1회 발생한다.
+// PlayerState가 아직 없어 팀 정보를 조회할 수조차 없었던 체력바 위젯들이 구독해뒀다가 재시도하는 용도.
+DECLARE_MULTICAST_DELEGATE(FOnPlayerStateReady);
+
 UCLASS()
 class FIERYTALE_API AFTPlayerController : public APlayerController
 {
@@ -38,6 +42,9 @@ public:
 	// GameMode에서 호출 — 팀을 PlayerState에 바인딩
 	void AssignTeam(EFTTeam InTeam);
 	void RequestRespawn();
+
+	// 로컬 소유 클라이언트에서 PlayerState 참조가 막 유효해지면 1회 발생한다
+	FOnPlayerStateReady OnPlayerStateReady;
 
 	// DT_CharacterData 테이블 하나만 보관한다. RowName은 EFTCharacterType 값 이름(RedHood/Aladdin/Kaguya/Alice)과
 	// 반드시 일치해야 하며, 스폰 시 SpawnCharacter()에서 RowName을 동적으로 찾아 행을 주입한다.

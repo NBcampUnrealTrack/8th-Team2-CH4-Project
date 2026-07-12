@@ -11,7 +11,9 @@
 class UFT_AbilitySystemComponent;
 class UFT_AttributeSet;
 
-
+// 이 PlayerState의 팀(Blue/Red) 태그가 ASC에 확정되면 1회 발생한다.
+// 팀 확정 전에 색상을 판정하려던 체력바 위젯들이 구독해뒀다가 재시도하는 용도.
+DECLARE_MULTICAST_DELEGATE(FOnTeamTagReady);
 
 UCLASS()
 class FIERYTALE_API AFTPlayerState  : public APlayerState, public IAbilitySystemInterface
@@ -31,7 +33,10 @@ public:
 
 	// GameMode → PlayerController → 여기로 전달되는 팀 태그 바인딩 함수
 	void AssignTeamTag(EFTTeam InTeam);
-	
+
+	// 이 PlayerState의 팀 태그가 확정되면 1회 발생한다 (경기 중 팀이 바뀌지 않으므로 1회성 신호로 취급)
+	FOnTeamTagReady OnTeamTagReady;
+
 	UFUNCTION(BlueprintPure, Category = "FieryTale|Team")
 	EFTTeam GetTeam() const { return Team; }
 	
@@ -72,14 +77,17 @@ private:
 	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
 	EFTCharacterType SelectedCharacterType;
 
-	// 복제되어 클라이언트에서 OnRep_Team을 트리거함
-	UPROPERTY(ReplicatedUsing = OnRep_Team)
+	UPROPERTY(Replicated)
 	EFTTeam Team = EFTTeam::Blue;
 
-	UFUNCTION()
-	void OnRep_Team();
+	// 팀이 실제로 배정됐는지 여부. 기본값이 항상 false라서 배정 시(false→true) RepNotify가 100% 보장된다.
+	UPROPERTY(ReplicatedUsing = OnRep_TeamAssigned)
+	bool bTeamAssigned = false;
 
-	void ApplyTeamTag() const;
+	UFUNCTION()
+	void OnRep_TeamAssigned();
+
+	void ApplyTeamTag();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | GAS", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UFT_AbilitySystemComponent> AbilitySystemComponent;

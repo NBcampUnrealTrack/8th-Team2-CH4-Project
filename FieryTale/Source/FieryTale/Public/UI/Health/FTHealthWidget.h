@@ -54,8 +54,13 @@ private:
 	// 사망 지연 후 UI 숨김
 	void HideWidgetAfterDelay();
 
-	// 팩션 판별 및 틴트 컬러 적용
-	void UpdateTeamColor();
+	// 팀 판정 재시도 게이트 — BoundASC(대상)/LocalASC(내 플레이어) 양쪽 PlayerState에 팀 태그가
+	// 모두 붙기 전까지는 색상 확정과 노출을 보류한다. 준비 안 된 쪽의 PlayerState/PlayerController가
+	// 갖고 있는 "준비 완료" 델리게이트에 자기 자신을 등록해뒀다가, 신호가 오면 이 함수가 다시 호출된다.
+	void TryResolveTeamColor();
+
+	// 특정 ASC에 팀(Blue/Red) 태그가 붙어있는지 확인
+	static bool HasTeamTag(const UAbilitySystemComponent* ASC);
 
 	// 머티리얼 파라미터 동기화
 	void RefreshHealthDisplay();
@@ -76,4 +81,7 @@ private:
 
 	// 유예 타이머 핸들
 	FTimerHandle DeathTimerHandle;
+
+	// 팀 색상이 이미 확정됐는지 여부 — 확정 후에는 재판정하지 않는다
+	bool bTeamColorResolved = false;
 };

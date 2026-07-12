@@ -9,6 +9,8 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Character/FTPlayerController.h"
+#include "Character/FTPlayerState.h"
 
 void UFTHealthWidget::NativeDestruct()
 {
@@ -39,7 +41,8 @@ void UFTHealthWidget::BindToAttributes(UAbilitySystemComponent* InASC)
 	if (!InASC) return; // ASC 유효성 검사
 	BoundASC = InASC; // 대상 포인터 저장
 
-	SetVisibility(ESlateVisibility::SelfHitTestInvisible); // UI 렌더링 활성화 및 힛테스트 무시
+	// 팀 판정이 끝나기 전까지는 숨겨둔다 — TryResolveTeamColor()가 확정되는 순간 노출 전환
+	SetVisibility(ESlateVisibility::Collapsed);
 
 	if (HealthBar && !DynamicFillMaterial) // 동적 머티리얼 캐싱 조건 확인
 	{
@@ -63,8 +66,8 @@ void UFTHealthWidget::UnbindFromAttributes()
 	BoundASC->GetGameplayAttributeValueChangeDelegate(UFT_AttributeSet::GetHealthAttribute()).RemoveAll(this); // 체력 이벤트 해제
 	BoundASC->GetGameplayAttributeValueChangeDelegate(UFT_AttributeSet::GetMaxHealthAttribute()).RemoveAll(this); // 최대 체력 이벤트 해제
 	BoundASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved).RemoveAll(this); // 사망 이벤트 해제
-	
 	BoundASC = nullptr; // 포인터 참조 해제
+	bTeamColorResolved = false; // 다음 바인딩을 위한 판정 상태 초기화
 }
 
 void UFTHealthWidget::FetchInitialAttributes()
@@ -78,7 +81,7 @@ void UFTHealthWidget::FetchInitialAttributes()
 	float InitialMaxHealth = BoundASC->GetGameplayAttributeValue(UFT_AttributeSet::GetMaxHealthAttribute(), bFound); // 최신 실시간 최대 체력 수치 추출
 	if (bFound) CachedMaxHealth = InitialMaxHealth;
 
-	UpdateTeamColor(); // 피아식별 색상 동기화
+	TryResolveTeamColor(); // 피아식별 색상 판정 시도 (준비 안 됐으면 재시도 등록 후 대기)
 	RefreshHealthDisplay(); // 그래픽 파라미터 전송 및 리드로우
 }
 
@@ -110,26 +113,60 @@ void UFTHealthWidget::HideWidgetAfterDelay()
 	SetVisibility(ESlateVisibility::Collapsed); // UI 가시성 완전 제거
 }
 
-void UFTHealthWidget::UpdateTeamColor()
+bool UFTHealthWidget::HasTeamTag(const UAbilitySystemComponent* ASC)
 {
-	if (!BoundASC || !HealthBar) return; // 컴포넌트 유효성 검사
+	return ASC && (ASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) || ASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red));
+}
 
-	FLinearColor FinalColor = FLinearColor(1.0f, 0.05f, 0.0f, 1.0f); // 디폴트 적색 설정
+void UFTHealthWidget::TryResolveTeamColor()
+{
+	if (bTeamColorResolved || !BoundASC || !HealthBar) return; // 이미 확정됐거나 컴포넌트가 없으면 재판정 불필요
 
-	if (APlayerController* LocalPC = GetOwningPlayer())
+	if (!HasTeamTag(BoundASC))
 	{
-		if (UAbilitySystemComponent* LocalASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(LocalPC->GetPawn()))
+		// 대상(캐릭터 본인)의 팀 태그가 아직 안 붙음 — 그 PlayerState가 팀을 확정하는 순간 재시도.
+		// 타워/넥서스는 자체 ASC에 팀 태그를 BeginPlay에서 동기적으로 붙이므로 이 분기를 탈 일이 없다.
+		if (AFTPlayerState* BoundPS = Cast<AFTPlayerState>(BoundASC->GetOwnerActor()))
 		{
-			bool bIsAlly = false;
-			if (LocalASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && BoundASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsAlly = true; // 블루팀 동맹 판정
-			else if (LocalASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && BoundASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsAlly = true; // 레드팀 동맹 판정
-
-			if (bIsAlly) HealthBar->SetColorAndOpacity(FLinearColor(0.2f, 1.0f, 0.1f, 1.0f)); // 아군 녹색 적용
-			else HealthBar->SetColorAndOpacity(FLinearColor(1.0f, 0.05f, 0.0f, 1.0f)); // 적군 적색 적용
-			return;
+			BoundPS->OnTeamTagReady.RemoveAll(this);
+			BoundPS->OnTeamTagReady.AddUObject(this, &UFTHealthWidget::TryResolveTeamColor);
 		}
+		return;
 	}
-	HealthBar->SetColorAndOpacity(FinalColor); // 최종 연산 색상 할당
+
+	APlayerController* LocalPC = GetOwningPlayer();
+	if (!LocalPC) return; // 이 위젯의 로컬 뷰어 자체가 아직 없음 — InitializeWithAbilitySystem이 재호출될 때 다시 시도된다
+
+	AFTPlayerState* LocalPS = LocalPC->GetPlayerState<AFTPlayerState>();
+	if (!LocalPS)
+	{
+		// 내 PlayerState가 아직 컨트롤러에 배정되지 않음 — 배정되는 순간 재시도
+		if (AFTPlayerController* LocalFTPC = Cast<AFTPlayerController>(LocalPC))
+		{
+			LocalFTPC->OnPlayerStateReady.RemoveAll(this);
+			LocalFTPC->OnPlayerStateReady.AddUObject(this, &UFTHealthWidget::TryResolveTeamColor);
+		}
+		return;
+	}
+
+	UAbilitySystemComponent* LocalASC = LocalPS->GetAbilitySystemComponent();
+	if (!HasTeamTag(LocalASC))
+	{
+		// 내 팀 태그가 아직 안 붙음 — 확정되는 순간 재시도
+		LocalPS->OnTeamTagReady.RemoveAll(this);
+		LocalPS->OnTeamTagReady.AddUObject(this, &UFTHealthWidget::TryResolveTeamColor);
+		return;
+	}
+
+	// 양쪽 다 준비됨 — 색상 최종 확정 및 노출
+	bTeamColorResolved = true;
+
+	bool bIsAlly = false;
+	if (LocalASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && BoundASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsAlly = true; // 블루팀 동맹 판정
+	else if (LocalASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && BoundASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsAlly = true; // 레드팀 동맹 판정
+
+	HealthBar->SetColorAndOpacity(bIsAlly ? FLinearColor(0.2f, 1.0f, 0.1f, 1.0f) : FLinearColor(1.0f, 0.05f, 0.0f, 1.0f)); // 아군 녹색 / 적군 적색 적용
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible); // 판정 완료 후 노출
 }
 
 void UFTHealthWidget::RefreshHealthDisplay()
