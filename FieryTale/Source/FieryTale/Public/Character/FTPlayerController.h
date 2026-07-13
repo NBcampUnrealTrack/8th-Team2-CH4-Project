@@ -15,6 +15,7 @@ class AFTPlayerState;
 class UInputMappingContext;
 class UInputAction;
 class UFTLobbyWidget;
+class UFTChatWidget;
 
 struct FFTCharacterData;
 class UFTHUDLayoutSubsystem;
@@ -45,6 +46,9 @@ public:
 
 	// 로컬 소유 클라이언트에서 PlayerState 참조가 막 유효해지면 1회 발생한다
 	FOnPlayerStateReady OnPlayerStateReady;
+
+	//	채팅 위젯이 NativeConstruct에서 자신을 등록한다. ChatAction(엔터)이 이 위젯의 입력창에 포커스를 준다.
+	void SetActiveChatWidget(UFTChatWidget* InWidget);
 
 	// DT_CharacterData 테이블 하나만 보관한다. RowName은 EFTCharacterType 값 이름(RedHood/Aladdin/Kaguya/Alice)과
 	// 반드시 일치해야 하며, 스폰 시 SpawnCharacter()에서 RowName을 동적으로 찾아 행을 주입한다.
@@ -133,6 +137,9 @@ private:
 
 	FVector  RespawnLocation;
 	FRotator RespawnRotation;
+
+	//	현재 화면에 떠 있는 채팅 위젯(HUD에 중첩돼 있어도 자가 등록으로 참조를 얻는다).
+	TWeakObjectPtr<UFTChatWidget> ActiveChatWidget;
 
 	// Enhanced Input → Character 위임
 	void Move(const FInputActionValue& Value);

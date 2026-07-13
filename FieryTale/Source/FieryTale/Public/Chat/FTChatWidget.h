@@ -26,6 +26,13 @@ class FIERYTALE_API UFTChatWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	/** 입력창에 키보드 포커스를 주고, 타이핑 중 게임 입력이 먹지 않도록 UIOnly로 전환한다.
+	 *  게임 플레이 중 컨트롤러의 ChatAction(엔터)에서 호출한다.
+	 *  위젯에서 직접 엔터를 감지할 수 없는 이유: 플레이 중 키보드 포커스는 게임 뷰포트에 있고
+	 *  이 위젯엔 없기 때문이다. 그래서 열기 트리거는 반드시 컨트롤러 입력을 거쳐야 한다. */
+	void FocusMessageInput();
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
@@ -71,6 +78,9 @@ private:
 
 	/** 입력창의 현재 내용을 전송하고 비운다. */
 	void SubmitCurrentInput();
+
+	/** UIOnly로 잠갔던 입력 모드를 게임 전용으로 되돌린다(엔터 전송/버튼 전송 후 호출). */
+	void RestoreGameInput();
 
 	/** 메시지 한 건을 스크롤 박스에 한 줄로 추가한다. (기반 단계: 단순 텍스트) */
 	void AddMessageRow(const FFTChatMessage& Message);

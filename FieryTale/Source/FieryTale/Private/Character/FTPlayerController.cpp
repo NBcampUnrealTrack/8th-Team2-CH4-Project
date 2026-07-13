@@ -20,6 +20,7 @@
 
 #include "Lobby/FTLobbyPlayerState.h"
 #include "Lobby/FTLobbyWidget.h"
+#include "Chat/FTChatWidget.h"
 #include "FieryTaleLog.h"
 #include "Camera/CameraActor.h"
 #include "Core/Game/FTArenaGameState.h"
@@ -422,9 +423,18 @@ void AFTPlayerController::OnAltReleased()
 	}
 }
 
+void AFTPlayerController::SetActiveChatWidget(UFTChatWidget* InWidget)
+{
+	ActiveChatWidget = InWidget;
+}
+
 void AFTPlayerController::OnChatPressed()
 {
-
+	//	게임 중 엔터 → 채팅 입력창에 포커스. (위젯 쪽에서 입력 모드를 UIOnly로 잠근다)
+	if (ActiveChatWidget.IsValid())
+	{
+		ActiveChatWidget->FocusMessageInput();
+	}
 }
 
 void AFTPlayerController::OnDeadTagChanged(const FGameplayTag Tag, int32 NewCount)
