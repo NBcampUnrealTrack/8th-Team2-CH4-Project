@@ -25,27 +25,41 @@ protected:
 	virtual void NativeConstruct() override;
 
 	// --- 방 만들기 패널 ---
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
 	UEditableTextBox* Input_RoomName;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
 	UEditableTextBox* Input_MaxPlayers;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
 	UButton* Btn_HostSession;
+	
+	// --- 방 만들기 카드용 ---
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
+	class UWidgetSwitcher* Switcher_HostCard;
+
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
+	class UButton* Btn_HostCardFront; // 앞면 버튼
 
 	// --- 방 찾기/참여 패널 ---
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
 	UButton* Btn_FindSessions;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
 	UScrollBox* Scroll_SessionList;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
 	UButton* Btn_JoinSession;
+	
+	// --- 방 찾기 카드용 ---
+	UPROPERTY(BlueprintReadWrite,meta = (BindWidget))
+	class UWidgetSwitcher* Switcher_JoinCard;
+
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
+	class UButton* Btn_JoinCardFront; // 앞면 버튼
 
 	// --- 상태 표시 ---
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget))
 	UTextBlock* Text_StatusMessage;
 
 	// 리스트에 추가할 Row 위젯 클래스 (블루프린트에서 설정)
@@ -61,6 +75,14 @@ private:
 
 	UFUNCTION()
 	void OnJoinButtonClicked();
+	
+	// 앞면 클릭 시 호출될 함수
+	UFUNCTION()
+	void OnHostFrontClicked();
+
+	UFUNCTION()
+	void OnJoinFrontClicked();
+
 
 	// 서브시스템 델리게이트 콜백
 	UFUNCTION()

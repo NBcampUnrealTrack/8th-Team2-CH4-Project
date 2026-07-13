@@ -6,6 +6,7 @@
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
+#include "Components/WidgetSwitcher.h"
 #include "MainMenu/FTSessionRowWidget.h"
 #include "Engine/GameInstance.h"
 
@@ -29,6 +30,14 @@ void UFTMainMenuWidget::NativeConstruct()
 	if (Btn_HostSession)  Btn_HostSession->OnClicked.AddDynamic(this, &UFTMainMenuWidget::OnHostButtonClicked);
 	if (Btn_FindSessions) Btn_FindSessions->OnClicked.AddDynamic(this, &UFTMainMenuWidget::OnFindButtonClicked);
 	if (Btn_JoinSession)  Btn_JoinSession->OnClicked.AddDynamic(this, &UFTMainMenuWidget::OnJoinButtonClicked);
+	
+	// 1. 시작할 때 스위처를 무조건 0번(앞면)으로 초기화합니다.
+	if (Switcher_HostCard) Switcher_HostCard->SetActiveWidgetIndex(0);
+	if (Switcher_JoinCard) Switcher_JoinCard->SetActiveWidgetIndex(0);
+
+	// 2. 앞면 버튼 클릭 이벤트를 연결합니다.
+	if (Btn_HostCardFront) Btn_HostCardFront->OnClicked.AddDynamic(this, &UFTMainMenuWidget::OnHostFrontClicked);
+	if (Btn_JoinCardFront) Btn_JoinCardFront->OnClicked.AddDynamic(this, &UFTMainMenuWidget::OnJoinFrontClicked);
 }
 
 void UFTMainMenuWidget::OnHostButtonClicked()
@@ -78,6 +87,23 @@ void UFTMainMenuWidget::OnJoinButtonClicked()
 	if (Text_StatusMessage) Text_StatusMessage->SetText(FText::FromString(TEXT("서버 접속 시도 중...")));
 	SessionSubsystem->JoinSessionByIndex(SelectedSessionIndex, TEXT(""));
 }
+
+void UFTMainMenuWidget::OnHostFrontClicked()
+{
+	if (Switcher_HostCard) 
+	{
+		Switcher_HostCard->SetActiveWidgetIndex(1);
+	}
+}
+
+void UFTMainMenuWidget::OnJoinFrontClicked()
+{
+	if (Switcher_JoinCard) 
+	{
+		Switcher_JoinCard->SetActiveWidgetIndex(1);
+	}
+}
+
 
 void UFTMainMenuWidget::HandleCreateSessionComplete(bool bWasSuccessful)
 {

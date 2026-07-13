@@ -34,6 +34,9 @@ protected:
 	UButton* Btn_Ready;
 	UPROPERTY(meta = (BindWidget))
 	UButton* Btn_StartGame;
+	
+	UPROPERTY(meta = (BindWidget))
+	UButton* Btn_ReturnToMain;
 
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* Text_ReadyStatus;
@@ -74,6 +77,8 @@ private:
 	void OnStartGameClicked();
 	UFUNCTION()
 	void OnReadyStateChanged();
+	UFUNCTION()
+	void OnReturnToMainClicked();
 	
 	// 주기적으로 타이머 호출해서 인원수 체크
 	FTimerHandle RosterCheckTimerHandle;

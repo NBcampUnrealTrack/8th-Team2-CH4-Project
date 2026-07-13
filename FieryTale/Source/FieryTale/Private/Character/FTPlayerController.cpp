@@ -25,6 +25,7 @@
 #include "Core/Game/FTArenaGameState.h"
 #include "Kismet/GameplayStatics.h"
 #include "Lobby/FTLobbyGameMode.h"
+#include "Online/FTSessionSubsystem.h"
 #include "UI/FTResultWidget.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerController);
@@ -568,6 +569,24 @@ void AFTPlayerController::InitializeLobbyLocal()
 			SetViewTarget(FoundCameras[0]); 
 		}
 	}
+}
+
+void AFTPlayerController::LeaveLobby()
+{
+	if (!IsLocalController()) return;
+
+	//  온라인 세션에서 안전하게 나가기
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UFTSessionSubsystem* Session = GameInstance->GetSubsystem<UFTSessionSubsystem>())
+		{
+			Session->LeaveSession();
+			UE_LOG(LogTemp, Log, TEXT("[PlayerController] 로비 세션에서 퇴장합니다."));
+		}
+	}
+
+	// 메인 메뉴 맵으로 로컬 클라이언트 이동
+	ClientTravel(TEXT("/Game/Maps/L_MainMenu"), TRAVEL_Absolute);
 }
 
 void AFTPlayerController::Client_ShowResultUI_Implementation(uint8 WinningTeam)
