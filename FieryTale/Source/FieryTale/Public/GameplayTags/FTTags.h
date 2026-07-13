@@ -103,6 +103,7 @@ namespace FTTags
     namespace Events
     {
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(KillScored);
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(CharacterDeath);
     }
 	
 }

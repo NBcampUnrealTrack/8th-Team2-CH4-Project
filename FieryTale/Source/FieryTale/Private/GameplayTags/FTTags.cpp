@@ -101,6 +101,7 @@ namespace FTTags
     namespace Events
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(KillScored, "FTTags.Event.KillScored", "적 영웅 혹은 크리처 처치 달성 시 배관망에 사출되는 마스터 이벤트 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(CharacterDeath, "FTTags.Event.CharacterDeath", "캐릭터 사망 시 GA_Death를 깨우기 위해 발송되는 게임플레이 이벤트 태그");
     }
 	
 }

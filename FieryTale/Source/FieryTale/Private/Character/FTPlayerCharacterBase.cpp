@@ -18,6 +18,9 @@
 #include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
 #include "AbilitySystem/Abilities/Player/Data/FTSkillMetaData.h"
 #include "Engine/SkeletalMesh.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimInstance.h"
+#include "AbilitySystem/Abilities/Player/FT_PlayerDeathAbility.h"
 #include "Components/TimelineComponent.h"
 #include "Curves/CurveFloat.h"
 #include "UI/Health/FTHealthWidgetComponent.h"
@@ -148,6 +151,12 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 	{
 		GetMesh()->SetAnimInstanceClass(AnimBPClass);
 	}
+
+	//	사망 몽타주도 위 메쉬/애님BP와 동일하게 영웅별 소프트 참조라 이 시점에 동기 로드해서 덮어쓴다.
+	if (UAnimMontage* LoadedDeathMontage = Data->DeathMontage.LoadSynchronous())
+	{
+		DeathMontage = LoadedDeathMontage;
+	}
 }
 
 AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer)
@@ -165,11 +174,6 @@ AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectI
 	//	멀티플레이에서 다른 클라이언트에게도 회전이 정상 전파된다 (수동 SetActorRotation은 서버로 전달되지 않음).
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 500.f, 0.f);
-	//GetCharacterMovement()->AirControl = 0.35f;
-	//GetCharacterMovement()->MaxWalkSpeed = 500.f;
-	//GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	//GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-	//GetCharacterMovement()->BrakingDecelerationFalling = 1500.f;
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -185,6 +189,9 @@ AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectI
 	DefaultFov = FollowCamera->FieldOfView;
 
 	FovTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("FovTimeline"));
+
+
+	StartupAbilities.Add(UFT_PlayerDeathAbility::StaticClass());
 }
 
 UAbilitySystemComponent* AFTPlayerCharacterBase::GetAbilitySystemComponent() const
@@ -482,7 +489,23 @@ void AFTPlayerCharacterBase::Revive()
 void AFTPlayerCharacterBase::OnHealthWidgetDeadTagChanged(const FGameplayTag Tag, int32 NewCount)
 {
 	//	태그가 제거된 순간(NewCount == 0)만 처리 — 부여될 때(사망)는 위젯 쪽에서 이미 처리한다.
-	if (NewCount > 0 || !HealthWidgetComponent)
+	if (NewCount > 0)
+	{
+		return;
+	}
+
+	//	Revive()는 서버에서만 실행되므로(위 Dead 태그 주석과 동일 사유), 사망 포즈로 홀드돼 있던 DeathMontage를
+	//	직접 여기서(복제되는 Dead 태그가 해제되는 시점에) 각 클라이언트가 로컬로 풀어준다 — 그래야 소유 클라이언트
+	//	자신의 화면에서도 기상 연출이 보인다. (DeathMontage는 bEnableAutoBlendOut=false로 마지막 포즈를 유지한다.)
+	if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+	{
+		if (UAnimMontage* Death = GetDeathMontage())
+		{
+			AnimInstance->Montage_Stop(0.25f, Death);
+		}
+	}
+
+	if (!HealthWidgetComponent)
 	{
 		return;
 	}

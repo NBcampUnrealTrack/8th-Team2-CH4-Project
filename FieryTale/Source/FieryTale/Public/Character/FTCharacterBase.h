@@ -34,6 +34,10 @@ public:
 	// Dead 태그 부여로 중복 호출을 차단하고, 입력/이동 차단과 사망 델리게이트(리스폰 예약)를 처리한다.
 	virtual void Die(AController* KillerController = nullptr);
 
+	// GA_Death가 재생할 몽타주를 조회하기 위한 접근자 (영웅별 몽타주는 FFTCharacterData에서 스폰 시점에 주입됨).
+	UFUNCTION(BlueprintPure, Category = "FieryTale | Animation")
+	UAnimMontage* GetDeathMontage() const { return DeathMontage; }
+
 protected:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "FieryTale | Animation")
 	TObjectPtr<UAnimMontage> DeathMontage;

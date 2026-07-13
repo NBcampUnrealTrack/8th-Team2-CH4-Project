@@ -36,7 +36,7 @@ DEFINE_LOG_CATEGORY(FTPlayerController);
 AFTPlayerController::AFTPlayerController(const FObjectInitializer& Initializer)
 	:Super(Initializer)
 {
-	RespawnDelay = 3.0f;
+	RespawnDelay = 5.0f;
 }
 
 void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const FRotator& SpawnRotation)
@@ -104,29 +104,6 @@ void AFTPlayerController::AssignTeam(EFTTeam InTeam)
 	}
 
 	PS->AssignTeamTag(InTeam);
-}
-
-void AFTPlayerController::RequestRespawn()
-{
-	// 서버권한에서만 동작함
-	if (!HasAuthority())
-	{
-		return;
-	}
-	
-	// 이미 작동중인 리스폰 타이머가 있는 경우 중복 실행 방지
-	if (GetWorld()->GetTimerManager().IsTimerActive(RespawnTimerHandle))
-	{
-		return;
-	}
-	
-	GetWorldTimerManager().SetTimer(
-		RespawnTimerHandle, 
-		this, 
-		&AFTPlayerController::ExecuteRespawn, 
-		RespawnDelay, 
-		false
-	);
 }
 
 void AFTPlayerController::ExecuteRespawn()

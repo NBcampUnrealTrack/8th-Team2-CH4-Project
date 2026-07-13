@@ -43,7 +43,6 @@ public:
 	
 	// GameMode에서 호출 — 팀을 PlayerState에 바인딩
 	void AssignTeam(EFTTeam InTeam);
-	void RequestRespawn();
 
 	// 로컬 소유 클라이언트에서 PlayerState 참조가 막 유효해지면 1회 발생한다
 	FOnPlayerStateReady OnPlayerStateReady;
