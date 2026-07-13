@@ -52,10 +52,7 @@
 		},
 		{
 			"Name": "ChaosCaching",
-			"Enabled": true,
-			"SupportedTargetPlatforms": [
-				"Win64"
-			]
+			"Enabled": true
 		}
 	]
 }
