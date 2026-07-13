@@ -37,7 +37,7 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
     }
-
+    
     // 1단계: 공격 애니메이션 몽타주 재생 태스크 생성 및 바인딩
     UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
         this, TEXT("MinionAttackTask"), AttackMontage, 1.0f, NAME_None, false
@@ -53,7 +53,9 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     }
     else
     {
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        // 💡 [ABP 부재용 임시 가드선]: 에셋이 없어서 태스크 생성이 안 되면 
+        // 프리징 방지를 위해 즉시 평타 어빌리티를 안전하게 닫아줍니다.
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false); 
         return;
     }
 
@@ -76,7 +78,13 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
 {
     AFTCharacterBase* AvatarChar = Cast<AFTCharacterBase>(GetAvatarActorFromActorInfo());
-    if (!AvatarChar) return;
+    
+    // 💡 [최전방 서버 주권 방어선 완착]: 
+    // 애니메이션 노티파이는 클라이언트 프록시에서도 격발되므로, 서버(Authority) 권한이 없다면 즉시 무효화 처분합니다.
+    if (!AvatarChar || !AvatarChar->HasAuthority())
+    {
+        return;
+    }
 
     AAIController* AIC = Cast<AAIController>(AvatarChar->GetController());
     UAbilitySystemComponent* MyASC = AvatarChar->GetAbilitySystemComponent();
@@ -141,6 +149,7 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
             FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
 
             // 지연 생성(Deferred Spawn)을 통한 투사체 인스턴스 사출 및 스펙 데이터 링크 결착
+            // 💡 오직 서버에서만 해당 투사체를 공식 스폰하고 클라이언트로 리플리케이션을 밀어냅니다.
             AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
                 TargetProjectileClass, SpawnTransform, AvatarChar, AvatarChar, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             
@@ -154,6 +163,7 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     else
     {
         // [근접 무기 형태 분기]: 투사체가 없을 경우 타깃에 GameplayEffect 다이렉트 적용
+        // 💡 서버 장부에서만 합법적으로 데미지 판정이 계산 및 인가됩니다.
         if (TargetASC && NewSpecHandle.IsValid())
         {
             if (NewSpecHandle.Data.IsValid())

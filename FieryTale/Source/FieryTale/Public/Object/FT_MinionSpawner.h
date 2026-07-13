@@ -73,13 +73,12 @@ protected:
 private:
     /** 30초 주기로 웨이브 생산 종을 울리는 통제 함수 */
     void TriggerMinionWave();
+    
+    /** 💡 [Hitch 박멸 배관]: 다중/연쇄 웨이브 비동기 로딩 핸들을 가비지 컬렉터로부터 방어 및 추적하기 위한 배열 */
+    TArray<TSharedPtr<struct FStreamableHandle>> ActiveStreamableHandles;
 
-    /** 
-     * [비동기 스트리밍 연동 수선 완료]
-     * 엔진 StreamableManager가 백그라운드에서 소프트 메쉬 에셋들을 완벽하게 다 읽어 들인 직후,
-     * 안전하게 정기 순차 사출 타이머를 가동해 줄 비동기 처리 콜백 함수입니다.
-     */
-    void StartSequentialSpawn();
+    /** 💡 [비동기 최적화 콜백]: 에셋 로드 완료 시 스폰 큐 개통 및 타이머를 연동할 정순 핸들러 */
+    void OnMinionAssetsLoaded(TArray<FSoftObjectPath> LoadedAssetPaths, FGameplayTag TeamTag);
 
     /** 대기 큐에서 데이터 에셋을 하나씩 꺼내 실물 육체에 주입 사출하는 엔진 함수 */
     void SpawnMinionFromQueue();
@@ -90,4 +89,7 @@ private:
 
     FTimerHandle WaveTimerHandle;
     FTimerHandle SequentialSpawnTimerHandle;
+
+    /** 스폰 루프가 현재 작동 중인지 확인하는 플래그 가드 */
+    bool bIsAlreadySpawning = false;
 };

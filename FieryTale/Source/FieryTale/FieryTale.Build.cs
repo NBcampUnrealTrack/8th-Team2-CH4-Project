@@ -25,7 +25,8 @@ public class FieryTale : ModuleRules
 			"OnlineSubsystemUtils",   // 온라인 보조 유틸 (접속 주소 해석 등)
             "GeometryCollectionEngine",// 카오스 디스트럭션을 위한 모듈
             "ChaosSolverEngine",	  // 카오스 디스트럭션 물리 연산을 위한 모듈
-            "ChaosCaching"			 // 카오스 디스트럭션 물리 연산 베이킹을 위한 모듈
+            "ChaosCaching",			 // 카오스 디스트럭션 물리 연산 베이킹을 위한 모듈
+            "NavigationSystem"
         });
 
 		// AI 시스템 (AIController/내비게이션 등). 모듈 내부에서만 사용하므로 Private.
