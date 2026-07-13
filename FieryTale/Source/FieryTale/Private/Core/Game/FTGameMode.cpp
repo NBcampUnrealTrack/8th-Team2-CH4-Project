@@ -16,6 +16,7 @@
 
 #include "Level/FTTurret.h"
 #include "Level/FTNexus.h"
+#include "Level/FTBattleSubsystem.h"
 #include "FieryTaleLog.h"
 #include "Character/FTPlayerController.h"
 #include "Character/FTPlayerState.h"
@@ -214,6 +215,11 @@ void AFTGameMode::TurretDestroyed(AFTTurret* DestroyedTurret)	// 포탑 파괴 �
 
 	UE_LOG(LogTemp, Log, TEXT("Notification: %s's %s Turret has been destroyed!"), *TeamStr, *PosStr);
 	// 포맷 스트링 형식을 빌려 어떤 팀의 어느 쪽 라인 방어 타워가 파괴되었는지 출력 창에 실시간 기록
+	
+	if (UFTBattleSubsystem* Battle = GetWorld()->GetSubsystem<UFTBattleSubsystem>())
+	{
+		Battle->NotifyTurretDestroyed(DestroyedTurret);
+	}
 }
 
 void AFTGameMode::NexusDestroyed(AFTNexus* DestroyedNexus)
