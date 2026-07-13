@@ -33,6 +33,10 @@ protected:
 	void HandleChannellingInterrupted();
 
 protected:
+	// 💡 노멀 어택처럼 공용 GE_Damage를 직접 꽂을 수 있도록 변수를 통일합니다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+	TSubclassOf<class UGameplayEffect> DamageEffectClass;
+	
 	/** 1초 장전 메커니즘 안전 제어용 순정 타이머 핸들 */
 	FTimerHandle ChannellingTimerHandle;
 

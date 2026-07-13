@@ -54,4 +54,7 @@ private:
 
     /** 메모리 누수 및 타이머 크래시 방지용 핸들 */
     FTimerHandle AIExecuteTimerHandle;
+    
+    // 💡 [스턴 프리징 방어 플래그 변수 완착]
+    bool bWasStunnedLastTick = false;
 };
