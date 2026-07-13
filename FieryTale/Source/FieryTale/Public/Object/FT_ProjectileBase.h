@@ -7,8 +7,10 @@
 #include "GameFramework/Actor.h"
 #include "FT_ProjectileBase.generated.h"
 
+// 💡 [컴파일 가드 전방 선언 명세 추가 완착]
 class UProjectileMovementComponent;
 class USphereComponent;
+class UStaticMeshComponent; // 스태틱 메시 전방 선언 누락 균열 보수 완료
 
 UCLASS()
 class FIERYTALE_API AFT_ProjectileBase : public AActor
@@ -25,13 +27,14 @@ public:
 protected:
     virtual void BeginPlay() override;
 
+    // 💡 [언리얼 순정 수명 주기 가상 함수 오버라이드 등록]
+    // 서버가 Destroy를 집행하면 모든 클라이언트 프록시 단에서도 이 함수가 격발되어 렉 잔상을 소각합니다.
+    virtual void Destroyed() override;
+
     // 순정 오버랩 관문으로 복귀합니다. 적중 즉시 대미지를 주고 소멸합니다.
     UFUNCTION()
     virtual void OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
-    // =========================================================================
-    // 💡 [지형/벽면 충돌 및 소각 파쇄 선로 추가 완착]
-    // =========================================================================
     /** 지형, 벽면, 포탑 구조물 등 블록 콜리전 히트를 정밀 수신할 순정 델리게이트 함수 */
     UFUNCTION()
     virtual void OnProjectileHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
@@ -47,9 +50,11 @@ protected:
     TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
 
 private:
-    // =========================================================================
-    // 💡 [클라이언트 유령 패킷 안락사 파이프라인]
-    // =========================================================================
-    /** 물리 기동 컴포넌트와 콜리전을 서버/클라이언트 양단에서 즉각 동결 소각 처리하는 마감 함수 */
+    /** 물리 기동 컴포넌트와 콜리전을 서버에서 즉각 철거 요청하는 마감 함수 */
     void ExplodeAndDestroy();
+
+    // 💡 [수명 주기 연출 분리용 플래그 장부 등록 완착]
+    // 허공에서 수명이 다해 소멸한 것과 적/벽에 충돌해 터진 상태를 정밀 필터링합니다.
+    UPROPERTY(Transient)
+    uint8 bExploded : 1;
 };

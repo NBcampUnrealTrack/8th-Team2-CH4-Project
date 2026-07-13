@@ -3,6 +3,7 @@
 #include "AbilitySystem/Abilities/Minion/FT_MinionAttackBase.h"
 #include "AbilitySystemComponent.h"
 #include "Character/FTCharacterBase.h"
+#include "Character/Minion/FT_MinionCharacterBase.h"
 #include "GameplayTags/FTTags.h"
 #include "AIController.h"
 #include "Object/FT_ProjectileBase.h"
@@ -10,12 +11,13 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Components/SkeletalMeshComponent.h"
 
 UFT_MinionAttackBase::UFT_MinionAttackBase()
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     
-    // 기절 상태 이상 레이어 가동 중일 때 공격 활성화 원천 차단
+    // 상태 이상(Stun) 상태일 때는 해당 어빌리티의 활성화를 원천 차단
     ActivationBlockedTags.AddTag(FTTags::FTStates::Debuff::Stunned);
 }
 
@@ -36,7 +38,7 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         return;
     }
 
-    // 1단계: 순정 애니메이션 몽타주 재생 태스크 가동
+    // 1단계: 공격 애니메이션 몽타주 재생 태스크 생성 및 바인딩
     UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
         this, TEXT("MinionAttackTask"), AttackMontage, 1.0f, NAME_None, false
     );
@@ -55,9 +57,7 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         return;
     }
 
-    // 2단계: 게임플레이 이벤트 수신 대기 태스크 병렬 가동
-    // 💡 [좀비 태스크 방어선]: 안전한 소각 청소를 위해 로컬 변수가 아닌 헤더에 선언된 
-    // 멤버 변수(ActiveWaitEventTask)에 주소를 확실히 결착합니다.
+    // 2단계: 몽타주 노티파이 시점에 연동될 게임플레이 이벤트 수신 태스크 가동
     ActiveWaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
         this, 
         FTTags::FTCombat::AnimNotify_Attack, 
@@ -81,19 +81,25 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     AAIController* AIC = Cast<AAIController>(AvatarChar->GetController());
     UAbilitySystemComponent* MyASC = AvatarChar->GetAbilitySystemComponent();
     
-    if (!AIC || !MyASC || !DamageEffectClass) return;
+    // 데이터 에셋 누수 등으로 인한 어빌리티 영구 프리징 방어를 위한 선제 가드
+    if (!AIC || !MyASC || !DamageEffectClass)
+    {
+        EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+        return;
+    }
 
-    // 브레인 포커스 대상 인양 후 즉시 댕글링 포인터 검문
+    // AI 포커스 대상 검증 (Dangling Pointer 및 유효성 2중 검문)
     AActor* TargetActor = AIC->GetFocusActor();
-    if (!IsValid(TargetActor)) return; // 💡 IsValid를 통해 메모리 파괴 여부까지 2중 방어
+    if (!IsValid(TargetActor)) return; 
 
-    // [오버킬/타깃 유효성 가드선]
+    // 타깃이 이미 사망 상태인 경우 불필요한 데미지 계산 및 투사체 스폰 스킵
     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
     if (TargetASC && TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
     {
         return;
     }
 
+    // 데미지 GameplayEffect Spec 설정 및 수치 기입
     FGameplayEffectContextHandle EffectContext = MyASC->MakeEffectContext();
     EffectContext.AddSourceObject(AvatarChar);
     FGameplayEffectSpecHandle NewSpecHandle = MyASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, EffectContext);
@@ -103,22 +109,40 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
         NewSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
     }
     
-    // 원거리 무기 형태 분기 라인 가동
-    if (ProjectileClass)
+    // 미니언 소체(CharacterBase) 장부로부터 데이터 에셋 기반의 투사체 클래스 동적 인양
+    TSubclassOf<AFT_ProjectileBase> TargetProjectileClass = nullptr;
+    if (AFT_MinionCharacterBase* MinionChar = Cast<AFT_MinionCharacterBase>(AvatarChar))
+    {
+        TargetProjectileClass = MinionChar->GetMinionProjectileClass();
+    }
+    
+    // [원거리 무기 형태 분기]: 투사체 클래스가 유효할 경우
+    if (TargetProjectileClass)
     {
         UWorld* World = GetWorld();
         if (World)
         {
+            USkeletalMeshComponent* MinionMesh = AvatarChar->GetMesh();
+            
+            // 기본 스폰 트랜스폼 데이터 초기화 (소켓 예외 가드용)
             FVector SpawnLocation = AvatarChar->GetActorLocation() + FVector(0, 0, 50);
+            FRotator SpawnRotation = AvatarChar->GetActorRotation();
+
+            // 에디터 스켈레톤의 우손 소총 소켓 존재 여부 정밀 검문 및 위치 동기화
+            FName MuzzleSocketName = TEXT("Socket_R_Hand_Riple"); 
+            if (MinionMesh && MinionMesh->DoesSocketExist(MuzzleSocketName))
+            {
+                SpawnLocation = MinionMesh->GetSocketLocation(MuzzleSocketName);
+            }
             
-            // 💡 [액세스 위반 크래시 완전 완치]: 검증이 완료된 TargetActor 명세를 안전선 타설 후 인양합니다.
-            FVector TargetCenterLocation = TargetActor->GetActorLocation() + FVector(0, 0, 50);
+            // 타깃 캐릭터의 가슴/상체 권역을 타겟팅하도록 보정 연산
+            FVector TargetCenterLocation = TargetActor->GetActorLocation() + FVector(0, 0, 30);
             FVector LaunchDirection = (TargetCenterLocation - SpawnLocation).GetSafeNormal();
-            
             FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
 
+            // 지연 생성(Deferred Spawn)을 통한 투사체 인스턴스 사출 및 스펙 데이터 링크 결착
             AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-                ProjectileClass, SpawnTransform, AvatarChar, AvatarChar, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+                TargetProjectileClass, SpawnTransform, AvatarChar, AvatarChar, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             
             if (Projectile)
             {
@@ -129,10 +153,10 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     }
     else
     {
-        // 근접 미니언 분기
-        if (TargetASC)
+        // [근접 무기 형태 분기]: 투사체가 없을 경우 타깃에 GameplayEffect 다이렉트 적용
+        if (TargetASC && NewSpecHandle.IsValid())
         {
-            if (NewSpecHandle.IsValid())
+            if (NewSpecHandle.Data.IsValid())
             {
                 MyASC->ApplyGameplayEffectSpecToTarget(*NewSpecHandle.Data.Get(), TargetASC);
             }
@@ -147,8 +171,7 @@ void UFT_MinionAttackBase::OnMontageCompletedOrCancelled()
 
 void UFT_MinionAttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 💡 [태스크 메모리 누수 청정 소각]:
-    // 어빌리티가 종료될 때 상주 중이던 비동기 이벤트 태스크를 명시적으로 파쇄 마감합니다.
+    // 어빌리티 종료 시 상주 중인 비동기 WaitGameplayEvent 태스크 명시적 클리어 (메모리 누수 차단)
     if (ActiveWaitEventTask)
     {
         ActiveWaitEventTask->EndTask();

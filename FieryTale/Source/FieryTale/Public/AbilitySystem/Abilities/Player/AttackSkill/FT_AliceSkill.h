@@ -41,6 +41,11 @@ protected:
     void HandleSkillInterrupted();
 
 protected:
+    
+    // 💡 노멀 어택처럼 공용 GE_Damage를 직접 꽂을 수 있도록 변수를 변경합니다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+    TSubclassOf<class UGameplayEffect> DamageEffectClass;
+    
     /** [2번째 사양 완착]: 평타 무기 데이터와 공유하지 않는 보조 공격 '시계 토끼' 고유의 독립된 투사체 블루프린트 매핑 슬롯 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Alice Spec")
     TSubclassOf<AFT_ProjectileBase> ClockRabbitProjectileClass;

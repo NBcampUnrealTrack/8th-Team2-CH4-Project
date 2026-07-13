@@ -59,6 +59,8 @@ public:
      * 본체의 내장형 GAS 인프라 및 비주얼 바인딩 시동 틱을 안전하게 켜줄 수동 트리거 함수입니다.
      */
     void LaunchMinionInfrastructure();
+    
+    TSubclassOf<class AFT_ProjectileBase> GetMinionProjectileClass() const { return MinionProjectileClass; }
 
 protected:
     /** 월드 진입 즉시 실행되던 구형 시동 로직을 보류하고 스포너의 완성 신호를 대기하기 위해 비워둡니다. */
@@ -105,6 +107,9 @@ protected:
     /** 미니언이 현재 라인을 타고 정찰 전진하며 실시간으로 쫓아가고 있는 타겟 웨이포인트 포인터입니다. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | AI | Navigation")
     TObjectPtr<AFT_WayPoint> CurrentTargetWayPoint;
+    
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Minion | GAS")
+    TSubclassOf<class AFT_ProjectileBase> MinionProjectileClass;
 
 private:
     /** 주입된 데이터 에셋 수치 동기화, 피아식별 태그 낙인, AI 브레인 시동을 원자적으로 통합 처리하는 공정 함수 */

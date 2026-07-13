@@ -1,6 +1,5 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "AbilitySystem/Abilities/Minion/FT_Minion_Brain.h"
 #include "AbilitySystemComponent.h"
 #include "Character/FTCharacterBase.h"
@@ -16,11 +15,14 @@
 
 UFT_Minion_Brain::UFT_Minion_Brain()
 {
-    // 각 개체별 독립적인 전술 타이머 제어를 위해 인스턴싱 정책을 확정합니다.
+    // 개체별 독립적인 주기적 연산을 위해 인스턴싱 정책 설정
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     
-    // 기절 상태이상 노출 시 최초 활성화를 원천 차단하는 가드 태그를 설정합니다.
+    // 기절(Stun) 상태이상 적용 중일 때는 브레인 활성화를 원천 차단
     ActivationBlockedTags.AddTag(FTTags::FTStates::Debuff::Stunned);
+    
+    // 스턴 상태 추적 플래그 초기화
+    bWasStunnedLastTick = false;
 }
 
 void UFT_Minion_Brain::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -33,9 +35,9 @@ void UFT_Minion_Brain::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
         return;
     }
 
+    // 지정된 주기(ScanInterval)마다 AI 판단 로직을 격발하는 타이머 가동
     if (GetWorld())
     {
-        // 0.1에서 0.2초 주기의 정밀 전술 로직 틱 타이머를 스타트합니다.
         GetWorld()->GetTimerManager().SetTimer(
             AIExecuteTimerHandle,
             this,
@@ -53,18 +55,19 @@ void UFT_Minion_Brain::ExecuteAILogic()
 
     UAbilitySystemComponent* MyASC = AvatarChar->GetAbilitySystemComponent();
     
-    // 안전 가드선 수선: 사망 장부 검적 시 유령 타이머가 죽은 액터를 재참조하여 크래시를 내지 않도록 타이머를 선제 클리어합니다.
+    // 액터 사망 상태 확인 시, 월드 참조 오류 방지를 위해 타이머를 우선 클리어하고 종료
     if (!MyASC || MyASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
     {
-        if (GetWorld())
+        UWorld* World = GetWorld();
+        if (World)
         {
-            GetWorld()->GetTimerManager().ClearTimer(AIExecuteTimerHandle);
+            World->GetTimerManager().ClearTimer(AIExecuteTimerHandle);
         }
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
         return;
     }
 
-    // 기절 상태이상 버프/디버프에 노출되었을 경우 무브먼트 물리 가속까지 완전 동결 처리합니다.
+    // 기절 제어 상태 이상 적용 시 즉시 무브먼트 컴포넌트 및 AI 패스 이동 동결
     if (MyASC->HasMatchingGameplayTag(FTTags::FTStates::Debuff::Stunned))
     {
         if (AAIController* AIC = Cast<AAIController>(AvatarChar->GetController()))
@@ -75,6 +78,9 @@ void UFT_Minion_Brain::ExecuteAILogic()
         {
             MoveComp->StopMovementImmediately();
         }
+        
+        // 스턴 상태 해제 시점의 재추격을 유도하기 위한 상태 캐싱
+        bWasStunnedLastTick = true;
         return;
     }
 
@@ -87,6 +93,7 @@ void UFT_Minion_Brain::ExecuteAILogic()
     UPathFollowingComponent* PathFollowComp = AIC->GetPathFollowingComponent();
     AActor* BestTarget = Cast<AActor>(BB->GetValueAsObject(TEXT("TargetEnemy")));
 
+    // [전술 상황 1: 유효 타깃 검출 시 추격 및 교전]
     if (IsValid(BestTarget))
     {
         AIC->SetFocus(BestTarget);
@@ -94,40 +101,41 @@ void UFT_Minion_Brain::ExecuteAILogic()
 
         if (DistanceToTarget <= AttackAcceptanceRadius)
         {
+            // 공격 사거리 내 진입 시 이동을 멈추고 공격 태그 어빌리티 격발
             AIC->StopMovement();
             
             FGameplayTagContainer AttackTags;
             AttackTags.AddTag(FTTags::FTAbilities::Minion_Attack);
-            
-            // 사거리 진입 시 일반 공격 능력을 실행합니다.
             MyASC->TryActivateAbilitiesByTag(AttackTags);
         }
         else
         {
-            // 최적화 가드벽: 추격 무빙 리패싱 맹점 정밀 완치
-            // 내비게이션 컴포넌트가 현재 추격 중인 실제 패스 최종 목적지와 타깃의 실시간 좌표를 오차 범위 내로 대조합니다.
+            // 이동 목적지 중복 명령 최적화 및 스턴 해제 직후 프리징 복구 분기
             bool bAlreadyMovingToTarget = false;
-            if (PathFollowComp && PathFollowComp->GetStatus() == EPathFollowingStatus::Moving)
+            
+            if (PathFollowComp && PathFollowComp->GetStatus() == EPathFollowingStatus::Moving && !bWasStunnedLastTick)
             {
                 FVector CurrentDest = PathFollowComp->GetPathDestination();
                 FVector TargetLoc = BestTarget->GetActorLocation();
 
-                // 타깃이 이동 틱 오차 범위(30cm) 내에 여전히 머물러 있다면 불필요한 중복 Move 명령을 청정 스킵합니다.
+                // 기존 목적지와 대상의 실시간 위치 오차가 30cm 이내면 재명령 스킵
                 if (CurrentDest.Equals(TargetLoc, 30.0f))
                 {
                     bAlreadyMovingToTarget = true;
                 }
             }
 
+            // 스턴이 풀렸거나 목적지가 변경된 경우 이동 명령 갱신
             if (!bAlreadyMovingToTarget)
             {
                 AIC->MoveToActor(BestTarget, AttackAcceptanceRadius, true, true, true);
+                bWasStunnedLastTick = false; 
             }
         }
     }
+    // [전술 상황 2: 적대 타깃 부재 시 라인 웨이포인트 복귀 무빙]
     else
     {
-        // 주위에 위협이 없다면 타깃 락 클리어 후 라인 복귀 연산을 단행합니다.
         AIC->ClearFocus(EAIFocusPriority::Gameplay);
 
         AFT_MinionCharacterBase* MinionChar = Cast<AFT_MinionCharacterBase>(AvatarChar);
@@ -138,7 +146,7 @@ void UFT_Minion_Brain::ExecuteAILogic()
             {
                 float DistanceToWP = FVector::Dist(MinionChar->GetActorLocation(), TargetWP->GetActorLocation());
                 
-                // 웨이포인트 도달 반경 검증을 통과하면 다음 거점으로 경로를 전진 이관합니다.
+                // 웨이포인트 도달 반경 검증 통과 시 다음 목적지 거점으로 자동 갱신 및 인양
                 if (DistanceToWP <= TargetWP->ArrivalRadius)
                 {
                     AFT_WayPoint* NextWP = TargetWP->NextWayPoint;
@@ -161,7 +169,9 @@ void UFT_Minion_Brain::ExecuteAILogic()
         if (!NextLineLocation.IsZero())
         {
             bool bAlreadyMovingToLoc = false;
-            if (PathFollowComp && PathFollowComp->GetStatus() == EPathFollowingStatus::Moving)
+            
+            // 라인 복귀 무빙 중 스턴 해제 시 예외 프리징 방어 처리 포함
+            if (PathFollowComp && PathFollowComp->GetStatus() == EPathFollowingStatus::Moving && !bWasStunnedLastTick)
             {
                 FVector CurrentDest = PathFollowComp->GetPathDestination();
                 if (CurrentDest.Equals(NextLineLocation, 10.0f))
@@ -173,6 +183,7 @@ void UFT_Minion_Brain::ExecuteAILogic()
             if (!bAlreadyMovingToLoc)
             {
                 AIC->MoveToLocation(NextLineLocation, 50.0f, true, true, true);
+                bWasStunnedLastTick = false;
             }
         }
     }
@@ -185,13 +196,14 @@ AActor* UFT_Minion_Brain::InternalScanBestTarget(AFTCharacterBase* AvatarChar, c
 
 void UFT_Minion_Brain::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    if (GetWorld())
+    // 어빌리티 종료 시 상주 중인 판단 루프 타이머 안전 소각
+    UWorld* World = GetWorld();
+    if (World)
     {
-        GetWorld()->GetTimerManager().ClearTimer(AIExecuteTimerHandle);
+        World->GetTimerManager().ClearTimer(AIExecuteTimerHandle);
     }
 
-    // 사망 및 종료 시 브레인 정화 완착
-    // 미니언이 사망하거나 브레인이 종료될 때 잡고 있던 조준(Focus) 상태를 강제 해제하여 시체 시선 고정 버그를 청정 소각합니다.
+    // 어빌리티 파쇄 및 미니언 사망 시 조준/이동 상태 강제 초기화
     if (ActorInfo && ActorInfo->AvatarActor.IsValid())
     {
         if (AFTCharacterBase* AvatarChar = Cast<AFTCharacterBase>(ActorInfo->AvatarActor.Get()))

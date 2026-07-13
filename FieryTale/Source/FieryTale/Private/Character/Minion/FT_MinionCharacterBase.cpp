@@ -10,13 +10,13 @@
 
 AFT_MinionCharacterBase::AFT_MinionCharacterBase()
 {
-    // 미니언은 대규모 군집 연산 최적화를 위해 미니멀 리플리케이션 모드를 확정 적용합니다.
+    // 대규모 군집 환경에서의 연산 및 네트워크 최적화를 위해 미니멀 리플리케이션 모드 적용
     AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
     AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
     AttributeSet = CreateDefaultSubobject<UFT_AttributeSet>(TEXT("AttributeSet"));
 
-    // 멀티플레이 세션 가동을 위한 순정 네트워킹 리플리케이션 명세를 결착합니다.
+    // 멀티플레이 세션 가동을 위한 액터 및 무브먼트 복제(Replication) 활성화
     SetReplicates(true);
     ACharacter::SetReplicateMovement(true);
 }
@@ -30,7 +30,7 @@ void AFT_MinionCharacterBase::PossessedBy(AController* NewController)
 {
     Super::PossessedBy(NewController);
 
-    // [서버 주권 결착 완착]: AI 컨트롤러가 소체를 완전히 포제스한 시점에 닻을 내리고 명확히 인프라를 등록합니다.
+    // 서버 권한: AI 컨트롤러가 소체를 포제스한 시점에 어빌리티 액터 인포 초기화 및 등록
     if (AbilitySystemComponent)
     {
         AbilitySystemComponent->InitAbilityActorInfo(this, this);
@@ -41,11 +41,13 @@ void AFT_MinionCharacterBase::OnRep_Controller()
 {
     Super::OnRep_Controller();
 
-    // [클라이언트 복제 안전망 개통]: 레이턴시 꼬임으로 인한 유령 액터 정보 등록 결함을 완벽히 방어합니다.
-    // 클라이언트 세션에 컨트롤러 복제가 완전 안착했는지 정밀 검문 후 어빌리티 액터 인포 지지대를 구축합니다.
+    // 클라이언트 권한: 복제 시차로 인한 오류를 방지하기 위해 컨트롤러 복제 안착 시점에 인포 초기화
     if (AbilitySystemComponent && GetController())
     {
         AbilitySystemComponent->InitAbilityActorInfo(this, this);
+        
+        // 원격 클라이언트 사이드에서도 미니언의 외형 메쉬 및 기본 비주얼 인프라가 정상 동기화되도록 호출
+        InitializeMinionInfrastructures();
     }
 }
 
@@ -60,25 +62,32 @@ void AFT_MinionCharacterBase::InitializeMinionInfrastructures()
 
     AbilitySystemComponent->InitAbilityActorInfo(this, this);
 
-    // [비주얼 and 무브먼트 양단 동시 타설 레이어]
+    // [비주얼 및 무브먼트 데이터 초기화 레이어]
     if (MinionData)
     {
+        // 소프트 object 포인터로 선언된 에셋을 동기 로드하여 메시 지정
         if (USkeletalMesh* TargetMesh = MinionData->MinionMesh.LoadSynchronous())
         {
-            GetMesh()->SetSkeletalMesh(TargetMesh);
+            if (GetMesh())
+            {
+                GetMesh()->SetSkeletalMesh(TargetMesh);
+            }
         }
 
+        // 데이터 에셋에 정의된 기본 이동 속도 반영
         if (GetCharacterMovement())
         {
             GetCharacterMovement()->MaxWalkSpeed = MinionData->DefaultMoveSpeed;
         }
+
+        // 원거리 공격 어빌리티가 실시간으로 참조할 수 있도록 데이터 에셋의 투사체 클래스를 소체에 캐싱
+        MinionProjectileClass = MinionData->ProjectileClass;
     }
 
-    // [서버 전용 권한 장부 확정 라인]
+    // [서버 주권 전용 인프라 타설 레이어]
     if (HasAuthority())
     {
-        // [이중 방어선 완착]: 서버 로컬 AI 컨트롤러가 지체 없이 팀 진영을 식별하도록 룹태그를 먼저 사출하고,
-        // 클라이언트 원격 동기화를 위해 정석 GE 파이프라인을 연동시켜 네트워킹 시차 렉을 전면 분쇄합니다.
+        // 서버 로컬 AI 컨트롤러의 즉각적인 진영 식별을 위한 루즈 태그 등록 및 원격지 동기화를 위한 GE 적용
         if (MinionTeamTag.IsValid())
         {
             AbilitySystemComponent->AddLooseGameplayTag(MinionTeamTag);
@@ -95,7 +104,7 @@ void AFT_MinionCharacterBase::InitializeMinionInfrastructures()
             }
         }
 
-        // 데이터 에셋 기반의 기저 속성 연산 장부를 할당하고 전술 스킬 무장을 기부합니다.
+        // 데이터 에셋 기반 기저 속성(Attributes) 수치 설정 및 스킬(GameplayAbility) 부여
         if (MinionData)
         {
             AbilitySystemComponent->SetNumericAttributeBase(UFT_AttributeSet::GetMaxHealthAttribute(),   MinionData->DefaultMaxHealth);
@@ -112,7 +121,7 @@ void AFT_MinionCharacterBase::InitializeMinionInfrastructures()
             }
         }
 
-        // 미니언의 전술 사고 회로이자 행동 패턴을 주도하는 마스터 브레인 어빌리티를 강제 격발합니다.
+        // 미니언의 자율 판단 및 행동 패턴을 제어하는 마스터 브레인 어빌리티 강제 격발
         if (BrainAbilityClass)
         {
             FGameplayAbilitySpec BrainSpec(BrainAbilityClass, 1);

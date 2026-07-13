@@ -12,28 +12,28 @@
 
 AFT_MinionAIController::AFT_MinionAIController()
 {
-    // 틱을 완전히 꺼버려서 매 프레임 발생하는 AI 연산 오버헤드를 0으로 박멸합니다.
-    // 우리의 뇌세포(GAS) 타이머가 지정된 주기에만 깨어나 통제할 것입니다.
+    // 매 프레임 발생하는 AI 연산 부하를 차단하기 위해 틱 비활성화
+    // 브레인 어빌리티(UFT_Minion_Brain) 타이머가 주기적으로 연산 통제
     PrimaryActorTick.bCanEverTick = false;
 
-    // 1단계: 순정 AIPerception 인프라 조립 공정 타설 (상속 변수명 충돌 방지선 개통)
+    // 1단계: 순정 AIPerception 인프라 및 시각 센서 컴포넌트 생성
     MinionPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("MinionPerceptionComponent"));
     SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
 
     if (SightConfig && MinionPerceptionComponent)
     {
-        // 2단계: 정면 전투 특화 시야각 및 색적 범위 기입 (FieryTale 미니언 표준 스펙)
-        SightConfig->SightRadius = 1500.f;       // 미니언의 최대 색적 범위 (15미터)
-        SightConfig->LoseSightRadius = 1800.f;   // 타깃을 놓치는 한계 범위
-        SightConfig->PeripheralVisionAngleDegrees = 90.f; // 전방 180도 전체를 커버하는 광폭 시야각
-        SightConfig->SetMaxAge(3.f);             // 감지된 기억의 유효 수명
+        // 2단계: 미니언 표준 시각 및 색적 범위 설정
+        SightConfig->SightRadius = 1500.f;                // 최대 색적 반경 (15미터)
+        SightConfig->LoseSightRadius = 1800.f;            // 타깃 상실 한계 반경
+        SightConfig->PeripheralVisionAngleDegrees = 90.f; // 전방 시야각 180도 커버
+        SightConfig->SetMaxAge(3.f);                      // 인지된 자극의 기억 유효 수명
         
-        // 피아식별 태그를 C++ 내부에서 정밀 필터링하므로, 엔진 기본 소속 분류는 전량 개방합니다.
+        // 피아식별은 C++ 내부 GAS 태그로 정밀 필터링하므로, 엔진 기본 소속 분류는 모두 개방
         SightConfig->DetectionByAffiliation.bDetectEnemies = true;
         SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
         SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
 
-        // 조립된 시각 설정을 마스터 컴포넌트에 완착 동기화합니다.
+        // 조립된 시각 설정을 퍼셉션 컴포넌트에 동기화 및 주 감지선으로 등록
         MinionPerceptionComponent->ConfigureSense(*SightConfig);
         MinionPerceptionComponent->SetDominantSense(SightConfig->GetSenseImplementation());
     }
@@ -47,7 +47,7 @@ void AFT_MinionAIController::OnPossess(APawn* InPawn)
     {
         UBlackboardComponent* BlackboardComp = GetBlackboardComponent();
         
-        // 내장 블랙보드가 없다면 깨끗하게 새로 생성하여 장부를 개통합니다.
+        // 내장 블랙보드 컴포넌트가 없을 경우 새로 생성하여 에셋 바인딩
         if (!BlackboardComp)
         {
             UseBlackboard(MinionBlackboardAsset, BlackboardComp);
@@ -55,16 +55,14 @@ void AFT_MinionAIController::OnPossess(APawn* InPawn)
         
         if (BlackboardComp)
         {
-            // [초기화 가드] 스포너가 좌표를 찍어주기 전까지 라인 웨이포인트를 안전하게 제로 벡터로 리셋해 둡니다.
+            // 초기화 가드: 경로 무빙 및 타깃 오브젝트 키값 안전 리셋
             BlackboardComp->SetValueAsVector(TEXT("LineWaypoint"), FVector::ZeroVector);
-            
-            // 타깃 오브젝트 키값도 안전하게 초기화합니다.
             BlackboardComp->SetValueAsObject(TEXT("TargetEnemy"), nullptr);
         }
     }
 
-    // 주권 서버 권한 하에서만 인지 감지 센서 델리게이트 밸브를 개통합니다.
-    if (HasAuthority() && MinionPerceptionComponent)
+    // OnPossess는 서버 전용이므로 HasAuthority() 분기 없이 타깃 퍼셉션 업데이트 델리게이트 바인딩
+    if (MinionPerceptionComponent)
     {
         MinionPerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AFT_MinionAIController::OnMinionPerceptionUpdated);
     }
@@ -77,10 +75,10 @@ void AFT_MinionAIController::OnMinionPerceptionUpdated(AActor* Actor, FAIStimulu
     UBlackboardComponent* BlackboardComp = GetBlackboardComponent();
     if (!BlackboardComp) return;
 
-    // 시야에서 적을 놓친 경우 (Successfully Sensed가 아닐 때)
+    // 시야에서 타깃을 놓친 경우 (Successfully Sensed 상태가 아닐 때)
     if (!Stimulus.WasSuccessfullySensed())
     {
-        // 현재 쫓던 타깃을 놓친 게 맞다면, 블랙보드 타깃 장부를 비워서 브레인 GA가 판단할 수 있도록 동기화합니다.
+        // 현재 추격 중이던 타깃과 일치하면 블랙보드 장부를 비워 브레인 연산이 인지하도록 동기화
         if (BlackboardComp->GetValueAsObject(TEXT("TargetEnemy")) == Actor)
         {
             BlackboardComp->SetValueAsObject(TEXT("TargetEnemy"), nullptr);
@@ -88,13 +86,13 @@ void AFT_MinionAIController::OnMinionPerceptionUpdated(AActor* Actor, FAIStimulu
         return;
     }
 
-    // 이미 타깃을 락온하고 교전 중이라면 불필요한 필터링 연산 낭비를 막기 위해 패스합니다.
+    // 이미 타깃을 락온하여 교전 중인 경우 불필요한 필터링 연산 방지를 위해 패스
     if (BlackboardComp->GetValueAsObject(TEXT("TargetEnemy")) != nullptr) return;
 
     APawn* PossessedPawn = GetPawn();
     if (!PossessedPawn) return;
 
-    // 3단계: FieryTale 진영 태그 기반 피아식별 검문소 가동
+    // 3단계: FieryTale 진영 태그 기반 피아식별 필터 검문
     UAbilitySystemComponent* MyASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(PossessedPawn);
     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor);
 
@@ -115,14 +113,14 @@ void AFT_MinionAIController::OnMinionPerceptionUpdated(AActor* Actor, FAIStimulu
             bIsSameTeam = true;
         }
 
-        // 같은 팀(아군 영웅, 아군 미니언)으로 판정되면 타깃팅에서 완벽히 배제합니다.
+        // 같은 진영(아군 영웅, 아군 미니언)으로 판정되면 타깃팅 대상에서 완전 배제
         if (bIsSameTeam)
         {
             return;
         }
 
-        // 4단계: 적 진영 확정 장부 기입! 블랙보드 "TargetEnemy" 키에 밀봉 주입합니다.
-        // 이제 브레인 GA(UFT_Minion_Brain)가 주기적으로 깨어나 이 블랙보드 장부를 인양해 무브와 공격을 통제합니다.
+        // 4단계: 적 진영 확정 시 블랙보드 "TargetEnemy" 키에 데이터 주입
+        // 이후 브레인 GA(UFT_Minion_Brain)가 해당 장부를 인양하여 주기적으로 무브 및 공격 통제
         BlackboardComp->SetValueAsObject(TEXT("TargetEnemy"), Actor);
     }
 }
