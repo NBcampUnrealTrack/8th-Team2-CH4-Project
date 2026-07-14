@@ -171,11 +171,11 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 	//	Equip 부착 소켓과 FirePoint 기준점 소켓 모두 무기 메쉬가 아니라 캐릭터 스켈레톤(리깅)에 박혀 있다 —
 	//	그래서 무기가 없는 캐릭터(카구야 등)도 스켈레톤만 맞으면 그대로 동작하고, 리깅에 해당 소켓이 없는
 	//	캐릭터는 DoesSocketExist 검사에 걸려 기존 폴백 동작으로 자연히 빠진다.
-	ApplyHandEquip(LeftHandWeaponMesh, Data->LEquip, TEXT("L_Hand_Equip"));
-	ApplyHandEquip(RightHandWeaponMesh, Data->REquip, TEXT("R_Hand_Equip"));
+	ApplyHandEquip(LeftHandWeaponMesh, Data->LEquip, TEXT("L_Hand_Equip"), Data->LEquipScale);
+	ApplyHandEquip(RightHandWeaponMesh, Data->REquip, TEXT("R_Hand_Equip"), Data->REquipScale);
 }
 
-void AFTPlayerCharacterBase::ApplyHandEquip(UStaticMeshComponent* WeaponMeshComp, const TSoftObjectPtr<UStaticMesh>& EquipMeshRef, FName HandSocket)
+void AFTPlayerCharacterBase::ApplyHandEquip(UStaticMeshComponent* WeaponMeshComp, const TSoftObjectPtr<UStaticMesh>& EquipMeshRef, FName HandSocket, float EquipScale)
 {
 	if (!WeaponMeshComp)
 	{
@@ -189,7 +189,7 @@ void AFTPlayerCharacterBase::ApplyHandEquip(UStaticMeshComponent* WeaponMeshComp
 	{
 		WeaponMeshComp->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocket);
 
-		WeaponMeshComp->SetWorldScale3D(FVector(1.f));
+		WeaponMeshComp->SetWorldScale3D(FVector(EquipScale));
 	}
 }
 

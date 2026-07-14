@@ -228,7 +228,8 @@ protected:
 
 	//	WeaponMeshComp에 EquipMeshRef(소프트 참조)를 로드해 세팅하고, 스켈레탈 메쉬에 HandSocket이 있으면
 	//	그 소켓에 부착한다. EquipMeshRef가 비어 있으면 기존에 붙어있던 메쉬를 비워(=화면에서 사라지게) 둔다.
-	void ApplyHandEquip(UStaticMeshComponent* WeaponMeshComp, const TSoftObjectPtr<UStaticMesh>& EquipMeshRef, FName HandSocket);
+	//	부착 후 월드 스케일을 EquipScale로 고정한다 (기본 1.0 = 에셋 원본 크기 그대로).
+	void ApplyHandEquip(UStaticMeshComponent* WeaponMeshComp, const TSoftObjectPtr<UStaticMesh>& EquipMeshRef, FName HandSocket, float EquipScale);
 
 	// 초기 혹은 Respawn 단계에서 CharacterData에 의거하여 Attribute 값 초기화
 	void InitializeCharacterAttribute() const;

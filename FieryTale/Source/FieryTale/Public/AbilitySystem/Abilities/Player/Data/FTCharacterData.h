@@ -86,10 +86,19 @@ struct FFTCharacterData : public FTableRowBase
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon")
 	TSoftObjectPtr<UStaticMesh> LEquip;
 
+	//	LEquip 무기의 월드 스케일 배율. 무기는 항상 절대 크기(월드 스케일 1.0 × 이 값)로 부착되므로,
+	//	원본 에셋 자체가 실제 크기 기준으로 제작되지 않은 경우(예: 거인 스켈레톤 기준 소품) 이 값으로 보정한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon", meta = (ClampMin = "0.01"))
+	float LEquipScale = 1.f;
+
 	//	오른손(R_Hand 소켓)에 부착할 무기 스태틱 메쉬 (소프트 참조). 비어 있으면 오른손에 아무것도 붙지 않는다.
 	//	이 메쉬에 "FirePoint" 소켓이 있으면, 평타 발사/판정 시작 위치가 캐릭터 기본 오프셋 대신 그 소켓 위치로 대체된다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon")
 	TSoftObjectPtr<UStaticMesh> REquip;
+
+	//	REquip 무기의 월드 스케일 배율. LEquipScale과 동일한 용도.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon", meta = (ClampMin = "0.01"))
+	float REquipScale = 1.f;
 
 
 	//  데이터 테이블의 이 행이 어떤 캐릭터 타입을 의미하는지 식별
