@@ -89,8 +89,7 @@ void UFT_SilverBulletSkill::FireSilverBullet()
             if (World && ProjectileClass && DamageEffectClass)
             {
                 // 스폰 위치 및 방향 계산
-                FVector ChestLocation = Character->GetActorLocation() + FVector(0.f, 0.f, 50.f); 
-                FVector SpawnLocation = ChestLocation + (Character->GetActorForwardVector() * 50.f);
+                FVector SpawnLocation = Character->GetWeaponMuzzleLocation();
                 FVector LaunchDirection = Character->GetActorForwardVector();
 
                 const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));

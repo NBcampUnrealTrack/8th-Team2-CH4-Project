@@ -70,8 +70,7 @@ void UFT_AliceSkill::FireClockRabbit()
     if (World && ClockRabbitProjectileClass && DamageEffectClass && Character)
     {
         // 스폰 위치 및 방향 계산
-        FVector ChestLocation = Character->GetActorLocation() + FVector(0.f, 0.f, 50.f); 
-        FVector SpawnLocation = ChestLocation + (Character->GetActorForwardVector() * 50.f);
+        FVector SpawnLocation = Character->GetWeaponMuzzleLocation();
         FVector LaunchDirection = Character->GetActorForwardVector();
 
         if (CurrentActorInfo && CurrentActorInfo->AbilitySystemComponent.IsValid())
@@ -115,6 +114,22 @@ void UFT_AliceSkill::FireClockRabbit()
             if (Projectile)
             {
                 Projectile->DamageEffectSpecHandle = SpecHandle;
+
+                // 추가 디버프(슬로우, 인장 등) 스펙 적용
+                if (DebuffEffectClass)
+                {
+                    FGameplayEffectSpecHandle DebuffSpecHandle = MakeOutgoingGameplayEffectSpec(DebuffEffectClass, GetAbilityLevel());
+                    if (DebuffSpecHandle.IsValid() && DebuffSpecHandle.Data.IsValid())
+                    {
+                        FGameplayEffectContextHandle DebuffContext = DebuffSpecHandle.Data->GetContext();
+                        DebuffContext.AddSourceObject(Character);
+                        DebuffContext.AddInstigator(Character, Character);
+                        DebuffSpecHandle.Data->SetContext(DebuffContext.Duplicate());
+                        
+                        Projectile->AdditionalEffectSpecHandles.Add(DebuffSpecHandle);
+                    }
+                }
+
                 Projectile->FinishSpawning(SpawnTransform);
             }
         }

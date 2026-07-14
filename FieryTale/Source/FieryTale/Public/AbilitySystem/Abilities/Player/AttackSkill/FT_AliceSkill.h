@@ -40,8 +40,12 @@ protected:
 protected:
     
     /** 대미지 이펙트 클래스 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Effects")
     TSubclassOf<class UGameplayEffect> DamageEffectClass;
+    
+    /** 적중 시 추가로 부여할 디버프 이펙트 클래스 (슬로우, 인장 등) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Effects")
+    TSubclassOf<class UGameplayEffect> DebuffEffectClass;
     
     /** 투사체 클래스 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Alice Spec")
