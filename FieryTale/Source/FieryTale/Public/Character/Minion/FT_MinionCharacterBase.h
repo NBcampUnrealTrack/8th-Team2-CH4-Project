@@ -58,6 +58,18 @@ public:
     
     FORCEINLINE TSubclassOf<class AFT_ProjectileBase> GetMinionProjectileClass() const { return MinionProjectileClass; }
 
+    /** 💡 [2단계: 데이터 에셋 Getter 뚫기 완착] 
+     *  미니언 뇌(Brain)에서 미니언의 데이터 에셋을 실시간으로 읽어가 사거리를 제어하도록 주소를 오픈합니다. */
+    FORCEINLINE UFT_MinionData* GetMinionData() const { return MinionData; }
+
+    /** 💡 [런타임 무기 스왑 관문]: bLequip 상태에 따라 손(Lequip) 또는 등/허리(Requip)로 무기 부착을 다이나믹하게 전환합니다. */
+    void SetWeaponAttachmentState(bool bLequip);
+
+    /** 💡 [파이어포인트 소켓 동적 인양 관문]: 
+     *  무기 스태틱 메쉬 내부에 자체 "FirePoint" 소켓이 구현되어 있다면 해당 월드 트랜스폼을 최우선 반환하고,
+     *  없다면 백업으로 캐릭터 본체의 Fallback 소켓 주소를 인양하여 평타 투사체 사출구 오차를 제로로 만듭니다. */
+    FTransform GetAttackLaunchTransform(FName CharacterFallbackSocketName) const;
+
     // =========================================================================
     // [멀티플레이어 네트워크 리플리케이션 명세 장부 선언]
     // =========================================================================
@@ -71,10 +83,6 @@ protected:
 
     /** 서버 단 AI 컨트롤러 포제스 시점에 GAS 하드웨어 연결을 마감하는 포인터 낚시 바늘 */
     virtual void PossessedBy(AController* NewController) override;
-
-    // 💡 [넷코드 유령 선로 완벽 소각]:
-    // AI가 조종하는 폰의 Controller 변수는 클라이언트로 복제되지 않으므로 영원히 격발되지 않던
-    // virtual void OnRep_Controller() override; 명세를 헤더에서 흔적도 없이 깔끔하게 청소했습니다.
 
     // =========================================================================
     // [RepNotify 콜백 배관]

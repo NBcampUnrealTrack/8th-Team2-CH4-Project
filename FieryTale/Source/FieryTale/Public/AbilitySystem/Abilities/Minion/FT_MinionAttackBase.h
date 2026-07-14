@@ -62,4 +62,6 @@ protected:
     /** 애니메이션이 조기에 중단되거나 무사히 종료되었을 때의 뒤처리 동기화 함수 */
     UFUNCTION()
     void OnMontageCompletedOrCancelled();
+    
+    FTimerHandle DebugNoMontageTimerHandle;
 };

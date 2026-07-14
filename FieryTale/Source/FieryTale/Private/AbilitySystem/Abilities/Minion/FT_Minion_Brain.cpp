@@ -15,8 +15,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "AbilitySystemBlueprintLibrary.h"
-
-// AbilitySystem/Abilities/Minion/FT_Minion_Brain.cpp
+#include "AbilitySystem/Abilities/Minion/DataAsset/FT_MinionData.h"
 
 UFT_Minion_Brain::UFT_Minion_Brain()
 {
@@ -40,8 +39,6 @@ void UFT_Minion_Brain::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
     if (GetWorld())
     {
-        // 💡 [런타임 세이프티 가드]: 혹여나 블루프린트 디테일 패널에서 실수로 0.0f 이하로 밀어버렸다면,
-        // 타이머가 엔진에서 터지거나 파괴되는 것을 막기 위해 하한 마진(0.1초)으로 강제 스냅 보정합니다.
         if (ScanInterval <= 0.0f)
         {
             ScanInterval = 0.25f;
@@ -92,10 +89,11 @@ void UFT_Minion_Brain::ExecuteAILogic()
     UPathFollowingComponent* PathFollowComp = AIC->GetPathFollowingComponent();
     AFT_MinionCharacterBase* MinionChar = Cast<AFT_MinionCharacterBase>(AvatarChar);
     
-    // =========================================================================
-    // 💡 [실시간 생존 타깃 스캔 엔진 개통] 
-    // 컨트롤러의 죽은 수동 락온 장부를 제거하고, 퍼셉션 컴포넌트 목록을 실시간 역산 스캔합니다.
-    // =========================================================================
+    if (MinionChar && MinionChar->GetMinionData())
+    {
+        AttackAcceptanceRadius = MinionChar->GetMinionData()->DefaultAttackRange;
+    }
+    
     AActor* BestTarget = nullptr;
     
     if (AIC->GetPerceptionComponent() && MinionChar)
@@ -113,13 +111,11 @@ void UFT_Minion_Brain::ExecuteAILogic()
             UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(PerceivedActor);
             if (!TargetASC) continue;
 
-            // 1차 검문: 타깃이 이미 사망 상태(Dead)라면 시체 구타 방지를 위해 즉각 소각 스킵
             if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
             {
                 continue;
             }
 
-            // 2차 검문: 나와 다른 적 진영 태그를 지니고 있는지 식별 (소체 내부의 적 진영 판정 태그 규칙 활용)
             bool bIsEnemy = false;
             if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
             {
@@ -130,7 +126,6 @@ void UFT_Minion_Brain::ExecuteAILogic()
                 bIsEnemy = true;
             }
 
-            // 3차 검문: 적 진영이 확정되었다면 실시간 최단 거리 미니언 락온 갱신
             if (bIsEnemy)
             {
                 float DistSq = FVector::DistSquared(MyLoc, PerceivedActor->GetActorLocation());
@@ -143,13 +138,19 @@ void UFT_Minion_Brain::ExecuteAILogic()
         }
     }
 
+    // =========================================================================
     // [전술 상황 1: 유효 생존 타깃 검출 시 추격 및 교전]
+    // =========================================================================
     if (IsValid(BestTarget))
     {
         AIC->SetFocus(BestTarget);
-        float DistanceToTarget = FVector::Dist(AvatarChar->GetActorLocation(), BestTarget->GetActorLocation());
 
-        if (DistanceToTarget <= AttackAcceptanceRadius)
+        // 💡 [배꼽 거리 vs 표면 거리 불일치 완치 완공]
+        // 두 캐릭터의 정중앙 피벗 점(배꼽) 간 거리 대신, 캡슐 표면 거리를 인양하는 GetDistanceTo를 채택합니다.
+        // 추가로 AI가 멈춰 서는 오차와 위치 보간을 유연하게 흡수할 수 있도록 50.0f 마진 가드선을 확정 적용합니다.
+        float DistanceToTarget = AvatarChar->GetDistanceTo(BestTarget);
+
+        if (DistanceToTarget <= AttackAcceptanceRadius + 50.0f)
         {
             AIC->StopMovement();
             
@@ -161,10 +162,8 @@ void UFT_Minion_Brain::ExecuteAILogic()
         {
             bool bAlreadyMovingToTarget = false;
             
-            // 💡 [순정 API 표준 결착]: GetPathGoalActor -> GetMoveGoal()로 교체하여 심볼 에러를 완전히 박멸합니다.
             if (PathFollowComp && PathFollowComp->GetStatus() == EPathFollowingStatus::Moving && !bWasStunnedLastTick)
             {
-                // 패스파인더가 현재 실시간 추적(Goal Tracking) 중인 액터 주소 직격 인양
                 if (PathFollowComp->GetMoveGoal() == BestTarget)
                 {
                     bAlreadyMovingToTarget = true;
@@ -173,7 +172,6 @@ void UFT_Minion_Brain::ExecuteAILogic()
 
             if (!bAlreadyMovingToTarget)
             {
-                // Goal Tracking 아키텍처로 안전 사출
                 FAIMoveRequest MoveRequest;
                 MoveRequest.SetGoalActor(BestTarget);
                 MoveRequest.SetAcceptanceRadius(AttackAcceptanceRadius);
@@ -227,7 +225,7 @@ void UFT_Minion_Brain::ExecuteAILogic()
             else if (PathFollowComp && PathFollowComp->GetStatus() == EPathFollowingStatus::Moving)
             {
                 FVector CurrentDest = PathFollowComp->GetPathDestination();
-                if (CurrentDest.Equals(NextLineLocation, 60.0f)) // 도달 반경과 동기화하여 허용 범위 여유 보정
+                if (CurrentDest.Equals(NextLineLocation, 60.0f)) 
                 {
                     bAlreadyMovingToLoc = true;
                 }

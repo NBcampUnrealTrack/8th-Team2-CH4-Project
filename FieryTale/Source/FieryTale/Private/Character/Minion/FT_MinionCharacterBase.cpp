@@ -62,6 +62,31 @@ AFT_MinionCharacterBase::AFT_MinionCharacterBase()
     }
 }
 
+FTransform AFT_MinionCharacterBase::GetAttackLaunchTransform(FName CharacterFallbackSocketName) const
+{
+    // 💡 [무기 자체 소켓(FirePoint) 우선 추적 파이프라인]
+    // 1. 주무기 컴포넌트 장부를 검문하여 실물 스태틱 메쉬 자산이 꽂혀있는지 징수합니다.
+    if (MainWeaponComponent && MainWeaponComponent->GetStaticMesh())
+    {
+        // 2. 중요: 캐릭터 뼈대가 아니라, '스태틱 메쉬 에셋 자체'에 기획/아트 파트가 "FirePoint" 소켓을 심어두었는지 확인합니다.
+        if (MainWeaponComponent->DoesSocketExist(TEXT("FirePoint")))
+        {
+            // 무기 끝단에 심어진 파이어포인트의 실시간 월드 트랜스폼을 정밀 사출하여 반환합니다!
+            return MainWeaponComponent->GetSocketTransform(TEXT("FirePoint"), ERelativeTransformSpace::RTS_World);
+        }
+    }
+
+    // 백업선 타설: 만약 무기 에셋 자체에 FirePoint 소켓이 없다면, 
+    // 인자로 넘어온 캐릭터 소체 뼈대의 기본 소켓(Fallback) 주소지를 인양해 돌려주어 크래시를 차단합니다.
+    if (GetMesh() && GetMesh()->DoesSocketExist(CharacterFallbackSocketName))
+    {
+        return GetMesh()->GetSocketTransform(CharacterFallbackSocketName, ERelativeTransformSpace::RTS_World);
+    }
+
+    // 최후의 마지노선: 둘 다 오염되어 없다면 시전자의 현재 가슴 높이 정면 트랜스폼을 안전장치로 리턴합니다.
+    return FTransform(GetActorRotation(), GetActorLocation() + FVector(0.f, 0.f, 60.f));
+}
+
 void AFT_MinionCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);

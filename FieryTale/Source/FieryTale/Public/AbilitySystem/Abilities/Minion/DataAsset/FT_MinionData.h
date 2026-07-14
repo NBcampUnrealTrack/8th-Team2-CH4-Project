@@ -61,6 +61,9 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Attributes")
     float DefaultAttackPower = 15.0f;
+    
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Attributes")
+    float DefaultAttackRange = 150.0f;
 
     // =========================================================================
     // [미니언 GAS 및 AI 인프라 자산 슬롯]

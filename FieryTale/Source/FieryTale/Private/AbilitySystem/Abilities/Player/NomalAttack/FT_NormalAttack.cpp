@@ -226,46 +226,47 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
 
     UWorld* World = GetWorld();
 
-    // 단발식 투사체 사출 파이프라인 구간입니다.
+    // 💡 [단발식 투사체 사출 파이프라인 무결화]
     if (InWeaponData->ProjectilesPerShot <= 1)
     {
-        FVector FinalForward = Forward;
-        if (UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo())
+        // 실물 액터(Actor) 스폰 권한을 오직 서버(HasAuthority) 권역으로 완벽하게 격리 배관합니다.
+        if (InCharacter->HasAuthority())
         {
-            const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
-            if (AttributeSet && AttributeSet->GetWeaponSpread() > 0.0f)
+            FVector FinalForward = Forward;
+            if (UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo())
             {
-                FinalForward = FMath::VRandCone(Forward, FMath::DegreesToRadians(AttributeSet->GetWeaponSpread()));
+                const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
+                if (AttributeSet && AttributeSet->GetWeaponSpread() > 0.0f)
+                {
+                    FinalForward = FMath::VRandCone(Forward, FMath::DegreesToRadians(AttributeSet->GetWeaponSpread()));
+                }
             }
-        }
 
 #if !UE_BUILD_SHIPPING
-        FVector ArrowEnd = Start + (FinalForward * 150.f);
-        DrawDebugDirectionalArrow(World, Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
+            FVector ArrowEnd = Start + (FinalForward * 150.f);
+            DrawDebugDirectionalArrow(World, Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
 #endif
 
-        FTransform SpawnTransform(FinalForward.Rotation(), Start);
-        FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
-        if (DamageSpecHandle.IsValid())
-        {
-            DamageSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, InWeaponData->BaseDamage);
-        }
+            FTransform SpawnTransform(FinalForward.Rotation(), Start);
+            FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
+            if (DamageSpecHandle.IsValid())
+            {
+                DamageSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, InWeaponData->BaseDamage);
+            }
 
-        // 예측 이중 격발 버그 박멸 완치선: 수동 Apply 사출 구문을 제거하고 오리지널 데이터 핸들을 투사체에 고스란히 봉인 이관합니다.
-        // 이로 인해 충돌 오버랩 시점에만 정확히 대미지 판정이 들어가 가상 좀비 패킷 무효화 및 대미지 씹힘 결함이 완벽히 해결됩니다.
-        AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-            InWeaponData->ProjectileClass, SpawnTransform, InCharacter, InCharacter, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-        
-        if (Projectile)
-        {
-            // 완벽히 생존 소유권이 보장된 오리지널 스펙 장부를 투사체에 고스란히 이관하여 타깃 적중 시 데미지 증발 현상을 원천 차단합니다.
-            Projectile->DamageEffectSpecHandle = DamageSpecHandle;
-            Projectile->FinishSpawning(SpawnTransform);
+            AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
+                InWeaponData->ProjectileClass, SpawnTransform, InCharacter, InCharacter, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            
+            if (Projectile)
+            {
+                Projectile->DamageEffectSpecHandle = DamageSpecHandle;
+                Projectile->FinishSpawning(SpawnTransform);
+            }
         }
         return;
     }
 
-    // 연사 및 점사식 비동기 타이머 기반 투사체 사출 구간입니다.
+    // 💡 [연사 및 점사식 비동기 타이머 기반 투사체 사출 파이프라인 무결화]
     TSharedPtr<int32> ShotCounter = MakeShared<int32>(0);
     int32 MaxShots = InWeaponData->ProjectilesPerShot;
     float Delay = InWeaponData->BurstDelay;
@@ -276,7 +277,7 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
 
     World->GetTimerManager().SetTimer(BurstTimerHandle, [WeakThis, WeakChar, World, ProjectileClass, Start, Forward, ShotCounter, MaxShots]() mutable
     {
-        // 생존선 정밀 보안 검문: 소유 캐릭터나 어빌리티 본체가 소멸 상태라면 타이머를 정순 강제 파쇄 정지하여 서버 댕글링 Null 크래시를 차단합니다.
+        // 생존선 정밀 보안 검문: 소유 캐릭터나 어빌리티 본체가 소멸 상태라면 타이머 파쇄
         if (!WeakThis.IsValid() || !WeakThis->IsActive() || !WeakChar.IsValid() || !World || !ProjectileClass || *ShotCounter >= MaxShots)
         {
             if (World && WeakThis.IsValid())
@@ -293,45 +294,51 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
         }
 
         AFTPlayerCharacterBase* CharacterPtr = WeakChar.Get();
-        FVector FinalForward = Forward;
-        UAbilitySystemComponent* MyASC = WeakThis->GetAbilitySystemComponentFromActorInfo();
-        if (MyASC)
+        
+        // 💡 [점사 가드선 타설]: 매 타임 틱 타이머 내부에서도 클라이언트 로컬 예측 스폰을 원천 멸균하고 
+        // 오직 권한을 가진 서버에서만 실물 물리 총알 액터가 사출되도록 완벽히 격리 차단합니다.
+        if (CharacterPtr->HasAuthority())
         {
-            const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
-            if (AttributeSet && AttributeSet->GetWeaponSpread() > 0.0f)
+            FVector FinalForward = Forward;
+            UAbilitySystemComponent* MyASC = WeakThis->GetAbilitySystemComponentFromActorInfo();
+            if (MyASC)
             {
-                FinalForward = FMath::VRandCone(Forward, FMath::DegreesToRadians(AttributeSet->GetWeaponSpread()));
+                const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
+                if (AttributeSet && AttributeSet->GetWeaponSpread() > 0.0f)
+                {
+                    FinalForward = FMath::VRandCone(Forward, FMath::DegreesToRadians(AttributeSet->GetWeaponSpread()));
+                }
             }
-        }
 
 #if !UE_BUILD_SHIPPING
-        FVector ArrowEnd = Start + (FinalForward * 150.f);
-        DrawDebugDirectionalArrow(World, Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
+            FVector ArrowEnd = Start + (FinalForward * 150.f);
+            DrawDebugDirectionalArrow(World, Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
 #endif
 
-        FTransform SpawnTransform(FinalForward.Rotation(), Start);
-        
-        FGameplayEffectSpecHandle DynamicSpecHandle = WeakThis->MakeOutgoingGameplayEffectSpec(WeakThis->BaseDamageEffectClass, WeakThis->GetAbilityLevel());
-        
-        if (DynamicSpecHandle.IsValid())
-        {
-            float BaseDamage = CharacterPtr->GetWeaponData() ? CharacterPtr->GetWeaponData()->BaseDamage : 0.0f;
-            DynamicSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
-        }
+            FTransform SpawnTransform(FinalForward.Rotation(), Start);
+            
+            FGameplayEffectSpecHandle DynamicSpecHandle = WeakThis->MakeOutgoingGameplayEffectSpec(WeakThis->BaseDamageEffectClass, WeakThis->GetAbilityLevel());
+            
+            if (DynamicSpecHandle.IsValid())
+            {
+                float BaseDamage = CharacterPtr->GetWeaponData() ? CharacterPtr->GetWeaponData()->BaseDamage : 0.0f;
+                DynamicSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
+            }
 
-        // 점사 내부 예측 이중 적용 완치선: 매 연사 틱마다 생성되는 동적 스펙 핸들 역시 수동 Apply 대미지 격발 구문을 제거하여 패킷 크래시를 전면 차단합니다.
-        AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-            ProjectileClass, SpawnTransform, CharacterPtr, CharacterPtr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-        
-        if (Projectile)
-        {
-            // 소유권이 생존한 오리지널 스펙 장부를 이관하여 점사 투사체의 데미지 증발 현상을 원천 방어합니다.
-            Projectile->DamageEffectSpecHandle = DynamicSpecHandle;
-            Projectile->FinishSpawning(SpawnTransform);
+            AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
+                ProjectileClass, SpawnTransform, CharacterPtr, CharacterPtr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+            
+            if (Projectile)
+            {
+                Projectile->DamageEffectSpecHandle = DynamicSpecHandle;
+                Projectile->FinishSpawning(SpawnTransform);
+            }
         }
         
         (*ShotCounter)++;
         
+        // 💡 [중요 넷코드 싱크 가드]: 타이머 카운터 마감 및 EndAbility 명령은 서버/클라이언트 예측 선로 양쪽 모두가 
+        // 동일하게 도달하여 큐를 비워야 하므로, Authority 스콥 외곽에서 원자적으로 처리하여 넷 상태 전이를 정순 정렬합니다.
         if (*ShotCounter >= MaxShots)
         {
             World->GetTimerManager().ClearTimer(WeakThis->BurstTimerHandle);
@@ -461,7 +468,6 @@ void UFT_NormalAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const
         }
 
         // [탄퍼짐 무한 고정 버그 파이프라인 최종 보수 완료]
-        // 확정 명세서 매핑: 데이터 자산 내 순정 태생 기저 탄퍼짐 수치인 WeaponData->InitBaseSpread로 정밀 락인합니다.
         if (UFT_AttributeSet* AttributeSet = const_cast<UFT_AttributeSet*>(Cast<UFT_AttributeSet>(SourceASC->GetAttributeSet(UFT_AttributeSet::StaticClass()))))
         {
             AFTPlayerCharacterBase* PlayerChar = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get());
