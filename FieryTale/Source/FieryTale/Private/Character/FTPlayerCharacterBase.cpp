@@ -463,13 +463,26 @@ void AFTPlayerCharacterBase::ApplyCharacterScaleVisual(float Scale)
 	//	발이 바닥 아래로 파고드는 문제가 생긴다.
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
-		Capsule->SetCapsuleSize(DefaultCapsuleRadius * Scale, DefaultCapsuleHalfHeight * Scale, true);
+		const float OldHalfHeight = Capsule->GetUnscaledCapsuleHalfHeight();
+		const float NewHalfHeight = DefaultCapsuleHalfHeight * Scale;
+		Capsule->SetCapsuleSize(DefaultCapsuleRadius * Scale, NewHalfHeight, true);
+
+		if (GetLocalRole() != ROLE_SimulatedProxy)
+		{
+			AddActorWorldOffset(FVector(0.f, 0.f, NewHalfHeight - OldHalfHeight));
+		}
 	}
 
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
 		MeshComp->SetRelativeScale3D(DefaultMeshRelativeScale * Scale);
-		MeshComp->SetRelativeLocation(FVector(DefaultMeshRelativeLocation.X, DefaultMeshRelativeLocation.Y, DefaultMeshRelativeLocation.Z * Scale));
+		const FVector NewMeshRelativeLocation(DefaultMeshRelativeLocation.X, DefaultMeshRelativeLocation.Y, DefaultMeshRelativeLocation.Z * Scale);
+		MeshComp->SetRelativeLocation(NewMeshRelativeLocation);
+
+		//	SimulatedProxy 네트워크 스무딩이 BaseTranslationOffset을 기준으로 메시 위치를 주기적으로
+		//	재적용하는데, 이게 스폰 시점에 캐싱된 원본 오프셋이라 스케일 변경분을 반영 못 해 몇 틱 뒤
+		//	원래 크기 위치로 되돌아간다. 스케일이 바뀔 때마다 같이 갱신해줘야 한다.
+		CacheInitialMeshOffset(NewMeshRelativeLocation, MeshComp->GetRelativeRotation());
 	}
 
 	//	HealthWidgetComponent는 RootComponent(캡슐)에 붙어있고 Root 자체는 스케일을 갖지 않으므로(위 주석 참고),
