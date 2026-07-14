@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -7,7 +7,7 @@
 #include "FT_UltimateGameplayAbility.generated.h"
 
 /**
- * FieryTale 모든 영웅의 궁극기(Q 스킬) 전용 베이스 클래스
+ * 모든 영웅의 궁극기(Q 스킬) 베이스 클래스입니다.
  */
 UCLASS()
 class FIERYTALE_API UFT_UltimateGameplayAbility : public UFT_GameplayAbility
@@ -17,16 +17,16 @@ class FIERYTALE_API UFT_UltimateGameplayAbility : public UFT_GameplayAbility
 public:
 	UFT_UltimateGameplayAbility();
 
-	// 능력을 발동할 수 있는지 게이지 자원을 선제 검사합니다
+	// 어빌리티를 활성화할 수 있는지 조건을 검사합니다.
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 	
 protected:
-	// 💡 엔진의 기본 비용 검사기 작동을 끄기 위한 안전망입니다.
+	// 기본 코스트 검증을 우회합니다.
 	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
-	// 궁극기 격발 성공 시 게이지를 완전히 소모시킵니다
+	// 어빌리티 코스트를 적용합니다.
 	virtual void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
 
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;

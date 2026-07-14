@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -12,8 +12,7 @@ class USkeletalMesh;
 class AFT_ProjectileBase;
 
 /**
- * FieryTale 라인 미니언들의 스탯, 외형 메쉬, 무기, GAS 스킬 명세를 
- * 기획 파트가 에디터에서 마스터 제어하도록 지원하는 데이터 에셋 클래스입니다.
+ * 미니언의 속성, 외형, 무기, 능력을 정의하는 데이터 에셋입니다.
  */
 UCLASS(BlueprintType)
 class FIERYTALE_API UFT_MinionData : public UDataAsset
@@ -25,33 +24,33 @@ public:
     FGameplayTag MinionRoleTag;
 
     // =========================================================================
-    // [미니언 비주얼 및 무기 사양 선언부]
+    // 시각 효과 및 장비
     // =========================================================================
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
     TSoftObjectPtr<USkeletalMesh> MinionMesh;
 
-    /** 💡 [애니메이션 블루프린트 슬롯 타설]: 메쉬에 매칭되는 AnimBlueprint 클래스를 소프트 포인터로 인양합니다. */
+    /** 애니메이션 블루프린트 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
     TSoftClassPtr<UAnimInstance> MinionAnimClass;
 
-    /** 💡 [주무기 자산 슬롯 (오른손 표준)]: 주로 오른손에 쥐여줄 주무기 메쉬 자산 주소입니다. */
+    /** 주무기 (주로 오른손 장착) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
     TSoftObjectPtr<UStaticMesh> MainWeaponMesh;
 
-    /** 💡 [주무기 결착 소켓]: 주무기가 장착될 소켓 이름입니다. (예: "Weapon_R_Socket") */
+    /** 주무기 장착 소켓 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
     FName MainWeaponSocketName;
 
-    /** 💡 [보조무기 자산 슬롯 (왼손/방패 표준)]: 쌍검 미니언이나 방패병을 위해 왼손에 쥐여줄 보조무기 메쉬 자산 주소입니다. */
+    /** 보조무기 (주로 왼손/방패 장착) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
     TSoftObjectPtr<UStaticMesh> SecondaryWeaponMesh;
 
-    /** 💡 [보조무기 결착 소켓]: 보조무기가 장착될 소켓 이름입니다. (예: "Weapon_L_Socket") */
+    /** 보조무기 장착 소켓 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
     FName SecondaryWeaponSocketName;
 
     // =========================================================================
-    // [미니언 기본 속성 수치 장부]
+    // 기본 속성
     // =========================================================================
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Attributes")
     float DefaultMaxHealth = 300.0f;
@@ -66,7 +65,7 @@ public:
     float DefaultAttackRange = 150.0f;
 
     // =========================================================================
-    // [미니언 GAS 및 AI 인프라 자산 슬롯]
+    // 어빌리티 및 AI
     // =========================================================================
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | GAS")
     TArray<TSubclassOf<UGameplayAbility>> MinionAbilities;

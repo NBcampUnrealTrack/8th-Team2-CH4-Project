@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -20,7 +20,13 @@ public:
 protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
+	UFUNCTION()
+	void OnMontageFinished();
+
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
+	TObjectPtr<class UAnimMontage> SkillMontage;
+
 	// --- 가구야 궁극기 고유 스펙 ---
 	/** 자신 중심 광역 스캔 반경 (기본 1200cm / 12m) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
@@ -34,8 +40,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Spec")
 	float PullForceMultiplier;
 
-	// --- 연동할 GameplayEffect(GE) 라인업 ---
-	/** 피해 연산기(GEEC_Damage)를 기동할 확정 대미지 이펙트 */
+	// --- 연동할 GameplayEffect(GE) 클래스 ---
+	/** 확정 대미지를 적용할 이펙트 클래스 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
 	TSubclassOf<class UGameplayEffect> DamageGameplayEffectClass;
 
@@ -43,6 +49,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
 	TSubclassOf<class UGameplayEffect> SlowDebuffEffectClass;
 	
-	// 💡 글로벌 궁극기 자원 전선 초기화를 위해 마스터 EndAbility를 오버라이드 선언합니다.
+	// 어빌리티 종료 시 태그 제거를 위해 EndAbility를 오버라이드합니다.
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 };

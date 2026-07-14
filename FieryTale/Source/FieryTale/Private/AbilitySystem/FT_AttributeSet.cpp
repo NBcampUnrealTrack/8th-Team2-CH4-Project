@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "AbilitySystem/FT_AttributeSet.h"
@@ -64,7 +64,7 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
     
     const FGameplayAttribute ModifiedAttribute = Data.EvaluatedData.Attribute;
 
-    // 메타 속성인 Damage가 주입되었을 때 실질적인 체력 및 보호막 차감 연산을 전개하는 정산소 분기입니다.
+    // 메타 속성인 Damage가 적용되었을 때 체력 및 보호막 차감을 처리하는 로직입니다.
     if (ModifiedAttribute == GetDamageAttribute())
     {
         const float LocalDamageDone = GetDamage();
@@ -83,7 +83,7 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
             }
             else
             {
-                // 보호막을 초과하는 대미지가 발생했을 때 잔여 화력을 체력(Health)으로 이관합니다.
+                // 보호막을 초과하는 대미지가 발생했을 때 초과분을 체력(Health)에 적용합니다.
                 SetShield(0.0f);
                 const float NewHealth = GetHealth() + NewShield;
                 
@@ -95,34 +95,34 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
                 SetHealth(ClampedNewHealth);
             }
 
-            // 공격적 획득 선로: 궁극기 게이지 대미지 비례 충전 파이프라인
+            // 궁극기 게이지 충전 로직
             if (ActualDamageApplied > 0.0f && Data.EffectSpec.GetContext().IsValid())
             {
                 if (UAbilitySystemComponent* InstigatorASC = Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent())
                 {
-                    // 3중 무결성 크로스 가드선 타설:
-                    // 1. 대미지 GE 에셋 자체 태그 검문 (AssetTags)
-                    // 2. 대미지 스펙의 동적 부여 태그 검문 (DynamicGrantedTags)
-                    // 3. 공격자(Instigator)의 ASC 몸뚱이에 궁극기 시전 상태 태그가 살아있는지 직접 검문합니다.
+                    // 검증 조건:
+                    // 1. 대미지 GE 에셋 자체 태그 검증 (AssetTags)
+                    // 2. 대미지 스펙의 동적 부여 태그 검증 (DynamicGrantedTags)
+                    // 3. 공격자(Instigator)의 ASC에 궁극기 시전 상태 태그가 있는지 확인합니다.
                     bool bIsUltimateDamage = Data.EffectSpec.Def->GetAssetTags().HasTag(FTTags::FTAbilities::UltimateSkill) || 
                                              Data.EffectSpec.DynamicGrantedTags.HasTag(FTTags::FTAbilities::UltimateSkill) ||
                                              InstigatorASC->HasMatchingGameplayTag(FTTags::FTAbilities::UltimateSkill);
 
-                    // 궁극기로 가한 대미지 피드백 루프가 확실히 아닐 때(평타 및 일반 기술)만 다음 궁극기 게이지를 누적 충전합니다.
+                    // 궁극기 대미지가 아닐 때(평타 및 일반 기술) 궁극기 게이지를 누적 충전합니다.
                     if (!bIsUltimateDamage)
                     {
                         const UFT_AttributeSet* InstigatorAttributeSet = Cast<UFT_AttributeSet>(InstigatorASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
             
                         if (InstigatorAttributeSet)
                         {
-                            // 기획 밸런스 셋업 배율을 반영합니다. (대미지 수치 비례 충전 사양)
+                            // 충전 배율을 적용합니다. (대미지 수치 비례 충전)
                             const float UltimateChargeMultiplier = 0.5f; 
                             const float UltimateBonus = ActualDamageApplied * UltimateChargeMultiplier;
 
                             float CurrentSourceUlt = InstigatorAttributeSet->GetUltimateGauge();
                             float NewSourceUlt = FMath::Clamp<float>(CurrentSourceUlt + UltimateBonus, 0.0f, InstigatorAttributeSet->GetMaxUltimateGauge());
 
-                            // 스탯 소유주(공격자)의 오리지널 스탯 장부에 클램핑된 신규 게이지 수치를 주입합니다.
+                            // 공격자의 속성에 클램핑된 새로운 궁극기 게이지 수치를 적용합니다.
                             InstigatorASC->SetNumericAttributeBase(GetUltimateGaugeAttribute(), NewSourceUlt);
                         }
                     }
@@ -140,7 +140,7 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
     }
     else if (ModifiedAttribute == GetMoveSpeedAttribute())
     {
-        // 이동 속도 스탯 변경 시 순정 캐릭터 무브먼트 컴포넌트의 MaxWalkSpeed와 동기화하여 연산 괴리를 소각합니다.
+        // 이동 속도 스탯 변경 시 순정 캐릭터 무브먼트 컴포넌트의 MaxWalkSpeed와 동기화합니다.
         SetMoveSpeed(FMath::Clamp<float>(GetMoveSpeed(), 0.0f, GetMaxMoveSpeed()));
         if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
         {
@@ -162,7 +162,7 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
         SetWeaponSpread(FMath::Clamp<float>(GetWeaponSpread(), 0.0f, GetMaxWeaponSpread()));
     }
 
-    // 최종 정산 후 체력이 0에 도달했다면 오너쉽 권한이 있는 서버 분기에서 즉각 사망 시퀀스를 처리합니다.
+    // 최종 정산 후 체력이 0에 도달했다면 서버 권한 환경에서 즉각 사망 시퀀스를 처리합니다.
     if (GetHealth() <= 0.0f)
     {
         if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
@@ -171,7 +171,7 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
             {
                 if (BaseChar->HasAuthority())
                 {
-                    // 🌟 1. 대미지 이펙트를 가한 주체(Instigator)의 컨트롤러를 추적합니다.
+                    // 대미지 이펙트를 가한 주체(Instigator)의 컨트롤러를 추적합니다.
                     AController* KillerController = nullptr;
                     if (Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent())
                     {
@@ -182,7 +182,7 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
                         }
                     }
 
-                    // 🌟 2. 찾은 가해자 컨트롤러를 Die 함수에 실어서 보냅니다!
+                    // 추적한 가해자 컨트롤러를 전달하여 Die 함수를 호출합니다.
                     BaseChar->Die(KillerController);
                 }
             }

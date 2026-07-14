@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "AbilitySystem/Abilities/Player/AttackSkill/FT_ChargedShotSkill.h"
@@ -36,7 +36,7 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 자원 및 쿨타임 선커밋 타설 (9초 재사용 대기시간 적용선)
+    // 어빌리티 활성화 조건 및 코스트를 검증합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -50,18 +50,18 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         return;
     }
 
-    // 💡 [지니의 압착: 광역 타격 중심점 계산 배관]
+    // 타격 중심점 계산
     FVector SpawnerLocation = Character->GetActorLocation();
     FVector FullTargetLocation = SpawnerLocation + (Character->GetActorForwardVector() * SkillRange);
-    FullTargetLocation.Z = SpawnerLocation.Z; // 높이 축 평면 통일하여 연산 괴리 방지
+    FullTargetLocation.Z = SpawnerLocation.Z;
 
-    // 💡 [서버 주권 격리 타격 정산]: 데미지 판정과 넉백 이펙트 적용은 서버 권한에서만 1회 엄정 집행합니다.
+    // 서버에서 광역 피해 및 넉백 처리 로직을 실행합니다.
     if (Character->HasAuthority())
     {
         ExecuteGeniusCrushLogic(FullTargetLocation, Character);
     }
 
-    // 💡 [시각적 연출 파이프라인]: 몽타주 재생은 예측 선로를 타고 클라이언트/서버 동시 격발합니다.
+    // 몽타주 재생 태스크 실행
     bool bTriggeredVisualTask = false;
     if (FireMontage)
     {
@@ -91,7 +91,7 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
     UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
     if (!World || !InCharacter || !MyASC || !DamageEffectClass) return;
 
-    // 원형 범위 오버랩 검문선 타설
+    // 타격 범위 내 대상 탐색
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(InCharacter);
 
@@ -111,20 +111,17 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
 
     if (!bHit) return;
 
-    // =========================================================================
-    // 💡 [4단계 명세: 메모리 낭비 제거 초적화 마스터 레이어 개통]
-    // 루프 바깥에서 공용 대미지 계산서(Spec)를 딱 1장만 선제 발행하여 힙 할당 빈도를 1회로 고정합니다.
-    // =========================================================================
+    // 대미지 이펙트 마스터 스펙 생성
     FGameplayEffectSpecHandle MasterSpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffectClass, GetAbilityLevel());
     if (!MasterSpecHandle.IsValid() || !MasterSpecHandle.Data.IsValid()) return;
 
-    // 시전자 정보 및 베이스 대미지/넉백 수치를 마스터 장부에 단 1회 락인 밀봉합니다.
+    // 마스터 스펙에 정보 설정
     MasterSpecHandle.Data->GetContext().AddInstigator(InCharacter, InCharacter);
     MasterSpecHandle.Data->GetContext().AddSourceObject(InCharacter);
     MasterSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
     MasterSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Knockback, KnockbackForce);
 
-    // 준비된 마스터 계산서 1장을 들고 오버랩된 적들 고속 루프 정산 전개
+    // 탐색된 대상들에게 처리 진행
     for (const FOverlapResult& Result : OverlapResults)
     {
         AActor* HitActor = Result.GetActor();
@@ -133,17 +130,17 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
         UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
         if (!TargetASC) continue;
 
-        // 팩션 검문선: 아군 오사 철저 배제
+        // 피아 식별 검증
         bool bIsSameTeam = false;
         if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsSameTeam = true;
         else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsSameTeam = true;
 
         if (bIsSameTeam) continue;
 
-        // 타깃 시체 구타 방지 검문
+        // 생존 여부 검증
         if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
 
-        // 💡 중심부에서 바깥쪽으로 밀쳐내는 방사형 넉백 벡터 연산
+        // 넉백 벡터 계산
         FVector TargetActorLoc = HitActor->GetActorLocation();
         FVector KnockbackDirection = TargetActorLoc - TargetCenterLocation; 
         KnockbackDirection.Z = 0.0f; // 수평 넉백 동기화
@@ -159,10 +156,7 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
 
         FVector FinalKnockbackVector = KnockbackDirection * KnockbackForce;
 
-        // =========================================================================
-        // 💡 [고성능 장부 돌려막기]: 신규 힙 할당 없이 복사 생성자로 가벼운 스택 사본 장부만 복제!
-        // 개별 타깃의 히트 결과 정보만 사본의 컨텍스트에 스냅샷 저장하여 직통 사출합니다.
-        // =========================================================================
+        // 마스터 스펙을 복제하여 개별 컨텍스트 생성
         FGameplayEffectSpec LocalSpec(*MasterSpecHandle.Data.Get());
         FGameplayEffectContextHandle LocalContext = LocalSpec.GetContext().Duplicate();
 
@@ -174,10 +168,10 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
         LocalContext.AddHitResult(IndividualHit, true);
         LocalSpec.SetContext(LocalContext);
 
-        // 공격자의 ASC가 타깃의 ASC에 직접 대미지 및 스탯 장부 집행!
+        // 대상에게 대미지 이펙트 적용
         MyASC->ApplyGameplayEffectSpecToTarget(LocalSpec, TargetASC);
         
-        // 타깃 폰의 무브먼트에 방사형 충격량(Impulse) 직접 때려 박기 (넉백)
+        // 대상에게 넉백 충격량 적용
         if (ACharacter* TargetChar = Cast<ACharacter>(HitActor))
         {
             if (UCharacterMovementComponent* MoveComp = TargetChar->GetCharacterMovement())

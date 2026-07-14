@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "AbilitySystem/Abilities/Minion/FT_MinionAttackBase.h"
 #include "AbilitySystemComponent.h"
@@ -12,14 +12,14 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "TimerManager.h" // 💡 [디버그 타이머 배관용 헤더 주입]
-#include "AbilitySystem/Abilities/Minion/DataAsset/FT_MinionData.h" // 💡 [데이터 에셋 참조용 헤더 주입]
+#include "TimerManager.h"
+#include "AbilitySystem/Abilities/Minion/DataAsset/FT_MinionData.h"
 
 UFT_MinionAttackBase::UFT_MinionAttackBase()
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     
-    // 상태 이상(Stun) 상태일 때는 해당 어빌리티의 활성화를 원천 차단
+    // 상태 이상 시 어빌리티 활성화를 차단합니다.
     ActivationBlockedTags.AddTag(FTTags::FTStates::Debuff::Stunned);
 }
 
@@ -40,7 +40,7 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         return;
     }
     
-    // 1단계: 공격 애니메이션 몽타주가 존재할 때만 정상적인 어빌리티 태스크 생성 파이프라인 기동
+    // 공격 몽타주가 존재할 경우 재생 태스크를 실행합니다.
     UAbilityTask_PlayMontageAndWait* MontageTask = nullptr;
     if (AttackMontage != nullptr)
     {
@@ -57,19 +57,18 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         
         MontageTask->ReadyForActivation();
     }
-    // 💡 [4단계 명세: 몽타주 프리패스 디버깅 모드 돌파선 완착]
-    // 에셋이 비어있어도 프리징을 원천 봉쇄하고 0.5초 가상 선딜레이 후 강제로 사격 노티파이 로직을 격발시킵니다.
+    // 몽타주가 없을 경우 가상 딜레이 후 공격을 실행합니다.
     else
     {
         if (UWorld* World = GetWorld())
         {
             World->GetTimerManager().SetTimer(DebugNoMontageTimerHandle, [this]()
             {
-                // 0.5초 경과 시점: 실제 타격/사출 연산 (OnMontageTargetedEvent) 강제 기폭
+                // 지연 시간 만료 시 강제로 공격 판정 실행
                 FGameplayEventData DummyEventData;
                 OnMontageTargetedEvent(DummyEventData);
                 
-                // 그로부터 0.2초 경과 시점: 어빌리티를 정순 종료하여 다음 쿨타임 루프 개통
+                // 이후 어빌리티 종료
                 if (UWorld* InnerWorld = GetWorld())
                 {
                     InnerWorld->GetTimerManager().SetTimer(DebugNoMontageTimerHandle, [this]()
@@ -86,7 +85,7 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         return;
     }
 
-    // 2단계: 몽타주 노티파이 시점에 연동될 게임플레이 이벤트 수신 태스크 가동 (몽타주가 있을 때만 활성화)
+    // 몽타주 노티파이 시점에 게임플레이 이벤트를 대기하는 태스크 실행
     ActiveWaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
         this, 
         FTTags::FTCombat::AnimNotify_Attack, 
@@ -106,7 +105,7 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
 {
     AFTCharacterBase* AvatarChar = Cast<AFTCharacterBase>(GetAvatarActorFromActorInfo());
     
-    // [최전방 서버 주권 방어선 완착]
+    // 서버에서만 처리합니다.
     if (!AvatarChar || !AvatarChar->HasAuthority())
     {
         return;
@@ -121,25 +120,23 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
         return;
     }
 
-    // AI 포커스 대상 검증
+    // AI 타깃 검증
     AActor* TargetActor = AIC->GetFocusActor();
     if (!IsValid(TargetActor)) return; 
 
-    // 타깃이 이미 사망 상태인 경우 스킵
+    // 사망한 타깃 제외
     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
     if (TargetASC && TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
     {
         return;
     }
 
-    // 데미지 GameplayEffect Spec 설정
+    // 대미지 이펙트 스펙 생성
     FGameplayEffectContextHandle EffectContext = MyASC->MakeEffectContext();
     EffectContext.AddSourceObject(AvatarChar);
     FGameplayEffectSpecHandle NewSpecHandle = MyASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, EffectContext);
     
-    // 💡 [기획 명세 1단계: 데이터 에셋 공격력 실시간 연동 필터]
-    // 기본 어빌리티의 BaseDamage 값을 유지하되, 미니언 캐릭터 정보와 기획 데이터 자산 장부가 살아있다면
-    // 에디터에서 자유롭게 깎고 늘린 'DefaultAttackPower' 기획 수치로 대미지를 덮어씌웁니다.
+    // 데이터 에셋에 정의된 피해량을 적용합니다.
     float ActualDamage = BaseDamage;
     AFT_MinionCharacterBase* MinionChar = Cast<AFT_MinionCharacterBase>(AvatarChar);
     if (MinionChar && MinionChar->GetMinionData())
@@ -149,42 +146,38 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
 
     if (NewSpecHandle.IsValid())
     {
-        // 💡 2. 동적 인양에 성공한 무결한 대미지 정본 수치를 이펙트 장부에 최종 주입합니다.
+        // 피해량 설정
         NewSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, ActualDamage);
     }
     
-    // 미니언 소체 장부로부터 데이터 에셋 기반의 투사체 클래스 동적 인양
+    // 투사체 클래스 획득
     TSubclassOf<AFT_ProjectileBase> TargetProjectileClass = nullptr;
     if (MinionChar)
     {
         TargetProjectileClass = MinionChar->GetMinionProjectileClass();
     }
     
-    // [원거리 무기 형태 분기]: 투사체 클래스가 유효할 경우
+    // 투사체를 스폰합니다.
     if (TargetProjectileClass)
     {
         UWorld* World = GetWorld();
         if (World)
         {
-            // 💡 [명치 기준 수평 보정 사출 파이프라인 기동]
-            // 1. 소켓을 무시하고 강제로 캐릭터 명치(가슴) 높이 좌표를 계산합니다.
+            // 스폰 위치 계산
             FVector ChestLocation = AvatarChar->GetActorLocation() + FVector(0.f, 0.f, 50.f); 
-        
-            // 2. 캐릭터 몸 안에 총알이 스폰되어 자폭하지 않도록, 앞으로 50만큼 밀어줍니다.
             FVector SpawnLocation = ChestLocation + (AvatarChar->GetActorForwardVector() * 50.f);
 
-            // 3. 조준점(타깃)도 나와 완벽히 똑같은 수평(Z) 높이로 락온시켜서 일직선으로 날아가게 합니다.
+            // 타격점 높이 동기화
             FVector TargetCenterLocation = TargetActor->GetActorLocation();
             TargetCenterLocation.Z = SpawnLocation.Z; 
         
-            // 4. 방향과 트랜스폼 최종 계산
+            // 스폰 트랜스폼 계산
             FVector LaunchDirection = (TargetCenterLocation - SpawnLocation).GetSafeNormal();
             FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
         
-            // 사출 트랜스폼 회전축 명시적 FQuat 형변환 및 대입
             SpawnTransform.SetRotation(FQuat(LaunchDirection.Rotation()));
 
-            // 오직 서버에서만 해당 투사체를 공식 스폰하고 클라이언트로 리플리케이션
+            // 서버에서 투사체 스폰
             AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
                 TargetProjectileClass, SpawnTransform, AvatarChar, AvatarChar, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             
@@ -197,7 +190,7 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     }
     else
     {
-        // [근접 무기 형태 분기]: 투사체가 없을 경우 타깃에 GameplayEffect 다이렉트 적용
+        // 투사체가 없으면 근접 공격으로 판정하여 대상에게 대미지 적용
         if (TargetASC && NewSpecHandle.IsValid())
         {
             if (NewSpecHandle.Data.IsValid())
@@ -215,7 +208,7 @@ void UFT_MinionAttackBase::OnMontageCompletedOrCancelled()
 
 void UFT_MinionAttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 💡 [추가 명세: 좀비 디버그 타이머 확실하게 청소]
+    // 디버그 타이머 해제
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(DebugNoMontageTimerHandle);

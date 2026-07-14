@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "AbilitySystem/Abilities/Minion/FT_Minion_Brain.h"
@@ -139,15 +139,14 @@ void UFT_Minion_Brain::ExecuteAILogic()
     }
 
     // =========================================================================
-    // [전술 상황 1: 유효 생존 타깃 검출 시 추격 및 교전]
+    // 유효 타깃 발견 시 추격 및 교전
     // =========================================================================
     if (IsValid(BestTarget))
     {
         AIC->SetFocus(BestTarget);
 
-        // 💡 [배꼽 거리 vs 표면 거리 불일치 완치 완공]
-        // 두 캐릭터의 정중앙 피벗 점(배꼽) 간 거리 대신, 캡슐 표면 거리를 인양하는 GetDistanceTo를 채택합니다.
-        // 추가로 AI가 멈춰 서는 오차와 위치 보간을 유연하게 흡수할 수 있도록 50.0f 마진 가드선을 확정 적용합니다.
+        // 두 캐릭터 간의 캡슐 표면 거리를 계산하여 공격 가능 여부를 판단합니다. 
+        // 위치 보간 오차를 감안하여 50.0f의 마진을 적용합니다.
         float DistanceToTarget = AvatarChar->GetDistanceTo(BestTarget);
 
         if (DistanceToTarget <= AttackAcceptanceRadius + 50.0f)
@@ -184,7 +183,7 @@ void UFT_Minion_Brain::ExecuteAILogic()
             }
         }
     }
-    // [전술 상황 2: 적대 타깃 부재 혹은 사망 시 라인 웨이포인트 복귀 무빙]
+    // 타깃이 없을 경우 다음 웨이포인트로 이동
     else
     {
         AIC->ClearFocus(EAIFocusPriority::Gameplay);

@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "AbilitySystem/Abilities/Player/AttackSkill/FT_SilverBulletSkill.h"
@@ -46,8 +46,7 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
         SourceASC->AddLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
     }
     
-    // 💡 [기본 평타 모션 완전 차단 및 전용 스킬 몽타주 격발 제어]
-    // 무기 에셋 장부를 기웃거리지 않고 헤더에 직통 신설한 SkillMontage 에셋을 직접 구동합니다.
+    // 장전 몽타주 재생 태스크 실행
     if (SkillMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
@@ -61,7 +60,7 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
         }
     }
 
-    // 💡 몽타주 에셋 유무와 상관없이 투사체 발사 타이머는 안전 기폭 보장
+    // 장전 타이머 설정
     UWorld* World = GetWorld();
     if (World)
     {
@@ -86,17 +85,14 @@ void UFT_SilverBulletSkill::FireSilverBullet()
         {
             UWorld* World = GetWorld();
             
-            // 💡 헤더에 생성한 'ProjectileClass' 직통 노출선 검문선 일치화 완료
+            // 투사체를 스폰합니다.
             if (World && ProjectileClass && DamageEffectClass)
             {
-                // 1. 명치(가슴) 높이 좌표 추출 (Z=50.0f)
+                // 스폰 위치 및 방향 계산
                 FVector ChestLocation = Character->GetActorLocation() + FVector(0.f, 0.f, 50.f); 
-            
-                // 2. 전방 스폰 오프셋 50 적용
                 FVector SpawnLocation = ChestLocation + (Character->GetActorForwardVector() * 50.f);
                 FVector LaunchDirection = Character->GetActorForwardVector();
 
-                // 3. 에임 탄퍼짐 계산 및 조준선 반영
                 const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
                 if (AttributeSet)
                 {
@@ -111,7 +107,7 @@ void UFT_SilverBulletSkill::FireSilverBullet()
                 FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
                 SpawnTransform.SetRotation(FQuat(LaunchDirection.Rotation()));
 
-                // 공용 대미지 GE 스펙 가드 수립
+                // 대미지 이펙트 스펙 생성
                 FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffectClass, GetAbilityLevel());
                 if (SpecHandle.IsValid() && SpecHandle.Data.IsValid())
                 {
@@ -123,9 +119,7 @@ void UFT_SilverBulletSkill::FireSilverBullet()
                     SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
                 }
 
-                // =========================================================================
-                // 💡 [서버 주권 격리 사출 전선]
-                // =========================================================================
+                // 서버에서 투사체 스폰을 처리합니다.
                 if (Character->HasAuthority())
                 {
                     AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(

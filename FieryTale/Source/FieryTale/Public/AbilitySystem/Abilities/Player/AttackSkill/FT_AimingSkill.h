@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -21,7 +21,7 @@ public:
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
-	/** 조준을 풀었을 때 원래 탄퍼짐으로 되돌리기 위해 참조할 캐릭터 포인터 캐싱 */
+	/** 탄퍼짐 복구를 위한 캐릭터 포인터 캐싱 */
 	UPROPERTY()
 	class AFTPlayerCharacterBase* CachedCharacter;
 };

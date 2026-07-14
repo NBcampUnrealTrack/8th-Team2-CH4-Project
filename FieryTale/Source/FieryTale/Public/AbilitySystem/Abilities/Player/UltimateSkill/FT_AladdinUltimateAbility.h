@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -17,10 +17,7 @@ class FIERYTALE_API UFT_AladdinUltimateAbility : public UFT_UltimateGameplayAbil
 public:
     UFT_AladdinUltimateAbility();
 
-    // =========================================================================
-    // 💡 [궁극기 자원 차단선 개통]: 게이지 부족 시 시전되는 비용 누수 버그를 막고
-    // 2~3타 연타 구간은 무결하게 통과시킬 순정 GAS 선행 검문소 선언입니다.
-    // =========================================================================
+    // 콤보 가동 중일 경우 코스트 검증을 우회하기 위해 CanActivateAbility를 오버라이드합니다.
     virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
 protected:
@@ -28,47 +25,47 @@ protected:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
     virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
-    // 지니가 전방을 강타하는 실질적인 물리 박스 오버랩 스캔 함수
+    // 전방 강타 판정 및 데미지 적용 함수입니다.
     void ExecuteGenieSmash(AActor* OwnerActor, UAbilitySystemComponent* SourceASC, int32 SmashIndex);
 
-    /** 3초 콤보 제한 시간이 만료되었을 때 좀비 태그와 스택을 무조건 청소할 수거용 콜백 함수 */
+    /** 콤보 제한 시간 만료 시 호출되는 콜백입니다. */
     UFUNCTION()
     void ResetComboState();
 
-    // =========================================================================
-    // 💡 [연타 감시망 파이프라인 개통]: WaitInputPress 태스크가 마우스 재클릭 신호를 
-    // 실시간 포착했을 때 수명 주기를 깨우고 콤보를 이어가게 유도할 내부 동적 콜백입니다.
-    // =========================================================================
-    /** 플레이어의 2타, 3타 루프 마우스 재클릭 신호를 감지하여 순정을 이어줄 비동기 인풋 수신 함수 */
+    /** 연속 입력 감지 콜백입니다. */
     UFUNCTION()
     void OnComboInputPressed(float TimeWaited);
 
 protected:
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
+    TObjectPtr<class UAnimMontage> SkillMontage;
+
+protected:
     // --- 알라딘 궁극기 고유 스펙 ---
-    /** 직선 타격 범위 사거리 수치 (기본값 1500.f / 15m) */
+    /** 사거리 수치 (기본값 1500.f) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin Spec")
     float AttackRange;
 
-    /** 직선 박스의 좌우 반폭 수치 (기본값 300.f / 총 너비 6m) */
+    /** 공격 너비 수치 (기본값 300.f) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin Spec")
     float AttackWidth;
 
-    /** 기획서 반영: 지니 환영 강타 적중 시 사출할 기본 피해량 수치 (기본값 50.f) */
+    /** 기본 피해량 수치 (기본값 50.f) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin Spec")
     float BaseDamageValue;
 
-    // --- 연동할 GameplayEffect(GE) Lineup ---
-    /** 피해 연산기(GEEC_Damage)를 가동할 확정 대미지 이펙트 클래스 */
+    // --- 연동할 GameplayEffect(GE) 클래스 ---
+    /** 대미지 이펙트 클래스 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
     TSubclassOf<class UGameplayEffect> DamageGameplayEffectClass;
 
 protected:
-    /** 콤보 입력 대기 윈도우 유효 시간을 통제할 3초 한계선 타이머 핸들 */
+    /** 콤보 제한 시간 타이머 핸들 */
     FTimerHandle ComboTimeoutTimerHandle;
 
-    /** [상태 머신 트래커] 현재 시전 중인 소원의 콤보 단계 카운트 (1 -> 2 -> 3타) */
+    /** 현재 콤보 카운트 */
     int32 CurrentWishCount;
     
-    /** 알라딘이 시전할 수 있는 최대 소원(콤보) 한계치 */
+    /** 최대 콤보 카운트 */
     static constexpr int32 MaxWishes = 3;
 };

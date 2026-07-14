@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "AbilitySystem/Abilities/Player/NomalAttack/FT_NormalAttack.h"
@@ -22,7 +22,7 @@ UFT_NormalAttack::UFT_NormalAttack()
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    // 사망, 재장전, 기절 상태에서는 기본 공격 격발을 원천 차단합니다.
+    // 특정 상태에서는 활성화를 차단합니다.
     ActivationBlockedTags.AddTag(FTTags::FTStates::Core::Dead);
     ActivationBlockedTags.AddTag(FTTags::FTStates::Core::Reloading);
     ActivationBlockedTags.AddTag(FTTags::FTStates::Debuff::Stunned);
@@ -46,7 +46,7 @@ bool UFT_NormalAttack::CanActivateAbility(const FGameplayAbilitySpecHandle Handl
 
 void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    // 좀비 타이머 선제 파쇄 가드선: 새로운 예측 사격 세션이 시작되면 이전 세션의 잔재 타이머를 완전히 소각합니다.
+    // 이전 타이머를 초기화합니다.
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(BurstTimerHandle);
@@ -57,7 +57,7 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
     
-    // 원자적 선커밋 검문을 통과시킵니다.
+    // 어빌리티 활성화 조건 및 코스트를 검증합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);    
@@ -74,7 +74,7 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
     UFT_WeaponData* WeaponData = Character->GetWeaponData();
 
-    // 사격 시 이동속도 저하 페널티 버프 적용선입니다.
+    // 이동 속도 감소 이펙트를 적용합니다.
     if (MovementPenaltyGameplayEffectClass)
     {
         FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(MovementPenaltyGameplayEffectClass, GetAbilityLevel());
@@ -84,10 +84,10 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
         }
     }
 
-    // 데이터 자산에 정의된 발사 유형별 판정 로직을 격발합니다.
+    // 무기 타입에 따른 공격 판정을 실행합니다.
     ExecuteWeaponHitDetection(WeaponData, Character);
 
-    // 모션 에셋 누락 시 무한 락에 빠지는 레이스 컨디션을 방어하는 안전 수명선입니다.
+    // 몽타주가 없을 경우 안전을 위해 지연 후 종료합니다.
     if (WeaponData->AttackMontage == nullptr)
     {
         GetWorld()->GetTimerManager().SetTimer(NoMontageSafetyTimerHandle, [this]()
@@ -98,11 +98,7 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
         return;
     }
 
-    // =========================================================================
-    // 💡 [데이터 에셋 기반 공격 몽타주 완벽 재생 및 전방위 콜백 바인딩 완료]
-    // 몽타주가 도중에 강제로 캔슬(피격 등)되거나 무기 스왑 시 어빌리티가 붕 뜨지 않도록
-    // OnCompleted, OnInterrupted, OnCancelled 채널을 완벽하게 동기화해 줍니다.
-    // =========================================================================
+    // 몽타주 재생 태스크 실행 및 콜백 등록
     UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
         this, FName("NormalAttackTask"), WeaponData->AttackMontage, 1.0f);
 
@@ -110,7 +106,7 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
     {
         MontageTask->OnCompleted.AddDynamic(this, &UFT_NormalAttack::OnAttackMontageFinished);
         MontageTask->OnInterrupted.AddDynamic(this, &UFT_NormalAttack::OnAttackMontageFinished);
-        MontageTask->OnCancelled.AddDynamic(this, &UFT_NormalAttack::OnAttackMontageFinished); // 💡 누락되었던 캔슬 경로 완치
+        MontageTask->OnCancelled.AddDynamic(this, &UFT_NormalAttack::OnAttackMontageFinished);
         
         MontageTask->ReadyForActivation();
     }
@@ -145,7 +141,7 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 {
     if (!InWeaponData || !InCharacter || !GetWorld()) return;
 
-    // 실전 탄도 동기화: 시전자의 WeaponSpread 속성값을 실시간 인양하여 전방 Forward 벡터에 무작위 회전 반경을 정밀 계산하여 주입합니다.
+    // 탄퍼짐 적용
     FVector FinalForward = Forward;
     UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
     if (MyASC)
@@ -156,7 +152,7 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
             const float CurrentSpread = AttributeSet->GetWeaponSpread();
             if (CurrentSpread > 0.0f)
             {
-                // 원형 난수 매핑 방식을 활용한 정밀 에임 탄퍼짐 편차 유도
+
                 const float ConeHalfAngleRadius = FMath::DegreesToRadians(CurrentSpread);
                 FinalForward = FMath::VRandCone(Forward, ConeHalfAngleRadius);
             }
@@ -187,23 +183,19 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
         
         if (MyASC && TargetASC)
         {
-            // 팩션 팀 태그 검문을 수행하여 아군 오사 및 팅김 현상을 철저히 예방합니다.
+            // 피아 식별 검증
             bool bIsSameTeam = false;
             if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsSameTeam = true;
             else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsSameTeam = true;
             
-            // =========================================================================
-            // 💡 [치명적 아군 피격 프리징 버그 소각 완료]
-            // 아군 오사 시 스킬 인프라 전체를 터트려 공격 애니메이션을 가로막던 EndAbility를 제거합니다.
-            // 대미지만 스킵하고 조용히 빠져나와(return) 사격 모션과 다음 사격 흐름을 정순 보존합니다.
-            // =========================================================================
+
             if (bIsSameTeam)
             {
                 return;
             }
         }
 
-        // 부위별 적중 계산에 기반한 헤드샷 대미지 증폭선을 타설합니다.
+        // 헤드샷 대미지 적용
         float FinalDamage = InWeaponData->BaseDamage;
         if (InWeaponData->bAllowHeadshot)
         {
@@ -236,10 +228,10 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
 
     UWorld* World = GetWorld();
 
-    // 💡 [단발식 투사체 사출 파이프라인 무결화]
+    // 단발 투사체 스폰
     if (InWeaponData->ProjectilesPerShot <= 1)
     {
-        // 실물 액터(Actor) 스폰 권한을 오직 서버(HasAuthority) 권역으로 완벽하게 격리 배관합니다.
+        // 서버에서만 투사체를 스폰합니다.
         if (InCharacter->HasAuthority())
         {
             FVector FinalForward = Forward;
@@ -276,7 +268,7 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
         return;
     }
 
-    // 💡 [연사 및 점사식 비동기 타이머 기반 투사체 사출 파이프라인 무결화]
+    // 점사 타이머 설정
     TSharedPtr<int32> ShotCounter = MakeShared<int32>(0);
     int32 MaxShots = InWeaponData->ProjectilesPerShot;
     float Delay = InWeaponData->BurstDelay;
@@ -287,7 +279,7 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
 
     World->GetTimerManager().SetTimer(BurstTimerHandle, [WeakThis, WeakChar, World, ProjectileClass, Start, Forward, ShotCounter, MaxShots]() mutable
     {
-        // 생존선 정밀 보안 검문: 소유 캐릭터나 어빌리티 본체가 소멸 상태라면 타이머 파쇄
+        // 유효성 검증
         if (!WeakThis.IsValid() || !WeakThis->IsActive() || !WeakChar.IsValid() || !World || !ProjectileClass || *ShotCounter >= MaxShots)
         {
             if (World && WeakThis.IsValid())
@@ -305,8 +297,7 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
 
         AFTPlayerCharacterBase* CharacterPtr = WeakChar.Get();
         
-        // 💡 [점사 가드선 타설]: 매 타임 틱 타이머 내부에서도 클라이언트 로컬 예측 스폰을 원천 멸균하고 
-        // 오직 권한을 가진 서버에서만 실물 물리 총알 액터가 사출되도록 완벽히 격리 차단합니다.
+        // 서버에서 투사체 스폰을 처리합니다.
         if (CharacterPtr->HasAuthority())
         {
             FVector FinalForward = Forward;
@@ -347,8 +338,7 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
         
         (*ShotCounter)++;
         
-        // 💡 [중요 넷코드 싱크 가드]: 타이머 카운터 마감 및 EndAbility 명령은 서버/클라이언트 예측 선로 양쪽 모두가 
-        // 동일하게 도달하여 큐를 비워야 하므로, Authority 스콥 외곽에서 원자적으로 처리하여 넷 상태 전이를 정순 정렬합니다.
+        // 점사가 완료되면 타이머를 해제하고 어빌리티를 종료합니다.
         if (*ShotCounter >= MaxShots)
         {
             World->GetTimerManager().ClearTimer(WeakThis->BurstTimerHandle);
@@ -365,8 +355,7 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
 
 void UFT_NormalAttack::OnAttackMontageFinished()
 {
-    // 💡 [안전 조율]: 연사/점사 타이머가 활성화되어 있는 도중에 애니메이션 몽타주 재생이 끝났다면
-    // 어빌리티를 성급하게 강제 종료하지 않고 사격이 안전 완료되도록 대기합니다.
+    // 점사 타이머가 활성화되어 있다면 종료를 대기합니다.
     if (GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(BurstTimerHandle))
     {
         return;
@@ -479,12 +468,11 @@ void UFT_NormalAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const
             MovementPenaltyActiveHandle.Invalidate();
         }
 
-        // [탄퍼짐 무한 고정 버그 파이프라인 최종 보수 완료]
+        // 탄퍼짐 속성을 원래 값으로 복구합니다.
         if (UFT_AttributeSet* AttributeSet = const_cast<UFT_AttributeSet*>(Cast<UFT_AttributeSet>(SourceASC->GetAttributeSet(UFT_AttributeSet::StaticClass()))))
         {
             AFTPlayerCharacterBase* PlayerChar = Cast<AFTPlayerCharacterBase>(ActorInfo->AvatarActor.Get());
             
-            // 마스터 헤더 장부(InitBaseSpread)와 공차 0.00% 완전 동기화 타설
             float OriginalSpread = (PlayerChar && PlayerChar->GetWeaponData()) ? PlayerChar->GetWeaponData()->InitBaseSpread : 0.0f;
             SourceASC->SetNumericAttributeBase(UFT_AttributeSet::GetWeaponSpreadAttribute(), OriginalSpread);
         }

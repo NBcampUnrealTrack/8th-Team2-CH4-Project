@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "AbilitySystem/Abilities/Player/UltimateSkill/FT_WolfRoarAbility.h"
@@ -8,10 +8,11 @@
 #include "Engine/World.h"
 #include "GameplayTags/FTTags.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 
 UFT_WolfRoarAbility::UFT_WolfRoarAbility()
 {
-    // 본체 개체별 독립적인 상태 추적 및 판정을 위해 인스턴싱 정책을 확정합니다.
+    // 개체별 상태 추적을 위해 인스턴싱 정책을 적용합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
@@ -26,10 +27,10 @@ UFT_WolfRoarAbility::UFT_WolfRoarAbility()
 
 void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
-    // [1단계]: 부모 가드선 최상단 전진 배치
+    // 부모 클래스의 ActivateAbility를 호출합니다.
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // [2단계]: 마스터 베이스 게이지 소모 및 검증 관문을 격발합니다.
+    // 어빌리티 활성화 조건 및 코스트를 검증합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -49,13 +50,13 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         UE_LOG(LogTemp, Log, TEXT("WolfRoar Activated: 할머니를 삼켰던 이빨로 적들을 물어뜯어라."));
     }
 
-    // [3단계]: 서버 주권 연산 레이어 완전 격리
+    // 서버 권한에서만 대미지 및 디버프를 적용하여 중복 처리를 방지합니다.
     if (HasAuthority(&ActivationInfo))
     {
         FVector StartLocation = OwnerActor->GetActorLocation();
         FVector ForwardVector = OwnerActor->GetActorForwardVector();
         
-        ForwardVector.Z = 0.f; // 고저차 지형에 의한 전방 방향 벡터 왜곡을 원천 차단합니다.
+        ForwardVector.Z = 0.f; // Z축 변위를 0으로 고정하여 수평 방향을 유지합니다.
         ForwardVector.Normalize();
 
         TArray<FOverlapResult> OverlapResults;
@@ -79,15 +80,11 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
                 // 부채꼴 시야 내각 필터링을 위한 코사인 임계값(DotThreshold)을 선제 도출합니다.
                 float DotThreshold = FMath::Cos(FMath::DegreesToRadians(ConeAngle * 0.5f));
 
-                // =========================================================================
-                // 💡 [초고속 광역기 메모리 최적화 레이어 개통]
-                // 루프 바깥에서 공용 대미지/속박(Root) 계산서 장부를 딱 1장씩만 힙 할당하여 고정합니다.
-                // 이로써 타깃이 수십 마리 겹쳐도 메모리 파편화 및 성능 드롭을 원천 차단합니다.
-                // =========================================================================
+                // 루프 외부에서 이펙트 인스턴스를 한 번만 생성하여 최적화합니다.
                 FGameplayEffectSpecHandle MasterDamageSpecHandle;
                 FGameplayEffectSpecHandle MasterRootSpecHandle;
 
-                // 1) 대미지 마스터 장부 선제 인스턴스화
+                // 1. 대미지 이펙트 인스턴스 생성
                 if (DamageGameplayEffectClass)
                 {
                     MasterDamageSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffectClass, GetAbilityLevel());
@@ -99,7 +96,7 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
                     }
                 }
 
-                // 2) 군중 제어 속박(Root) 마스터 장부 선제 인스턴스화
+                // 2. 속박 디버프 이펙트 인스턴스 생성
                 if (RootGameplayEffectClass)
                 {
                     MasterRootSpecHandle = MakeOutgoingGameplayEffectSpec(RootGameplayEffectClass, GetAbilityLevel());
@@ -110,9 +107,7 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
                     }
                 }
 
-                // -------------------------------------------------------------------------
-                // 💡 마스터 장부 장착 후 부채꼴 타격 검출 루프 고속 기동
-                // -------------------------------------------------------------------------
+                // 부채꼴 범위 내의 대상을 검출하고 이펙트를 적용합니다.
                 for (const FOverlapResult& Result : OverlapResults)
                 {
                     AActor* TargetActor = Result.GetActor();
@@ -130,20 +125,20 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
                     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
                     if (TargetASC)
                     {
-                        // AOS 피아식별 안전망 (아군 오사 대미지/CC 면제)
+                        // 아군 타격을 방지합니다.
                         if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
                         if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
 
-                        // 타깃 사망 시 시체 구타 방지 검문
+                        // 대상이 이미 사망했는지 확인합니다.
                         if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
 
-                        // 타깃 적중 히트 데이터 생성 (공통 스냅샷)
+                        // 공통 히트 결과를 생성합니다.
                         FHitResult IndividualHit;
                         IndividualHit.HitObjectHandle = TargetActor;
                         IndividualHit.Location = TargetActor->GetActorLocation();
                         IndividualHit.ImpactPoint = TargetActor->GetActorLocation();
 
-                        // 💡 [스택 사본 복사 돌려막기 1 - 대미지]
+                        // 1) 생성된 이펙트 인스턴스를 재사용하여 대미지를 적용합니다.
                         if (MasterDamageSpecHandle.IsValid() && MasterDamageSpecHandle.Data.IsValid())
                         {
                             FGameplayEffectSpec LocalDamageSpec(*MasterDamageSpecHandle.Data.Get());
@@ -154,7 +149,7 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
                             SourceASC->ApplyGameplayEffectSpecToTarget(LocalDamageSpec, TargetASC);
                         }
 
-                        // 💡 [스택 사본 복사 돌려막기 2 - 속박 디버프]
+                        // 2) 생성된 이펙트 인스턴스를 재사용하여 속박 디버프를 적용합니다.
                         if (MasterRootSpecHandle.IsValid() && MasterRootSpecHandle.Data.IsValid())
                         {
                             FGameplayEffectSpec LocalRootSpec(*MasterRootSpecHandle.Data.Get());
@@ -170,13 +165,36 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         }
     }
     
-    // 단발성 즉시 광역 포효 스킬이므로 연산 후 기동 시퀀스를 원자적으로 클린 마감 종료합니다.
-    EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+    if (SkillMontage)
+    {
+        UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+            this, FName("WolfRoarMontage"), SkillMontage, 1.0f);
+        if (MontageTask)
+        {
+            MontageTask->OnCompleted.AddDynamic(this, &UFT_WolfRoarAbility::OnMontageFinished);
+            MontageTask->OnInterrupted.AddDynamic(this, &UFT_WolfRoarAbility::OnMontageFinished);
+            MontageTask->OnCancelled.AddDynamic(this, &UFT_WolfRoarAbility::OnMontageFinished);
+            MontageTask->ReadyForActivation();
+        }
+        else
+        {
+            EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        }
+    }
+    else
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+    }
+}
+
+void UFT_WolfRoarAbility::OnMontageFinished()
+{
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_WolfRoarAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 자가 수급 전선 초기화 마감: 필살기 식별 루즈 태그 안전 회수
+    // 어빌리티 종료 시 궁극기 태그를 제거합니다.
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {

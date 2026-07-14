@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -19,15 +19,19 @@ public:
 
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
+	UFUNCTION()
+	void OnMontageFinished();
+
 protected:
-	// 💡 [자원 사이클 초기화 배관 안착]: 
-	// 어빌리티 종료 시 부모 클래스가 시전자에게 심어둔 궁극기 동적 플래그를 
-	// 클린하게 수거 청소하기 위해 마스터 EndAbility 가상 함수를 선언합니다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
+	TObjectPtr<class UAnimMontage> SkillMontage;
+
+	// 어빌리티 종료 시 궁극기 태그를 제거하기 위해 EndAbility를 오버라이드합니다.
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
 	// --- 늑대 포효 물리 판정 스펙 ---
-	/** 늑대 포효 부채꼴 중심 사거리 수치 */
+	/** 사거리 수치 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Wolf Spec")
 	float HuntRadius;
 
@@ -35,16 +39,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Wolf Spec")
 	float ConeAngle;
 
-	/** 기획서 반영: 늑대 포효 적중 시 사출할 기본 피해량 수치 */
+	/** 기본 피해량 수치 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Wolf Spec")
 	float BaseDamageValue;
 
-	// --- 연동할 GameplayEffect(GE) 라인업 ---
-	/** 피격자들에게 주입할 대미지 이펙트 (GEEC_Damage 연동용) */
+	// --- 연동할 GameplayEffect(GE) 클래스 ---
+	/** 대미지 이펙트 클래스 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
 	TSubclassOf<class UGameplayEffect> DamageGameplayEffectClass;
 
-	/** 2초간 속박 상태 이상을 부여할 디버프 이펙트 */
+	/** 속박 디버프 이펙트 클래스 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
 	TSubclassOf<class UGameplayEffect> RootGameplayEffectClass;
 };
