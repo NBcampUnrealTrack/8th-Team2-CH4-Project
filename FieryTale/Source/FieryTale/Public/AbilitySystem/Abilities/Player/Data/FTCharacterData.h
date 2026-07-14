@@ -9,6 +9,7 @@
 
 class USkeletalMesh;
 class UAnimInstance;
+class UAnimMontage;
 class UFT_WeaponData;
 class UStaticMesh;
 
@@ -33,6 +34,10 @@ struct FFTCharacterData : public FTableRowBase
 	// 애니메이션 블루프린트
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Character")
 	TSoftClassPtr<UAnimInstance> AnimClass;
+
+	//	사망 시 재생할 몽타주 (소프트 참조 — 위 스켈레탈 메쉬와 동일한 스켈레톤 기준으로 제작되어야 함)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Character")
+	TSoftObjectPtr<UAnimMontage> DeathMontage;
 
 	// --- 스킬 설정 ---
 	// 좌클릭 (기본 공격)
