@@ -11,6 +11,8 @@
 class UFT_AbilitySystemComponent;
 class UFT_AttributeSet;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStructureDestroyed);
+
 UCLASS(Abstract)
 class FIERYTALE_API AFTTowerBase : public AActor, public IAbilitySystemInterface
 {
@@ -22,6 +24,11 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override; // 멀티플레이 변수 복제 등록용 필수 함수
 
 	void OnHealthChanged(const FOnAttributeChangeData& Data); // 자식 클래스의 델리게이트 접근 권한 에러를 해결하기 위해 public으로 개방된 콜백 함수
+
+	bool IsDestroyed() const { return bIsDestroyed; }
+	
+	UPROPERTY(BlueprintAssignable, Category = "FieryTale | Structure")
+	FOnStructureDestroyed OnStructureDestroyed;
 
 protected:
 	virtual void BeginPlay() override; // 데이터베이스 및 GAS 세팅 초기화 루틴

@@ -20,6 +20,9 @@ class FIERYTALE_API UFTBattleSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Battle")
+	TArray<AFTTurret*> GetTurrets(EFTTurretTeam Team) const;
+
 	// 해당 팀의 넥서스를 레벨에서 찾아 반환한다.
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Battle")
 	AFTNexus* GetNexus(EFTTurretTeam Team) const;

@@ -61,4 +61,5 @@ void AFTTowerBase::OnHealthChanged(const FOnAttributeChangeData& Data)
 void AFTTowerBase::OnRep_IsDestroyed()
 {
 	PerformDestructionEffects(); // 1P와 2P 화면 양쪽에서 동시에 자식 클래스들의 시각적 연출 함수를 가동
+	OnStructureDestroyed.Broadcast(); 
 }

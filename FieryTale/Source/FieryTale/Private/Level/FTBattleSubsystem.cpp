@@ -5,6 +5,21 @@
 #include "FieryTaleLog.h"
 #include "EngineUtils.h"
 
+TArray<AFTTurret*> UFTBattleSubsystem::GetTurrets(EFTTurretTeam Team) const
+{
+	TArray<AFTTurret*> Result;
+
+	for (TActorIterator<AFTTurret> It(GetWorld()); It; ++It)
+	{
+		if (It->GetTurretTeam() == Team)
+		{
+			Result.Add(*It);
+		}
+	}
+
+	return Result;
+}
+
 AFTNexus* UFTBattleSubsystem::GetNexus(EFTTurretTeam Team) const
 {
 	const EFTNexusTeam TargetTeam = (Team == EFTTurretTeam::BlueTeam) ? EFTNexusTeam::BlueTeam : EFTNexusTeam::RedTeam;

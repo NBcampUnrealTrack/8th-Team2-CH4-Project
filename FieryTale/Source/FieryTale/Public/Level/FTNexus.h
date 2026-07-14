@@ -31,6 +31,9 @@ public:
 
 	// 넥서스의 파괴 가능 여부를 토글한다. false면 GAS Invincible 태그가 붙어 무적 상태를 유지한다.
 	void SetVulnerable(bool bNewVulnerable);
+	
+	UFUNCTION(BlueprintPure, Category = "FieryTale | Structure")
+	bool IsVulnerable() const;
 
 protected:
 	virtual void BeginPlay() override; // 넥서스 특화 데이터베이스 연동 루틴

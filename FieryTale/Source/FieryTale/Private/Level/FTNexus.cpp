@@ -41,7 +41,11 @@ void AFTNexus::BeginPlay()
 		AttributeSet->InitMaxHealth(TargetMaxHealth); // 확보된 시트 체력을 GAS 최대치에 세팅
 		AttributeSet->InitHealth(TargetMaxHealth); // 확보된 시트 체력을 GAS 현재치에 세팅
 		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AFTTowerBase::OnHealthChanged); // 공통 권한 개방을 통한 리스너 정상 부착
-		AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible); // 같은 팀 타워가 하나라도 파괴되기 전까지 넥서스 무적 유지
+
+		if (HasAuthority())
+		{
+			AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 같은 팀 타워가 하나라도 파괴되기 전까지 넥서스 무적 유지
+		}
 	}
 
 	Super::BeginPlay(); // 기초 베이스 연동
@@ -88,19 +92,24 @@ void AFTNexus::PerformDestructionEffects()
 
 void AFTNexus::SetVulnerable(bool bNewVulnerable)
 {
-	if (!AbilitySystemComponent)
+	if (!AbilitySystemComponent || !HasAuthority())
 	{
 		return;
 	}
 
 	if (bNewVulnerable)
 	{
-		AbilitySystemComponent->RemoveLooseGameplayTag(FTTags::FTStates::Buff::Invincible); // 무적 해제 → GEEC_Damage에서 데미지 계산 허용
+		AbilitySystemComponent->RemoveLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll);
 	}
 	else
 	{
-		AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible);
+		AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll);
 	}
+}
+
+bool AFTNexus::IsVulnerable() const
+{
+	return AbilitySystemComponent && !AbilitySystemComponent->HasMatchingGameplayTag(FTTags::FTStates::Buff::Invincible);
 }
 
 void AFTNexus::NotifyGameMode()
