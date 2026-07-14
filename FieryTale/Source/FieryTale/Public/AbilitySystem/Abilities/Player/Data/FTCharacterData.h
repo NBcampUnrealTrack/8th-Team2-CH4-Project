@@ -10,6 +10,7 @@
 class USkeletalMesh;
 class UAnimInstance;
 class UFT_WeaponData;
+class UStaticMesh;
 
 /**
  * 캐릭터 정보를 정의하는 데이터 테이블 행 구조체입니다.
@@ -75,9 +76,18 @@ struct FFTCharacterData : public FTableRowBase
 	// 무기 데이터 에셋
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon")
 	TObjectPtr<UFT_WeaponData> WeaponData;
-	
-	
-	// 캐릭터 타입
+
+	//	왼손(L_Hand 소켓)에 부착할 무기 스태틱 메쉬 (소프트 참조). 비어 있으면 왼손에 아무것도 붙지 않는다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon")
+	TSoftObjectPtr<UStaticMesh> LEquip;
+
+	//	오른손(R_Hand 소켓)에 부착할 무기 스태틱 메쉬 (소프트 참조). 비어 있으면 오른손에 아무것도 붙지 않는다.
+	//	이 메쉬에 "FirePoint" 소켓이 있으면, 평타 발사/판정 시작 위치가 캐릭터 기본 오프셋 대신 그 소켓 위치로 대체된다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Weapon")
+	TSoftObjectPtr<UStaticMesh> REquip;
+
+
+	//  데이터 테이블의 이 행이 어떤 캐릭터 타입을 의미하는지 식별
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Character")
 	EFTCharacterType CharacterType;
 

@@ -120,7 +120,7 @@ void UFT_NormalAttack::ExecuteWeaponHitDetection(UFT_WeaponData* InWeaponData, A
 {
     if (!InWeaponData || !InCharacter) return;
 
-    FVector StartLocation = InCharacter->GetActorLocation() + FVector(0, 0, 60); 
+    FVector StartLocation = InCharacter->GetWeaponMuzzleLocation();
     FVector ForwardVector = InCharacter->GetActorForwardVector();
 
     switch (InWeaponData->FireType)
@@ -368,7 +368,7 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
 {
     if (!InWeaponData || !InCharacter || !GetWorld() || !BaseDamageEffectClass) return;
 
-    FVector StartLocation = InCharacter->GetActorLocation() + FVector(0, 0, 60);
+    FVector StartLocation = InCharacter->GetWeaponMuzzleLocation();
     FVector ForwardVector = InCharacter->GetActorForwardVector();
 
     FVector BoxCenter = StartLocation + (ForwardVector * (InWeaponData->AttackRange * 0.5f));

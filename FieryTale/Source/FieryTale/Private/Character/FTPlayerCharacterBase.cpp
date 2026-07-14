@@ -14,6 +14,8 @@
 #include "TimerManager.h"
 #include "AbilitySystem/FT_AttributeSet.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "GameplayTags/FTTags.h"
 #include "AbilitySystem/Abilities/Player/Data/FTCharacterData.h"
 #include "AbilitySystem/Abilities/Player/Data/FTSkillMetaData.h"
@@ -103,6 +105,12 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 		return;
 	}
 
+	if (LastAppliedCharacterRow == CharacterRow)
+	{
+		return;
+	}
+	LastAppliedCharacterRow = CharacterRow;
+
 	GetCharacterMovement()->MaxWalkSpeed = Data->DefaultMoveSpeed;
 
 	//	메쉬/애님BP는 소프트 참조 — 영웅이 확정된 이 시점에 동기 로드해서 적용한다.
@@ -117,7 +125,8 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 		if (MeshOriginalHeight > 0.0f)
 		{
 			// 2. 캡슐 절반 높이 가져오기 (기본값: 96.0f)
-			float CapsuleHalfHeight = GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+			const AFTPlayerCharacterBase* CDO = GetClass()->GetDefaultObject<AFTPlayerCharacterBase>();
+			float CapsuleHalfHeight = CDO->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
 			float TargetHeight = CapsuleHalfHeight * 2.0f;
 
 			// 3. 목표 높이 대비 메쉬 원본 높이의 비율 계산
@@ -139,7 +148,7 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 			CacheInitialMeshOffset(NewMeshRelativeLocation, NewMeshRelativeRotation);
 
 			// 7. SetCharacterScale의 기준값으로 캐싱 — 이 시점의 캡슐/메시 배치가 이 캐릭터의 "100% 크기"다.
-			DefaultCapsuleRadius = GetCapsuleComponent()->GetUnscaledCapsuleRadius();
+			DefaultCapsuleRadius = CDO->GetCapsuleComponent()->GetUnscaledCapsuleRadius();
 			DefaultCapsuleHalfHeight = CapsuleHalfHeight;
 			DefaultMeshRelativeScale = GetMesh()->GetRelativeScale3D();
 			DefaultMeshRelativeLocation = NewMeshRelativeLocation;
@@ -157,6 +166,66 @@ void AFTPlayerCharacterBase::ApplyCharacterVisuals()
 	{
 		DeathMontage = LoadedDeathMontage;
 	}
+
+	//	스켈레탈 메쉬가 확정된 뒤라야 소켓 존재 여부를 정확히 판단할 수 있으므로 이 순서로 호출한다.
+	//	Equip 부착 소켓과 FirePoint 기준점 소켓 모두 무기 메쉬가 아니라 캐릭터 스켈레톤(리깅)에 박혀 있다 —
+	//	그래서 무기가 없는 캐릭터(카구야 등)도 스켈레톤만 맞으면 그대로 동작하고, 리깅에 해당 소켓이 없는
+	//	캐릭터는 DoesSocketExist 검사에 걸려 기존 폴백 동작으로 자연히 빠진다.
+	ApplyHandEquip(LeftHandWeaponMesh, Data->LEquip, TEXT("L_Hand_Equip"));
+	ApplyHandEquip(RightHandWeaponMesh, Data->REquip, TEXT("R_Hand_Equip"));
+}
+
+void AFTPlayerCharacterBase::ApplyHandEquip(UStaticMeshComponent* WeaponMeshComp, const TSoftObjectPtr<UStaticMesh>& EquipMeshRef, FName HandSocket)
+{
+	if (!WeaponMeshComp)
+	{
+		return;
+	}
+
+	UStaticMesh* EquipMesh = EquipMeshRef.LoadSynchronous();
+	WeaponMeshComp->SetStaticMesh(EquipMesh); // 데이터에 참조가 없으면 nullptr이 들어가 자동으로 화면에서 사라진다.
+
+	if (EquipMesh && GetMesh()->DoesSocketExist(HandSocket))
+	{
+		WeaponMeshComp->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocket);
+
+		WeaponMeshComp->SetWorldScale3D(FVector(1.f));
+	}
+}
+
+FVector AFTPlayerCharacterBase::GetWeaponMuzzleLocation() const
+{
+	static const FName WeaponFirePointSocketName(TEXT("Socket_Fire_Point"));
+	static const FName RightFirePointSocketName(TEXT("R_Hand_FirePoint"));
+	static const FName LeftFirePointSocketName(TEXT("L_Hand_FirePoint"));
+
+	const USkeletalMeshComponent* CharacterMesh = GetMesh();
+
+	if (RightHandWeaponMesh && RightHandWeaponMesh->GetStaticMesh())
+	{
+		if (RightHandWeaponMesh->DoesSocketExist(WeaponFirePointSocketName))
+		{
+			return RightHandWeaponMesh->GetSocketLocation(WeaponFirePointSocketName);
+		}
+		if (CharacterMesh && CharacterMesh->DoesSocketExist(RightFirePointSocketName))
+		{
+			return CharacterMesh->GetSocketLocation(RightFirePointSocketName);
+		}
+	}
+
+	if (LeftHandWeaponMesh && LeftHandWeaponMesh->GetStaticMesh())
+	{
+		if (LeftHandWeaponMesh->DoesSocketExist(WeaponFirePointSocketName))
+		{
+			return LeftHandWeaponMesh->GetSocketLocation(WeaponFirePointSocketName);
+		}
+		if (CharacterMesh && CharacterMesh->DoesSocketExist(LeftFirePointSocketName))
+		{
+			return CharacterMesh->GetSocketLocation(LeftFirePointSocketName);
+		}
+	}
+
+	return GetActorLocation() + FVector(0.f, 0.f, 60.f); // 무기/FirePoint 리깅이 없는 캐릭터는 기존 기본 오프셋 그대로 사용.
 }
 
 AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer)
@@ -190,6 +259,15 @@ AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectI
 
 	FovTimeline = CreateDefaultSubobject<UTimelineComponent>(TEXT("FovTimeline"));
 
+	//	L_Hand/R_Hand 소켓 부착 여부는 스켈레탈 메쉬가 확정되는 ApplyCharacterVisuals에서 판가름 나므로,
+	//	여기서는 일단 메시 루트에 매달아두고 실제 재부착은 그쪽에서 처리한다.
+	LeftHandWeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftHandWeaponMesh"));
+	LeftHandWeaponMesh->SetupAttachment(GetMesh());
+	LeftHandWeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	RightHandWeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightHandWeaponMesh"));
+	RightHandWeaponMesh->SetupAttachment(GetMesh());
+	RightHandWeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	StartupAbilities.Add(UFT_PlayerDeathAbility::StaticClass());
 }

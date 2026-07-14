@@ -14,6 +14,8 @@ class UCameraComponent;
 class UTimelineComponent;
 class UCurveFloat;
 class UFTHealthWidgetComponent;
+class UStaticMeshComponent;
+class UStaticMesh;
 struct FInputActionValue;
 struct FFTCharacterData;
 
@@ -44,6 +46,14 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 	// TODO:: GetWeaponData시 CharacterData->GetWeaponData(); 따로 필드에 이 값을 갖고 있을 필요성이 있는가?
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Weapon", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UFT_WeaponData> CurrentWeaponData;
+
+	//	CharacterData.LEquip/REquip이 있을 때만 스태틱 메쉬를 붙이는 손 무기 컴포넌트. 스켈레탈 메쉬가 확정되는
+	//	ApplyCharacterVisuals 시점에 L_Hand/R_Hand 소켓 존재 여부를 확인해 부착 위치를 잡는다.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Weapon", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> LeftHandWeaponMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Weapon", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMeshComponent> RightHandWeaponMesh;
 
 	//	FOV 연출용 타임라인 — 액터 Tick과 무관하게 자체적으로 틱하는 컴포넌트라 PrimaryActorTick 설정을 건드릴 필요가 없다.
 	UPROPERTY()
@@ -90,6 +100,9 @@ class FIERYTALE_API AFTPlayerCharacterBase : public AFTCharacterBase
 	float DefaultCapsuleHalfHeight = 96.f;
 	FVector DefaultMeshRelativeScale = FVector::OneVector;
 	FVector DefaultMeshRelativeLocation = FVector::ZeroVector;
+
+	//	ApplyCharacterVisuals가 이미 이 행으로 적용됐으면 재실행을 건너뛰기 위한 캐시.
+	FDataTableRowHandle LastAppliedCharacterRow;
 
 	//	실제 축소/확대 배율의 서버 권위 값 — 서버의 SetCharacterScale이 갱신하면 모든 클라이언트로 복제되어
 	//	OnRep_CharacterScale이 캡슐/메시를 동일하게 맞춘다 (제3자 클라이언트도 같은 크기를 보게 하기 위함).
@@ -142,6 +155,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Weapon")
 	UFT_WeaponData* GetWeaponData() const;
+
+	UFUNCTION(BlueprintPure, Category = "FieryTale | Weapon")
+	FVector GetWeaponMuzzleLocation() const;
 
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
@@ -209,6 +225,10 @@ protected:
 
 	// CharacterData 기반으로 메시·이동속도 적용 — BeginPlay 및 OnRep_CharacterData에서 호출
 	void ApplyCharacterVisuals();
+
+	//	WeaponMeshComp에 EquipMeshRef(소프트 참조)를 로드해 세팅하고, 스켈레탈 메쉬에 HandSocket이 있으면
+	//	그 소켓에 부착한다. EquipMeshRef가 비어 있으면 기존에 붙어있던 메쉬를 비워(=화면에서 사라지게) 둔다.
+	void ApplyHandEquip(UStaticMeshComponent* WeaponMeshComp, const TSoftObjectPtr<UStaticMesh>& EquipMeshRef, FName HandSocket);
 
 	// 초기 혹은 Respawn 단계에서 CharacterData에 의거하여 Attribute 값 초기화
 	void InitializeCharacterAttribute() const;
