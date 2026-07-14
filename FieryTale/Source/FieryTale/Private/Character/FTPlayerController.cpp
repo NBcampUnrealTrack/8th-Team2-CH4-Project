@@ -21,6 +21,8 @@
 #include "Lobby/FTLobbyPlayerState.h"
 #include "Lobby/FTLobbyWidget.h"
 #include "Chat/FTChatWidget.h"
+#include "UI/Scoreboard/FTScoreboardWidget.h"
+#include "Blueprint/UserWidget.h"
 #include "FieryTaleLog.h"
 #include "Camera/CameraActor.h"
 #include "Core/Game/FTArenaGameState.h"
@@ -270,6 +272,7 @@ void AFTPlayerController::SetupInputComponent()
 		EIC->BindAction(ShiftAction,      ETriggerEvent::Started,   this, &AFTPlayerController::OnShift);
 		EIC->BindAction(ToggleHUDEditModeAction, ETriggerEvent::Started,   this, &AFTPlayerController::ToggleHUDEditMode);
 		EIC->BindAction(ScoreboardAction,        ETriggerEvent::Started,   this, &AFTPlayerController::OnScoreboardPressed);
+		EIC->BindAction(ScoreboardAction,        ETriggerEvent::Completed, this, &AFTPlayerController::OnScoreboardReleased);
 		EIC->BindAction(AltMouseAction,          ETriggerEvent::Started,   this, &AFTPlayerController::OnAltPressed);
 		EIC->BindAction(AltMouseAction,          ETriggerEvent::Completed, this, &AFTPlayerController::OnAltReleased);
 		EIC->BindAction(ChatAction,              ETriggerEvent::Started,   this, &AFTPlayerController::OnChatPressed);
@@ -400,7 +403,35 @@ void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter, 
 
 void AFTPlayerController::OnScoreboardPressed()
 {
-	
+	//	로컬 클라이언트 화면 전용 UI. 최초 표시 시점에 1회 생성한다(이때면 GameState/PlayerState가 이미 유효).
+	if (!IsLocalController() || !ScoreboardWidgetClass)
+	{
+		return;
+	}
+
+	if (!ScoreboardWidgetInstance)
+	{
+		ScoreboardWidgetInstance = CreateWidget<UFTScoreboardWidget>(this, ScoreboardWidgetClass);
+		if (ScoreboardWidgetInstance)
+		{
+			//	HUD 위에 오도록 높은 ZOrder로 뷰포트에 붙여둔다. 이후엔 가시성만 토글한다.
+			ScoreboardWidgetInstance->AddToViewport(50);
+		}
+	}
+
+	if (ScoreboardWidgetInstance)
+	{
+		ScoreboardWidgetInstance->SetVisibility(ESlateVisibility::Visible);
+	}
+}
+
+void AFTPlayerController::OnScoreboardReleased()
+{
+	//	TAB에서 손을 떼면 숨긴다. Collapsed면 위젯 NativeTick도 조기 반환해 갱신 비용이 들지 않는다.
+	if (ScoreboardWidgetInstance)
+	{
+		ScoreboardWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void AFTPlayerController::OnAltPressed()

@@ -16,6 +16,7 @@ class UInputMappingContext;
 class UInputAction;
 class UFTLobbyWidget;
 class UFTChatWidget;
+class UFTScoreboardWidget;
 
 struct FFTCharacterData;
 class UFTHUDLayoutSubsystem;
@@ -67,6 +68,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> ArenaHUDWidget;
+
+	//	TAB 홀드 스코어보드. ScoreboardAction Press/Release로 가시성을 토글한다(최초 표시 시 지연 생성).
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UFTScoreboardWidget> ScoreboardWidgetClass;
 
 	UPROPERTY(EditAnywhere, Category = "Setting")
 	float RespawnDelay;
@@ -127,6 +132,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UUserWidget> ArenaHUDWidgetInstance;
 
+	//	스코어보드 인스턴스 — 최초 TAB 입력 때 1회 생성해 뷰포트에 붙여두고 이후 가시성만 토글한다.
+	UPROPERTY()
+	TObjectPtr<UFTScoreboardWidget> ScoreboardWidgetInstance;
+
 	// 타이머 만료 후 실제 리스폰을 실행할 함수
 	void ExecuteRespawn();
 
@@ -156,6 +165,7 @@ private:
 	UFTHUDLayoutSubsystem* GetHUDLayoutSubsystem() const;
 
 	void OnScoreboardPressed();
+	void OnScoreboardReleased();
 	// Alt 홀드 = 임시 HUD 편집 모드 (커서 노출 + Movable 위젯 편집 활성 / 해제 시 원복)
 	void OnAltPressed();
 	void OnAltReleased();
