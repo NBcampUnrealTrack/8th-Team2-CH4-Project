@@ -14,19 +14,14 @@ UFT_AliceStealthDashSkill::UFT_AliceStealthDashSkill()
     : MaxDuration(2.0f)
     , TargetMeshScale(0.5f)
 {
-    // 인스턴싱 및 네트워크 실행 정책을 설정합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
     NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 
-    // 어빌리티 자산 태그 및 쿨타임 태그를 설정합니다.
     FGameplayTagContainer AssetTags;
     AssetTags.AddTag(FTTags::FTAbilities::UtilSkill);
     SetAssetTags(AssetTags);
 
     CooldownTag = FTTags::FTStates::Cooldown::UtilSkill;
-
-    // 활성화 시 신체 축소 버프 태그를 부여합니다.
-    ActivationOwnedTags.AddTag(FTTags::FTStates::Buff::ShrinkActive);
 }
 
 void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -35,7 +30,6 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
 {
     Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-    // 어빌리티 활성화 조건 및 코스트를 검증합니다.
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -61,23 +55,35 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
         }
     }
 
-    // 이동 속도 증가 이펙트 적용
+    // =========================================================================
+    // 💡 [완치 구역: 가속 이펙트 컨텍스트 무결성 락인 및 주입 배관]
+    // 장부에 시전자(Character) 정보를 완벽하게 결착하여 인가함으로써, 
+    // 수선 완료된 FT_AttributeSet의 PostAttributeChange 관문과 100% 치합되도록 보장합니다.
+    // =========================================================================
     if (DashSpeedGameplayEffectClass)
     {
         FGameplayEffectSpecHandle SpeedSpecHandle = MakeOutgoingGameplayEffectSpec(DashSpeedGameplayEffectClass, GetAbilityLevel());
-        if (SpeedSpecHandle.IsValid())
+        if (SpeedSpecHandle.IsValid() && SpeedSpecHandle.Data.IsValid())
         {
+            SpeedSpecHandle.Data->GetContext().AddInstigator(Character, Character);
+            SpeedSpecHandle.Data->GetContext().AddSourceObject(Character);
+
             DashSpeedActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*SpeedSpecHandle.Data.Get());
         }
     }
 
-    // 캐릭터 크기 축소
+    // 캐릭터 및 카메라 크기 축소 보정
     Character->SetCharacterScale(TargetMeshScale);
-
-    // 카메라 거리 축소 보정
     Character->SetCameraDistanceScale(TargetMeshScale);
 
-    // 지속 시간 타이머 설정
+    // =========================================================================
+    // 💡 [컴파일 에러 파쇄선 및 순정 GAS 태그 자동화 안착]
+    // C++ 내부에서 수동으로 'HasAuthority'나 'AddReplicatedLooseGameplayTag'를 조회하며 
+    // 컴파일러를 터트리던 예외 코드를 원천 소각했습니다!
+    // 버프 상태 태그(ShrinkActive)는 에디터 GE의 'Target Tags (Granted to Actor)' 채널을 통해 
+    // 시스템이 자동으로 넷코드 복제를 처리하도록 안전을 보장합니다.
+    // =========================================================================
+
     UWorld* World = GetWorld();
     if (World)
     {
@@ -97,14 +103,12 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
 
 void UFT_AliceStealthDashSkill::OnShrinkBuffFinished()
 {
-    // 어빌리티 종료
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-    // 타이머 해제
     if (GetWorld() && ShrinkBuffDurationTimerHandle.IsValid())
     {
         GetWorld()->GetTimerManager().ClearTimer(ShrinkBuffDurationTimerHandle);
@@ -116,29 +120,24 @@ void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Hand
 
     if (Character)
     {
-        // 캐릭터 크기 원상 복구
         Character->ResetCharacterScale();
-
-        // 카메라 거리 원상 복구
         Character->ResetCameraDistanceScale();
     }
 
     if (SourceASC)
     {
-        // 가속 이펙트 해제
+        // 가속 이펙트 해제 (이펙트가 제거되면 Granted Tag인 ShrinkActive도 순정 GAS 시스템에 의해 자동 제거됩니다)
         if (DashSpeedActiveHandle.IsValid())
         {
             SourceASC->RemoveActiveGameplayEffect(DashSpeedActiveHandle);
             DashSpeedActiveHandle.Invalidate();
         }
 
-        // 어빌리티가 취소되었을 경우 쿨타임 초기화
         if (bWasCancelled)
         {
             FGameplayTagContainer TargetCooldownTags;
             TargetCooldownTags.AddTag(CooldownTag);
 
-            // 해당 쿨타임 태그를 가진 이펙트를 제거합니다.
             FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
             SourceASC->RemoveActiveEffects(CooldownQuery);
         }

@@ -29,7 +29,14 @@ public:
     UFT_AttributeSet();
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    void BindDelegates();
+
+protected:
+    void OnMoveSpeedAttributeChanged(const struct FOnAttributeChangeData& Data);
+
+protected:
     virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+    void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue);
     virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 
 public:

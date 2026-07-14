@@ -37,6 +37,10 @@ protected:
     /** 투사체 클래스 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Projectile")
     TSubclassOf<class AFT_ProjectileBase> ProjectileClass;
+
+    /** 슬로우 이펙트 클래스 */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Effects")
+    TSubclassOf<class UGameplayEffect> SlowEffectClass;
     
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Animation")
     TObjectPtr<UAnimMontage> SkillMontage;

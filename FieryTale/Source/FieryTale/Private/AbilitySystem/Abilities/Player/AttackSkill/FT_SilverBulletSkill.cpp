@@ -128,6 +128,22 @@ void UFT_SilverBulletSkill::FireSilverBullet()
                     if (Projectile)
                     {
                         Projectile->DamageEffectSpecHandle = SpecHandle;
+                        
+                        // 슬로우 이펙트 스펙 추가
+                        if (SlowEffectClass)
+                        {
+                            FGameplayEffectSpecHandle SlowSpecHandle = MakeOutgoingGameplayEffectSpec(SlowEffectClass, GetAbilityLevel());
+                            if (SlowSpecHandle.IsValid() && SlowSpecHandle.Data.IsValid())
+                            {
+                                FGameplayEffectContextHandle SlowContext = SlowSpecHandle.Data->GetContext();
+                                SlowContext.AddSourceObject(Character);
+                                SlowContext.AddInstigator(Character, Character);
+                                SlowSpecHandle.Data->SetContext(SlowContext.Duplicate());
+                                
+                                Projectile->AdditionalEffectSpecHandles.Add(SlowSpecHandle);
+                            }
+                        }
+
                         Projectile->FinishSpawning(SpawnTransform);
                     }
                 }

@@ -13,11 +13,32 @@ UFT_AttributeSet::UFT_AttributeSet()
 {
 }
 
+void UFT_AttributeSet::BindDelegates()
+{
+    if (UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent())
+    {
+        ASC->GetGameplayAttributeValueChangeDelegate(GetMoveSpeedAttribute()).AddUObject(this, &UFT_AttributeSet::OnMoveSpeedAttributeChanged);
+    }
+}
+
+void UFT_AttributeSet::OnMoveSpeedAttributeChanged(const FOnAttributeChangeData& Data)
+{
+    if (UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent())
+    {
+        if (ACharacter* TargetChar = Cast<ACharacter>(ASC->GetAvatarActor()))
+        {
+            if (UCharacterMovementComponent* MoveComp = TargetChar->GetCharacterMovement())
+            {
+                MoveComp->MaxWalkSpeed = Data.NewValue;
+            }
+        }
+    }
+}
+
 void UFT_AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    // 네트워크 환경에서 모든 속성 데이터가 안정적으로 동기화되도록 복제 조건을 확정합니다.
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, Health, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, MaxHealth, COND_None, REPNOTIFY_Always);
     DOREPLIFETIME_CONDITION_NOTIFY(UFT_AttributeSet, Shield, COND_None, REPNOTIFY_Always);
@@ -35,7 +56,6 @@ void UFT_AttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, f
 {
     Super::PreAttributeChange(Attribute, NewValue);
 
-    // 스탯이 실시간으로 변경되기 직전 최솟값과 최댓값 범위 내부로 정밀 클램핑을 수행합니다.
     if (Attribute == GetHealthAttribute())
     {
         NewValue = FMath::Clamp<float>(NewValue, 0.0f, GetMaxHealth());
@@ -44,9 +64,10 @@ void UFT_AttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, f
     {
         NewValue = FMath::Clamp<float>(NewValue, 0.0f, GetMaxShield());
     }
-    else if (Attribute == GetMoveSpeedAttribute())
+    // 💡 [속도 버프 감옥 해방]: MaxMoveSpeed 한계치에 구속되지 않고 상한 속도를 마음껏 돌파하도록 격리합니다.
+    else if (Attribute == GetMoveSpeedAttribute() || Attribute == GetMaxMoveSpeedAttribute())
     {
-        NewValue = FMath::Clamp<float>(NewValue, 0.0f, GetMaxMoveSpeed());
+        NewValue = FMath::Max<float>(NewValue, 0.0f);
     }
     else if (Attribute == GetUltimateGaugeAttribute())
     {
@@ -58,13 +79,20 @@ void UFT_AttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, f
     }
 }
 
+void UFT_AttributeSet::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
+{
+    Super::PostAttributeChange(Attribute, OldValue, NewValue);
+
+    // 다른 스탯들의 갱신 처리가 필요하다면 이곳에서 수행합니다.
+    // (참고: MoveSpeed의 경우 FTPlayerCharacterBase에서 델리게이트를 통해 안전하게 갱신하고 있습니다)
+}
+
 void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
     Super::PostGameplayEffectExecute(Data);
     
     const FGameplayAttribute ModifiedAttribute = Data.EvaluatedData.Attribute;
 
-    // 메타 속성인 Damage가 적용되었을 때 체력 및 보호막 차감을 처리하는 로직입니다.
     if (ModifiedAttribute == GetDamageAttribute())
     {
         const float LocalDamageDone = GetDamage();
@@ -74,7 +102,6 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
         {
             float ActualDamageApplied = 0.0f;
 
-            // 1단계 연산: 보호막(Shield)을 먼저 깎아 대미지를 흡수합니다.
             const float NewShield = GetShield() - LocalDamageDone;
             if (NewShield >= 0.0f)
             {
@@ -83,7 +110,6 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
             }
             else
             {
-                // 보호막을 초과하는 대미지가 발생했을 때 초과분을 체력(Health)에 적용합니다.
                 SetShield(0.0f);
                 const float NewHealth = GetHealth() + NewShield;
                 
@@ -95,34 +121,26 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
                 SetHealth(ClampedNewHealth);
             }
 
-            // 궁극기 게이지 충전 로직
             if (ActualDamageApplied > 0.0f && Data.EffectSpec.GetContext().IsValid())
             {
                 if (UAbilitySystemComponent* InstigatorASC = Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent())
                 {
-                    // 검증 조건:
-                    // 1. 대미지 GE 에셋 자체 태그 검증 (AssetTags)
-                    // 2. 대미지 스펙의 동적 부여 태그 검증 (DynamicGrantedTags)
-                    // 3. 공격자(Instigator)의 ASC에 궁극기 시전 상태 태그가 있는지 확인합니다.
                     bool bIsUltimateDamage = Data.EffectSpec.Def->GetAssetTags().HasTag(FTTags::FTAbilities::UltimateSkill) || 
                                              Data.EffectSpec.DynamicGrantedTags.HasTag(FTTags::FTAbilities::UltimateSkill) ||
                                              InstigatorASC->HasMatchingGameplayTag(FTTags::FTAbilities::UltimateSkill);
 
-                    // 궁극기 대미지가 아닐 때(평타 및 일반 기술) 궁극기 게이지를 누적 충전합니다.
                     if (!bIsUltimateDamage)
                     {
                         const UFT_AttributeSet* InstigatorAttributeSet = Cast<UFT_AttributeSet>(InstigatorASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
             
                         if (InstigatorAttributeSet)
                         {
-                            // 충전 배율을 적용합니다. (대미지 수치 비례 충전)
                             const float UltimateChargeMultiplier = 0.5f; 
                             const float UltimateBonus = ActualDamageApplied * UltimateChargeMultiplier;
 
                             float CurrentSourceUlt = InstigatorAttributeSet->GetUltimateGauge();
                             float NewSourceUlt = FMath::Clamp<float>(CurrentSourceUlt + UltimateBonus, 0.0f, InstigatorAttributeSet->GetMaxUltimateGauge());
 
-                            // 공격자의 속성에 클램핑된 새로운 궁극기 게이지 수치를 적용합니다.
                             InstigatorASC->SetNumericAttributeBase(GetUltimateGaugeAttribute(), NewSourceUlt);
                         }
                     }
@@ -138,20 +156,14 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
     {
         SetShield(FMath::Clamp<float>(GetShield(), 0.0f, GetMaxShield()));
     }
+    // =========================================================================
+    // 💡 [완치 구역: PostExecute 내부의 중복 이속 동기화 제거]
+    // 가속 상태에서 MoveSpeed를 MaxMoveSpeed로 싹둑 잘라 하향 평준화 시키던 
+    // 오래된 Clamp 코드를 소각하고, 순수하게 비정상 연산으로 음수 속도가 되는 현상만 방어합니다.
+    // =========================================================================
     else if (ModifiedAttribute == GetMoveSpeedAttribute())
     {
-        // 이동 속도 스탯 변경 시 순정 캐릭터 무브먼트 컴포넌트의 MaxWalkSpeed와 동기화합니다.
-        SetMoveSpeed(FMath::Clamp<float>(GetMoveSpeed(), 0.0f, GetMaxMoveSpeed()));
-        if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
-        {
-            if (ACharacter* TargetChar = Cast<ACharacter>(Data.Target.AbilityActorInfo->AvatarActor.Get()))
-            {
-                if (UCharacterMovementComponent* MoveComp = TargetChar->GetCharacterMovement())
-                {
-                    MoveComp->MaxWalkSpeed = GetMoveSpeed();
-                }
-            }
-        }
+        SetMoveSpeed(FMath::Max<float>(GetMoveSpeed(), 0.0f));
     }
     else if (ModifiedAttribute == GetUltimateGaugeAttribute())
     {
@@ -162,7 +174,6 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
         SetWeaponSpread(FMath::Clamp<float>(GetWeaponSpread(), 0.0f, GetMaxWeaponSpread()));
     }
 
-    // 최종 정산 후 체력이 0에 도달했다면 서버 권한 환경에서 즉각 사망 시퀀스를 처리합니다.
     if (GetHealth() <= 0.0f)
     {
         if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
@@ -171,7 +182,6 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
             {
                 if (BaseChar->HasAuthority())
                 {
-                    // 대미지 이펙트를 가한 주체(Instigator)의 컨트롤러를 추적합니다.
                     AController* KillerController = nullptr;
                     if (Data.EffectSpec.GetContext().GetInstigatorAbilitySystemComponent())
                     {
@@ -182,7 +192,6 @@ void UFT_AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbac
                         }
                     }
 
-                    // 추적한 가해자 컨트롤러를 전달하여 Die 함수를 호출합니다.
                     BaseChar->Die(KillerController);
                 }
             }

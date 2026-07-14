@@ -25,6 +25,8 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	virtual void BeginPlay() override;
+
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	
 	virtual void CopyProperties(APlayerState* PlayerState) override;

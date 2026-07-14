@@ -18,6 +18,16 @@ AFTPlayerState::AFTPlayerState()
 	AttributeSet = CreateDefaultSubobject<UFT_AttributeSet>(TEXT("AttributeSet"));
 }
 
+void AFTPlayerState::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (AttributeSet)
+	{
+		AttributeSet->BindDelegates();
+	}
+}
+
 UAbilitySystemComponent* AFTPlayerState::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;

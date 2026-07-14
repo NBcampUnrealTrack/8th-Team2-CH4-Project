@@ -241,4 +241,8 @@ protected:
 	//	위 델리게이트의 등록/해제를 핸들로 명시 관리한다(RemoveAll(this) 대신). PossessedBy/OnRep_PlayerState가
 	//	여러 번 불릴 수 있어, 재등록 전 이 핸들로만 정확히 이전 바인딩을 제거해 중복 등록을 막는다.
 	FDelegateHandle HealthWidgetDeadTagEventHandle;
+	FDelegateHandle MoveSpeedChangeEventHandle;
+
+	// 이동 속도 어트리뷰트 변경(버프/디버프 적용 및 해제) 시 호출되는 델리게이트 콜백
+	void OnMoveSpeedAttributeChanged(const struct FOnAttributeChangeData& Data);
 };

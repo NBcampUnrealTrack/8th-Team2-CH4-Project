@@ -622,6 +622,14 @@ void AFTPlayerCharacterBase::NotifyControllerChanged()
 	}
 }
 
+void AFTPlayerCharacterBase::OnMoveSpeedAttributeChanged(const FOnAttributeChangeData& Data)
+{
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->MaxWalkSpeed = Data.NewValue;
+	}
+}
+
 
 // [서버 인프라 초기화 및 데이터 주입]
 void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
@@ -652,6 +660,14 @@ void AFTPlayerCharacterBase::PossessedBy(AController* NewController)
 			}
 			HealthWidgetDeadTagEventHandle = ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
 				.AddUObject(this, &AFTPlayerCharacterBase::OnHealthWidgetDeadTagChanged);
+
+			// 이동 속도(MoveSpeed) 변경 이벤트 구독 — 버프 부여/만료 및 기본값 변경을 가장 완벽하게 감지합니다.
+			if (MoveSpeedChangeEventHandle.IsValid())
+			{
+				ASC->GetGameplayAttributeValueChangeDelegate(UFT_AttributeSet::GetMoveSpeedAttribute()).Remove(MoveSpeedChangeEventHandle);
+			}
+			MoveSpeedChangeEventHandle = ASC->GetGameplayAttributeValueChangeDelegate(UFT_AttributeSet::GetMoveSpeedAttribute())
+				.AddUObject(this, &AFTPlayerCharacterBase::OnMoveSpeedAttributeChanged);
 
 			// 2. 서버 권한 하에 초기화 수행
 			if (HasAuthority())
@@ -726,6 +742,13 @@ void AFTPlayerCharacterBase::OnRep_PlayerState()
 			}
 			HealthWidgetDeadTagEventHandle = ASC->RegisterGameplayTagEvent(FTTags::FTStates::Core::Dead, EGameplayTagEventType::NewOrRemoved)
 				.AddUObject(this, &AFTPlayerCharacterBase::OnHealthWidgetDeadTagChanged);
+
+			if (MoveSpeedChangeEventHandle.IsValid())
+			{
+				ASC->GetGameplayAttributeValueChangeDelegate(UFT_AttributeSet::GetMoveSpeedAttribute()).Remove(MoveSpeedChangeEventHandle);
+			}
+			MoveSpeedChangeEventHandle = ASC->GetGameplayAttributeValueChangeDelegate(UFT_AttributeSet::GetMoveSpeedAttribute())
+				.AddUObject(this, &AFTPlayerCharacterBase::OnMoveSpeedAttributeChanged);
 		}
 	}
 }

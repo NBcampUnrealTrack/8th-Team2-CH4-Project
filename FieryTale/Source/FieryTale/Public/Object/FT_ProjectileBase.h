@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -23,6 +23,10 @@ public:
     // 공격을 가한 GA 측에서 발사 직전 이 투사체에 최종 데미지 계산서를 주입해 주는 통로입니다.
     UPROPERTY(BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "FieryTale | GAS")
     FGameplayEffectSpecHandle DamageEffectSpecHandle;
+
+    /** 적중 시 추가로 적용할 상태 이상(슬로우, 기절 등) 이펙트 스펙들입니다. */
+    UPROPERTY(BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "FieryTale | GAS")
+    TArray<FGameplayEffectSpecHandle> AdditionalEffectSpecHandles;
 
 protected:
     virtual void BeginPlay() override;
