@@ -10,6 +10,7 @@
 
 class UTextBlock;
 class UImage;
+class UWidgetSwitcher;
 
 /**
  * 
@@ -25,6 +26,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> Img_HeroPortrait;
+	
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UWidgetSwitcher> Switcher_SlotState;
 
 public:
 	// 에디터에서 캐릭터 타입별 2D 텍스처(초상화)를 지정할 맵

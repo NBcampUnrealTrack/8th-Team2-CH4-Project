@@ -130,35 +130,37 @@ void UFTLobbyWidget::RefreshTeamRoster()
 		});
 	}
 
-	// 3. 무조건 최대 인원수(MaxPlayerCount)만큼 슬롯을 생성합니다.
+	// 무조건 최대 인원수(MaxPlayerCount)만큼 슬롯을 생성합니다.[cite: 9]
 	for (int32 i = 0; i < MaxPlayerCount; ++i)
 	{
 		UFTLobbyPlayerSlot* PlayerSlot = CreateWidget<UFTLobbyPlayerSlot>(this, PlayerSlotWidgetClass);
 		if (!PlayerSlot) continue;
 
-		// 4. 현재 인덱스(i)에 접속한 유저가 존재한다면 (예: 6칸 중 2명 접속 시 i가 0, 1일 때)
+		bool bSlotFilled = false;
+
+		// 현재 인덱스(i)에 접속한 유저가 존재한다면
 		if (SortedArray.IsValidIndex(i))
 		{
 			AFTLobbyPlayerState* TargetPS = Cast<AFTLobbyPlayerState>(SortedArray[i]);
 			if (TargetPS)
 			{
-				// 델리게이트 안전하게 바인딩 (캐릭터 변경 시 새로고침 용도)
+				// 델리게이트 안전하게 바인딩 (캐릭터 변경 시 새로고침 용도)[cite: 9]
 				TargetPS->OnCharacterStateChanged.RemoveDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
 				TargetPS->OnCharacterStateChanged.AddDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
 
 				// 실제 유저의 이름과 선택한 캐릭터 타입으로 슬롯을 업데이트합니다.
 				PlayerSlot->UpdateSlotData(TargetPS->GetPlayerName(), TargetPS->GetCharacterType());
+				bSlotFilled = true;
 			}
 		}
-		// 5. 접속한 유저가 없는 남은 빈자리라면 (예: i가 2, 3, 4, 5일 때)
-		else
+
+		// 접속한 유저가 없거나 빈자리로 판별된 인덱스는 완벽하게 빈 데이터 주입
+		if (!bSlotFilled)
 		{
-			// 빈 자리임을 알 수 있게 더미 데이터를 넘겨줍니다. 
-			// (EFTCharacterType::None이 빈 상태라고 가정)
 			PlayerSlot->UpdateSlotData(TEXT(""), EFTCharacterType::None); 
 		}
 
-		// 패널에 추가합니다. (TeamRosterBox가 UVerticalBox일 경우 AddChild 사용)
+		// 패널에 추가합니다.[cite: 9]
 		TeamRosterBox->AddChild(PlayerSlot);
 	}
 }

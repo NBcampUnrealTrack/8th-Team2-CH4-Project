@@ -28,7 +28,10 @@ public:
 	// 캐릭터가 소환될 위치를 지정할 컴포넌트
 	UPROPERTY(VisibleAnywhere, Category = "Display")
 	class USceneComponent* SpawnPoint;
-
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Display")
+	USceneCaptureComponent2D* SceneCaptureComp;
+	
 	// 캐릭터가 변경되었을 때 호출될 함수
 	void UpdateCharacter(EFTCharacterType NewType);
 	

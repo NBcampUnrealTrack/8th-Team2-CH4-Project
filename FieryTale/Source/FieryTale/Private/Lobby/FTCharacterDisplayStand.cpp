@@ -4,6 +4,7 @@
 #include "Lobby/FTCharacterDisplayStand.h"
 #include "Character/FTCharacterTypes.h"
 #include "Engine/World.h"
+#include "Components/SceneCaptureComponent2D.h"
 
 // Sets default values
 AFTCharacterDisplayStand::AFTCharacterDisplayStand()
@@ -14,39 +15,52 @@ AFTCharacterDisplayStand::AFTCharacterDisplayStand()
 	
 	SpawnPoint = CreateDefaultSubobject<USceneComponent>(TEXT("SpawnPoint"));
 	SpawnPoint->SetupAttachment(RootComponent);
+	
+	SceneCaptureComp = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("SceneCaptureComp"));
+	SceneCaptureComp->SetupAttachment(RootComponent);
+	
+	// 'Show Only List'에 등록된 액터만 렌더링하도록 모드를 강제합니다.
+	SceneCaptureComp->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
 }
 
 void AFTCharacterDisplayStand::UpdateCharacter(EFTCharacterType NewType)
 {
-	// 1. 기존에 세워둔 캐릭터가 있다면 지워줍니다.
 	if (SpawnedCharacter)
 	{
 		SpawnedCharacter->Destroy();
 		SpawnedCharacter = nullptr;
 	}
-
-	// 2. '선택 안 됨'이거나 딕셔너리에 등록되지 않은 타입이면 그냥 비워둡니다.
+	
+	if (SceneCaptureComp)
+	{
+		SceneCaptureComp->ShowOnlyActors.Empty();
+	}
+	
 	if (NewType == EFTCharacterType::None || !CharacterClasses.Contains(NewType))
 	{
 		return;
 	}
-
-	// 3. 에디터에서 매핑해둔 블루프린트 클래스 정보를 가져와 실제 액터로 스폰합니다.
+	
 	TSubclassOf<AActor> ClassToSpawn = CharacterClasses[NewType];
 	if (ClassToSpawn)
 	{
 		FActorSpawnParameters SpawnParams;
-		SpawnParams.Owner = GetOwner(); // 🌟 핵심: 진열대의 오너(플레이어 컨트롤러 등)를 액터 오너로 지정
+		SpawnParams.Owner = GetOwner(); // 진열대의 오너(플레이어 컨트롤러 등)를 액터 오너로 지정
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 		FTransform SpawnTransform = SpawnPoint->GetComponentTransform();
 		SpawnedCharacter = GetWorld()->SpawnActor<AActor>(ClassToSpawn, SpawnTransform, SpawnParams);
         
-		// 🌟 복제 활성화 명시
 		if (SpawnedCharacter)
 		{
-			SpawnedCharacter->SetReplicates(false); 
+			SpawnedCharacter->SetReplicates(false); // 복제 비활성화 명시
 			SpawnedCharacter->AttachToComponent(SpawnPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+
+			// 🌟 새로 스폰된 캐릭터를 캡처 카메라의 Show Only 배열에 찔러넣습니다!
+			if (SceneCaptureComp)
+			{
+				SceneCaptureComp->ShowOnlyActors.Add(SpawnedCharacter);
+			}
 		}
 	}
 }
