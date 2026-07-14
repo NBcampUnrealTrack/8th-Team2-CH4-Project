@@ -13,6 +13,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "TimerManager.h" // 💡 [디버그 타이머 배관용 헤더 주입]
+#include "AbilitySystem/Abilities/Minion/DataAsset/FT_MinionData.h" // 💡 [데이터 에셋 참조용 헤더 주입]
 
 UFT_MinionAttackBase::UFT_MinionAttackBase()
 {
@@ -136,14 +137,24 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     EffectContext.AddSourceObject(AvatarChar);
     FGameplayEffectSpecHandle NewSpecHandle = MyASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, EffectContext);
     
+    // 💡 [기획 명세 1단계: 데이터 에셋 공격력 실시간 연동 필터]
+    // 기본 어빌리티의 BaseDamage 값을 유지하되, 미니언 캐릭터 정보와 기획 데이터 자산 장부가 살아있다면
+    // 에디터에서 자유롭게 깎고 늘린 'DefaultAttackPower' 기획 수치로 대미지를 덮어씌웁니다.
+    float ActualDamage = BaseDamage;
+    AFT_MinionCharacterBase* MinionChar = Cast<AFT_MinionCharacterBase>(AvatarChar);
+    if (MinionChar && MinionChar->GetMinionData())
+    {
+        ActualDamage = MinionChar->GetMinionData()->DefaultAttackPower;
+    }
+
     if (NewSpecHandle.IsValid())
     {
-        NewSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
+        // 💡 2. 동적 인양에 성공한 무결한 대미지 정본 수치를 이펙트 장부에 최종 주입합니다.
+        NewSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, ActualDamage);
     }
     
     // 미니언 소체 장부로부터 데이터 에셋 기반의 투사체 클래스 동적 인양
     TSubclassOf<AFT_ProjectileBase> TargetProjectileClass = nullptr;
-    AFT_MinionCharacterBase* MinionChar = Cast<AFT_MinionCharacterBase>(AvatarChar);
     if (MinionChar)
     {
         TargetProjectileClass = MinionChar->GetMinionProjectileClass();
@@ -155,26 +166,22 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
         UWorld* World = GetWorld();
         if (World)
         {
-            // 💡 [무기 자체 소켓 파이어포인트 배관 완벽 직결]
-            // 이전에 완성해 둔 GetAttackLaunchTransform을 호출하여, 무기 스태틱 메쉬의 "FirePoint" 소켓을 1순위로 뒤지고
-            // 메쉬가 없거나 소켓이 누락되었다면 오른손 소켓("R_Hand_Equip")으로 안전 회수(Fallback) 동기화합니다!
-            FTransform SpawnTransform;
-            if (MinionChar)
-            {
-                SpawnTransform = MinionChar->GetAttackLaunchTransform(TEXT("R_Hand_Equip"));
-            }
-            else
-            {
-                SpawnTransform = FTransform(AvatarChar->GetActorRotation(), AvatarChar->GetActorLocation() + FVector(0.f, 0.f, 60.f));
-            }
+            // 💡 [명치 기준 수평 보정 사출 파이프라인 기동]
+            // 1. 소켓을 무시하고 강제로 캐릭터 명치(가슴) 높이 좌표를 계산합니다.
+            FVector ChestLocation = AvatarChar->GetActorLocation() + FVector(0.f, 0.f, 50.f); 
+        
+            // 2. 캐릭터 몸 안에 총알이 스폰되어 자폭하지 않도록, 앞으로 50만큼 밀어줍니다.
+            FVector SpawnLocation = ChestLocation + (AvatarChar->GetActorForwardVector() * 50.f);
 
-            FVector SpawnLocation = SpawnTransform.GetLocation();
-            
-            // 타깃 캐릭터의 가슴/상체 권역을 정밀 리드 타겟팅 조준 보정
-            FVector TargetCenterLocation = TargetActor->GetActorLocation() + FVector(0, 0, 30);
+            // 3. 조준점(타깃)도 나와 완벽히 똑같은 수평(Z) 높이로 락온시켜서 일직선으로 날아가게 합니다.
+            FVector TargetCenterLocation = TargetActor->GetActorLocation();
+            TargetCenterLocation.Z = SpawnLocation.Z; 
+        
+            // 4. 방향과 트랜스폼 최종 계산
             FVector LaunchDirection = (TargetCenterLocation - SpawnLocation).GetSafeNormal();
-            
-            // 사출 트랜스폼 회전축 갱신 재배정
+            FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
+        
+            // 사출 트랜스폼 회전축 명시적 FQuat 형변환 및 대입
             SpawnTransform.SetRotation(FQuat(LaunchDirection.Rotation()));
 
             // 오직 서버에서만 해당 투사체를 공식 스폰하고 클라이언트로 리플리케이션
@@ -209,7 +216,6 @@ void UFT_MinionAttackBase::OnMontageCompletedOrCancelled()
 void UFT_MinionAttackBase::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
     // 💡 [추가 명세: 좀비 디버그 타이머 확실하게 청소]
-    // 어빌리티가 중간에 캔슬되거나 강제 종료될 때, 예약되어 있던 가상 선딜레이 타이머 밸브를 즉시 소각 박멸합니다.
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(DebugNoMontageTimerHandle);

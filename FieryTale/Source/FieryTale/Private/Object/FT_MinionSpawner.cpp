@@ -228,11 +228,6 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
         if (HasAuthority())
         {
             SpawnedMinion->SpawnDefaultController();
-            
-            if (AAIController* AIC = Cast<AAIController>(SpawnedMinion->GetController()))
-            {
-                AIC->Possess(SpawnedMinion);
-            }
         }
     }
 }

@@ -99,7 +99,9 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
         }
     }
     
+    // =========================================================================
     // [대미지 정산 및 투사체 소멸 파이프라인]
+    // =========================================================================
     if (TargetASC)
     {
         if (DamageEffectSpecHandle.IsValid() && DamageEffectSpecHandle.Data.IsValid())
@@ -118,7 +120,6 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
                 USceneComponent* RootComp = OtherActor->GetRootComponent();
                 UPrimitiveComponent* TargetPrimitive = OtherComp ? OtherComp : (RootComp ? Cast<UPrimitiveComponent>(RootComp) : nullptr);
               
-                // 💡 [오타 완치]: 내부 변수명을 FinalHitResult로 완벽하게 정순 통일 타설했습니다.
                 FinalHitResult.Component = TargetPrimitive ? TargetPrimitive : SphereComponent;
                 FinalHitResult.Location = GetActorLocation();
                 FinalHitResult.ImpactPoint = GetActorLocation();
@@ -134,16 +135,15 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
             Context.AddHitResult(FinalHitResult, true);
             LocalSpec.SetContext(Context);
 
-            // 노멀 어택과 100% 동일하게 HitResult로부터 TargetDataHandle을 패킹합니다.
-            FGameplayAbilityTargetDataHandle TargetDataHandle = UAbilitySystemBlueprintLibrary::AbilityTargetDataFromHitResult(FinalHitResult);
-
-            // TargetData의 순정 엘리먼트 직접 실행기를 구동하여 GEEC_Damage 연산소를 완벽하게 기폭합니다.
-            if (TargetDataHandle.IsValid(0))
+            // 💡 [치명적 버그 완치선]: 기존의 복잡하고 유실 확률이 높았던 TargetDataHandle 패킹 과정을 영구 소각했습니다.
+            // 공격 주체(Instigator)가 명확히 확인되었다면, 인스턴스화된 스펙 데이터를 타깃의 ASC 장부에 무결 직통으로 꽂아 넣습니다.
+            if (InstigatorASC)
             {
-                TargetDataHandle.Get(0)->ApplyGameplayEffectSpec(LocalSpec);
+                InstigatorASC->ApplyGameplayEffectSpecToTarget(LocalSpec, TargetASC);
             }
             else
             {
+                // 백업 보장선: 만약 극단적인 패킷 밀림으로 가해자의 ASC를 유실했다면, 타깃 스스로 자가 적용을 기폭시킵니다.
                 TargetASC->ApplyGameplayEffectSpecToSelf(LocalSpec);
             }
         }

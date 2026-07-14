@@ -348,7 +348,7 @@ void AFT_MinionCharacterBase::Die(AController* KillerController)
 
     if (!AbilitySystemComponent) return;
 
-    AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Core::Dead);
+    AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Core::Dead, 1, EGameplayTagReplicationState::TagAndCountToAll);
     
     if (AFT_MinionAIController* FTC = Cast<AFT_MinionAIController>(GetController()))
     {
