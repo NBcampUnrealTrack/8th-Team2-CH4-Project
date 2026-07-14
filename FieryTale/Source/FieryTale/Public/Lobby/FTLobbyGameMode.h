@@ -47,7 +47,7 @@ protected:
 
 	/** 전원 Ready 시 자동으로 매치를 시작할지 여부. false 면 호스트 버튼으로만 시작. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "FieryTale|Lobby")
-	bool bAutoStartWhenAllReady = true;
+	bool bAutoStartWhenAllReady = false;
 
 	bool AreAllPlayersReady() const;
 	void TravelToMatch();

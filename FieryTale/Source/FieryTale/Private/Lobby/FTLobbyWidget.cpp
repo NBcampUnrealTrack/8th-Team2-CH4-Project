@@ -6,6 +6,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/HorizontalBox.h"
+#include "Components/VerticalBox.h"
 #include "GameFramework/GameStateBase.h"
 
 #include "Character/FTPlayerController.h"
@@ -118,30 +119,47 @@ void UFTLobbyWidget::RefreshTeamRoster()
 	TeamRosterBox->ClearChildren();
 
 	AGameStateBase* GameState = GetWorld()->GetGameState();
-	if (!GameState) return;
+	TArray<APlayerState*> SortedArray;
 	
-	// 네트워크 아이디 기준으로 배열 강제 정렬
-	TArray<APlayerState*> SortedArray = GameState->PlayerArray;
-	Algo::Sort(SortedArray, [](APlayerState* A, APlayerState* B) {
-		return A->GetPlayerId() < B->GetPlayerId();
-	});
-
-	for (APlayerState* PS : SortedArray)
+	// 2. 현재 접속 중인 플레이어 배열을 가져와 정렬합니다.
+	if (GameState)
 	{
-		AFTLobbyPlayerState* TargetPS = Cast<AFTLobbyPlayerState>(PS);
-		if (TargetPS)
-		{
-			// UI를 새로 그릴 때마다 각 유저의 델리게이트를 새로 묶어줍니다.
-			TargetPS->OnCharacterStateChanged.RemoveDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
-			TargetPS->OnCharacterStateChanged.AddDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
+		SortedArray = GameState->PlayerArray;
+		Algo::Sort(SortedArray, [](APlayerState* A, APlayerState* B) {
+			return A->GetPlayerId() < B->GetPlayerId();
+		});
+	}
 
-			UFTLobbyPlayerSlot* PlayerSlot = CreateWidget<UFTLobbyPlayerSlot>(this, PlayerSlotWidgetClass);
-			if (PlayerSlot)
+	// 3. 무조건 최대 인원수(MaxPlayerCount)만큼 슬롯을 생성합니다.
+	for (int32 i = 0; i < MaxPlayerCount; ++i)
+	{
+		UFTLobbyPlayerSlot* PlayerSlot = CreateWidget<UFTLobbyPlayerSlot>(this, PlayerSlotWidgetClass);
+		if (!PlayerSlot) continue;
+
+		// 4. 현재 인덱스(i)에 접속한 유저가 존재한다면 (예: 6칸 중 2명 접속 시 i가 0, 1일 때)
+		if (SortedArray.IsValidIndex(i))
+		{
+			AFTLobbyPlayerState* TargetPS = Cast<AFTLobbyPlayerState>(SortedArray[i]);
+			if (TargetPS)
 			{
+				// 델리게이트 안전하게 바인딩 (캐릭터 변경 시 새로고침 용도)
+				TargetPS->OnCharacterStateChanged.RemoveDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
+				TargetPS->OnCharacterStateChanged.AddDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
+
+				// 실제 유저의 이름과 선택한 캐릭터 타입으로 슬롯을 업데이트합니다.
 				PlayerSlot->UpdateSlotData(TargetPS->GetPlayerName(), TargetPS->GetCharacterType());
-				TeamRosterBox->AddChildToHorizontalBox(PlayerSlot);
 			}
 		}
+		// 5. 접속한 유저가 없는 남은 빈자리라면 (예: i가 2, 3, 4, 5일 때)
+		else
+		{
+			// 빈 자리임을 알 수 있게 더미 데이터를 넘겨줍니다. 
+			// (EFTCharacterType::None이 빈 상태라고 가정)
+			PlayerSlot->UpdateSlotData(TEXT(""), EFTCharacterType::None); 
+		}
+
+		// 패널에 추가합니다. (TeamRosterBox가 UVerticalBox일 경우 AddChild 사용)
+		TeamRosterBox->AddChild(PlayerSlot);
 	}
 }
 

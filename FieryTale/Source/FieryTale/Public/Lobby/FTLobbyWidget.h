@@ -18,6 +18,7 @@ class UTextBlock;
 class AFTPlayerController;
 class AFTLobbyPlayerState;
 class UHorizontalBox;
+class UVerticalBox;
 class AGameStateBase;
 
 UCLASS()
@@ -55,7 +56,7 @@ protected:
 	
 	// 팀원들의 초상화 위젯들이 담길 가로형 박스
 	UPROPERTY(meta = (BindWidget))
-	UHorizontalBox* TeamRosterBox;
+	UVerticalBox* TeamRosterBox;
 
 	// 팀원 1명을 표시할 서브 위젯 클래스 (에디터에서 지정)
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -67,6 +68,9 @@ public:
 	//  팀원 목록을 싹 지우고 최신화하는 함수
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void RefreshTeamRoster();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Lobby")
+	int32 MaxPlayerCount = 6;
 
 private:
 	
