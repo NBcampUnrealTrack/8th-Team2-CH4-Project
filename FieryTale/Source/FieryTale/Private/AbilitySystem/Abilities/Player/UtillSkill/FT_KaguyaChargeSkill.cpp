@@ -54,19 +54,23 @@ void UFT_KaguyaChargeSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
         FVector SpawnLocation = Character->GetActorLocation();
         FRotator SpawnRotation = Character->GetActorRotation();
 
-        // 영역 액터 가동 파이프라인 개통: 에디터 슬롯 검문선 타설 및 블루프린트 영역 액터 월드 소환을 처리합니다.
-        if (BambooGroveAreaClass)
-        {
-            FActorSpawnParameters SpawnParams;
-            SpawnParams.Owner = Character;
-            SpawnParams.Instigator = Character;
-            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-            // 추후 이 소환된 영역 액터 내부에 BambooGroveRadius와 BambooGroveDuration을 전달하여 시각적 파티클 크기와 콜리전 볼륨 범위가 동기화되도록 연동하시면 청정합니다.
-            World->SpawnActor<AActor>(BambooGroveAreaClass, SpawnLocation, SpawnRotation, SpawnParams);
+        if (Character->HasAuthority())
+        {
+            // 영역 액터 가동 파이프라인 개통: 에디터 슬롯 검문선 타설 및 블루프린트 영역 액터 월드 소환을 처리합니다.
+            if (BambooGroveAreaClass)
+            {
+                FActorSpawnParameters SpawnParams;
+                SpawnParams.Owner = Character;
+                SpawnParams.Instigator = Character;
+                SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+                // 추후 이 소환된 영역 액터 내부에 BambooGroveRadius와 BambooGroveDuration을 전달하여 시각적 파티클 크기와 콜리전 볼륨 범위가 동기화되도록 연동하시면 청정합니다.
+                World->SpawnActor<AActor>(BambooGroveAreaClass, SpawnLocation, SpawnRotation, SpawnParams);
+            }
         }
 
-        // 지속 제한 시간 타이머 가동을 통해 영역 버프의 수명을 제어합니다.
+   
         World->GetTimerManager().SetTimer(
             BambooGroveDurationTimerHandle,
             this,

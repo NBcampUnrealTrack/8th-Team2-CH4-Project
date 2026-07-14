@@ -98,7 +98,11 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
         return;
     }
 
-    // 공격 몽타주 비동기 재생 태스크를 가동합니다.
+    // =========================================================================
+    // 💡 [데이터 에셋 기반 공격 몽타주 완벽 재생 및 전방위 콜백 바인딩 완료]
+    // 몽타주가 도중에 강제로 캔슬(피격 등)되거나 무기 스왑 시 어빌리티가 붕 뜨지 않도록
+    // OnCompleted, OnInterrupted, OnCancelled 채널을 완벽하게 동기화해 줍니다.
+    // =========================================================================
     UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
         this, FName("NormalAttackTask"), WeaponData->AttackMontage, 1.0f);
 
@@ -106,6 +110,8 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
     {
         MontageTask->OnCompleted.AddDynamic(this, &UFT_NormalAttack::OnAttackMontageFinished);
         MontageTask->OnInterrupted.AddDynamic(this, &UFT_NormalAttack::OnAttackMontageFinished);
+        MontageTask->OnCancelled.AddDynamic(this, &UFT_NormalAttack::OnAttackMontageFinished); // 💡 누락되었던 캔슬 경로 완치
+        
         MontageTask->ReadyForActivation();
     }
     else
@@ -186,9 +192,13 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
             if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsSameTeam = true;
             else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsSameTeam = true;
             
+            // =========================================================================
+            // 💡 [치명적 아군 피격 프리징 버그 소각 완료]
+            // 아군 오사 시 스킬 인프라 전체를 터트려 공격 애니메이션을 가로막던 EndAbility를 제거합니다.
+            // 대미지만 스킵하고 조용히 빠져나와(return) 사격 모션과 다음 사격 흐름을 정순 보존합니다.
+            // =========================================================================
             if (bIsSameTeam)
             {
-                EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
                 return;
             }
         }
@@ -355,6 +365,8 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
 
 void UFT_NormalAttack::OnAttackMontageFinished()
 {
+    // 💡 [안전 조율]: 연사/점사 타이머가 활성화되어 있는 도중에 애니메이션 몽타주 재생이 끝났다면
+    // 어빌리티를 성급하게 강제 종료하지 않고 사격이 안전 완료되도록 대기합니다.
     if (GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(BurstTimerHandle))
     {
         return;

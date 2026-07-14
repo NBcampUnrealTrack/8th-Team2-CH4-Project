@@ -6,7 +6,6 @@
 #include "TimerManager.h"
 #include "Engine/World.h"
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/Abilities/Player/NomalAttack/DataAsset/FT_WeaponData.h"
 #include "GameplayTags/FTTags.h"
 #include "Object/FT_ProjectileBase.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
@@ -47,23 +46,22 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
         SourceASC->AddLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
     }
     
-    if (Character && Character->GetWeaponData())
+    // 💡 [기본 평타 모션 완전 차단 및 전용 스킬 몽타주 격발 제어]
+    // 무기 에셋 장부를 기웃거리지 않고 헤더에 직통 신설한 SkillMontage 에셋을 직접 구동합니다.
+    if (SkillMontage)
     {
-        UFT_WeaponData* WeaponData = Character->GetWeaponData();
-        if (WeaponData && WeaponData->AttackMontage)
-        {
-            UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-                this, TEXT("SilverBulletChannellingTask"), WeaponData->AttackMontage, 1.0f);
+        UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+            this, TEXT("SilverBulletChannellingTask"), SkillMontage, 1.0f);
 
-            if (MontageTask)
-            {
-                MontageTask->OnInterrupted.AddDynamic(this, &UFT_SilverBulletSkill::HandleChannellingInterrupted);
-                MontageTask->OnCancelled.AddDynamic(this, &UFT_SilverBulletSkill::HandleChannellingInterrupted);
-                MontageTask->ReadyForActivation();
-            }
+        if (MontageTask)
+        {
+            MontageTask->OnInterrupted.AddDynamic(this, &UFT_SilverBulletSkill::HandleChannellingInterrupted);
+            MontageTask->OnCancelled.AddDynamic(this, &UFT_SilverBulletSkill::HandleChannellingInterrupted);
+            MontageTask->ReadyForActivation();
         }
     }
 
+    // 💡 몽타주 에셋 유무와 상관없이 투사체 발사 타이머는 안전 기폭 보장
     UWorld* World = GetWorld();
     if (World)
     {
@@ -84,17 +82,21 @@ void UFT_SilverBulletSkill::FireSilverBullet()
         AFTPlayerCharacterBase* Character = Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get());
         UAbilitySystemComponent* MyASC = CurrentActorInfo->AbilitySystemComponent.Get();
 
-        if (Character && MyASC && Character->GetWeaponData())
+        if (Character && MyASC)
         {
-            UFT_WeaponData* WeaponData = Character->GetWeaponData();
             UWorld* World = GetWorld();
             
-            // 💡 [수선 완료]: SilverBulletImpactEffectClass 자리에 DamageEffectClass 배관 타설
-            if (World && WeaponData->ProjectileClass && DamageEffectClass)
+            // 💡 헤더에 생성한 'ProjectileClass' 직통 노출선 검문선 일치화 완료
+            if (World && ProjectileClass && DamageEffectClass)
             {
-                FVector SpawnLocation = Character->GetActorLocation() + FVector(0, 0, 60);
+                // 1. 명치(가슴) 높이 좌표 추출 (Z=50.0f)
+                FVector ChestLocation = Character->GetActorLocation() + FVector(0.f, 0.f, 50.f); 
+            
+                // 2. 전방 스폰 오프셋 50 적용
+                FVector SpawnLocation = ChestLocation + (Character->GetActorForwardVector() * 50.f);
                 FVector LaunchDirection = Character->GetActorForwardVector();
 
+                // 3. 에임 탄퍼짐 계산 및 조준선 반영
                 const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(MyASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
                 if (AttributeSet)
                 {
@@ -107,30 +109,33 @@ void UFT_SilverBulletSkill::FireSilverBullet()
                 }
 
                 FTransform SpawnTransform(LaunchDirection.Rotation(), SpawnLocation);
+                SpawnTransform.SetRotation(FQuat(LaunchDirection.Rotation()));
 
-                // 💡 공용 대미지 GE를 기반으로 아웃고잉 스펙 핸들 생성
+                // 공용 대미지 GE 스펙 가드 수립
                 FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffectClass, GetAbilityLevel());
                 if (SpecHandle.IsValid() && SpecHandle.Data.IsValid())
                 {
-                    // 💡 [GEEC 연산소 완착 트리거]: 시전자 정보(Source/Instigator)를 컨텍스트 장부에 물리적으로 완전히 주입합니다.
                     FGameplayEffectContextHandle SkillContext = SpecHandle.Data->GetContext();
                     SkillContext.AddSourceObject(Character);
                     SkillContext.AddInstigator(Character, Character);
                     
-                    // 깊은 복사를 거친 컨텍스트 락인
                     SpecHandle.Data->SetContext(SkillContext.Duplicate());
-
-                    // 실버불릿 스킬 고유 베이스 대미지 주입 (50.0f)
                     SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
                 }
 
-                AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-                    WeaponData->ProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-                
-                if (Projectile)
+                // =========================================================================
+                // 💡 [서버 주권 격리 사출 전선]
+                // =========================================================================
+                if (Character->HasAuthority())
                 {
-                    Projectile->DamageEffectSpecHandle = SpecHandle;
-                    Projectile->FinishSpawning(SpawnTransform);
+                    AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
+                        ProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+        
+                    if (Projectile)
+                    {
+                        Projectile->DamageEffectSpecHandle = SpecHandle;
+                        Projectile->FinishSpawning(SpawnTransform);
+                    }
                 }
             }
         }

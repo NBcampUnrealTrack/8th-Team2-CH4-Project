@@ -51,7 +51,6 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     }
 
     // 💡 [지니의 압착: 광역 타격 중심점 계산 배관]
-    // 알라딘 시전자의 전방으로 SkillRange(600)만큼 떨어진 좌표를 원형 타격 센터로 지정합니다.
     FVector SpawnerLocation = Character->GetActorLocation();
     FVector FullTargetLocation = SpawnerLocation + (Character->GetActorForwardVector() * SkillRange);
     FullTargetLocation.Z = SpawnerLocation.Z; // 높이 축 평면 통일하여 연산 괴리 방지
@@ -107,16 +106,29 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
     );
 
 #if !UE_BUILD_SHIPPING
-    // 개발 단계 검증용 디버그 스피어 사출
     DrawDebugSphere(World, TargetCenterLocation, SkillRadius, 16, FColor::Orange, false, 2.0f, 0, 3.0f);
 #endif
 
     if (!bHit) return;
 
+    // =========================================================================
+    // 💡 [4단계 명세: 메모리 낭비 제거 초적화 마스터 레이어 개통]
+    // 루프 바깥에서 공용 대미지 계산서(Spec)를 딱 1장만 선제 발행하여 힙 할당 빈도를 1회로 고정합니다.
+    // =========================================================================
+    FGameplayEffectSpecHandle MasterSpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffectClass, GetAbilityLevel());
+    if (!MasterSpecHandle.IsValid() || !MasterSpecHandle.Data.IsValid()) return;
+
+    // 시전자 정보 및 베이스 대미지/넉백 수치를 마스터 장부에 단 1회 락인 밀봉합니다.
+    MasterSpecHandle.Data->GetContext().AddInstigator(InCharacter, InCharacter);
+    MasterSpecHandle.Data->GetContext().AddSourceObject(InCharacter);
+    MasterSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
+    MasterSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Knockback, KnockbackForce);
+
+    // 준비된 마스터 계산서 1장을 들고 오버랩된 적들 고속 루프 정산 전개
     for (const FOverlapResult& Result : OverlapResults)
     {
         AActor* HitActor = Result.GetActor();
-        if (!HitActor) continue;
+        if (!IsValid(HitActor)) continue;
 
         UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
         if (!TargetASC) continue;
@@ -128,14 +140,16 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
 
         if (bIsSameTeam) continue;
 
-        // 💡 [핵심: 중심부에서 바깥쪽으로 밀쳐내는 방사형 넉백 벡터 연산]
+        // 타깃 시체 구타 방지 검문
+        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
+
+        // 💡 중심부에서 바깥쪽으로 밀쳐내는 방사형 넉백 벡터 연산
         FVector TargetActorLoc = HitActor->GetActorLocation();
-        FVector KnockbackDirection = TargetActorLoc - TargetCenterLocation; // "중심점 ➡️ 피격자 위치" 벡터 추출
+        FVector KnockbackDirection = TargetActorLoc - TargetCenterLocation; 
         KnockbackDirection.Z = 0.0f; // 수평 넉백 동기화
 
         if (KnockbackDirection.IsNearlyZero())
         {
-            // 만약 정확히 정중앙에 서있어서 벡터가 0이라면 시전자의 전방 벡터를 백업으로 부여합니다.
             KnockbackDirection = InCharacter->GetActorForwardVector();
         }
         else
@@ -143,29 +157,32 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
             KnockbackDirection.Normalize();
         }
 
-        // 최종 합산 방사형 넉백 화력 세팅
         FVector FinalKnockbackVector = KnockbackDirection * KnockbackForce;
 
-        // GE 스펙 장부에 대미지(50) 및 방사형 넉백 벡터 주입
-        FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffectClass, GetAbilityLevel());
-        if (SpecHandle.IsValid())
+        // =========================================================================
+        // 💡 [고성능 장부 돌려막기]: 신규 힙 할당 없이 복사 생성자로 가벼운 스택 사본 장부만 복제!
+        // 개별 타깃의 히트 결과 정보만 사본의 컨텍스트에 스냅샷 저장하여 직통 사출합니다.
+        // =========================================================================
+        FGameplayEffectSpec LocalSpec(*MasterSpecHandle.Data.Get());
+        FGameplayEffectContextHandle LocalContext = LocalSpec.GetContext().Duplicate();
+
+        FHitResult IndividualHit;
+        IndividualHit.HitObjectHandle = HitActor;
+        IndividualHit.Location = TargetActorLoc;
+        IndividualHit.ImpactPoint = TargetActorLoc;
+        
+        LocalContext.AddHitResult(IndividualHit, true);
+        LocalSpec.SetContext(LocalContext);
+
+        // 공격자의 ASC가 타깃의 ASC에 직접 대미지 및 스탯 장부 집행!
+        MyASC->ApplyGameplayEffectSpecToTarget(LocalSpec, TargetASC);
+        
+        // 타깃 폰의 무브먼트에 방사형 충격량(Impulse) 직접 때려 박기 (넉백)
+        if (ACharacter* TargetChar = Cast<ACharacter>(HitActor))
         {
-            SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, BaseDamage);
-            
-            // 💡 넉백 방향 벡터 정보를 SetByCaller를 통해 전달하거나, 필요 시 GE의 Context에 주입합니다.
-            // 여기서는 기존 장부 규격인 Magnitude에 힘을 실어주되 피격자 컴포넌트 펄스 연산이나 버프 내에서 활용하도록 전달합니다.
-            SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Knockback, KnockbackForce);
-            
-            FGameplayAbilityTargetDataHandle TargetDataHandle = UAbilitySystemBlueprintLibrary::AbilityTargetDataFromActor(HitActor);
-            ApplyGameplayEffectSpecToTarget(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, SpecHandle, TargetDataHandle);
-            
-            // 💡 [강제 넷코드 물리 주입]: 타깃 폰의 무브먼트 퓨즈에 즉각 방사형 충격량(Impulse)을 직접 때려 박아 팅겨냅니다.
-            if (ACharacter* TargetChar = Cast<ACharacter>(HitActor))
+            if (UCharacterMovementComponent* MoveComp = TargetChar->GetCharacterMovement())
             {
-                if (UCharacterMovementComponent* MoveComp = TargetChar->GetCharacterMovement())
-                {
-                    MoveComp->AddImpulse(FinalKnockbackVector, true);
-                }
+                MoveComp->AddImpulse(FinalKnockbackVector, true);
             }
         }
     }

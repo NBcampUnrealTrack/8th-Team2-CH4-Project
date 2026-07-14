@@ -181,41 +181,64 @@ void UFT_AladdinUltimateAbility::ExecuteGenieSmash(AActor* OwnerActor, UAbilityS
         DrawDebugBox(OwnerActor->GetWorld(), BoxCenter, BoxHalfExtent, BoxOrientation, FColor::Blue, false, 1.f, 0, 3.f);
     }
 #endif
-
-    bool bHasOverlap = OwnerActor->GetWorld()->OverlapMultiByChannel(
-        OverlapResults, BoxCenter, BoxOrientation, ECollisionChannel::ECC_Pawn, ScanBox, QueryParams
-    );
-
-    if (bHasOverlap)
+    
+    if (OwnerActor->HasAuthority())
     {
-        for (const FOverlapResult& Result : OverlapResults)
+        bool bHasOverlap = OwnerActor->GetWorld()->OverlapMultiByChannel(
+            OverlapResults, BoxCenter, BoxOrientation, ECollisionChannel::ECC_Pawn, ScanBox, QueryParams
+        );
+
+        if (bHasOverlap && DamageGameplayEffectClass)
         {
-            AActor* TargetActor = Result.GetActor();
-            // 액세스 위반 크래시 완전 완치: 포인터 생존 유효성을 엄격하게 사전 검문합니다.
-            if (!IsValid(TargetActor)) continue;
-
-            UAbilitySystemComponent* TargetASC = TargetActor->GetComponentByClass<UAbilitySystemComponent>();
-            if (TargetASC)
+            //  [대량 학살 시 성능 병목 파쇄 - 마스터 계산서 1장 선제 발행]
+            // 루프 바깥에서 공용 스펙 장부를 단 1회만 힙 할당하여 고속 정산 파이프라인을 구축합니다.
+            FGameplayEffectSpecHandle MasterSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffectClass, GetAbilityLevel());
+            if (MasterSpecHandle.IsValid() && MasterSpecHandle.Data.IsValid())
             {
-                // AOS 피아식별 안전망 가동: 아군 진영에 대한 팀킬 피해 연산을 원천 차단합니다.
-                if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
-                if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
+                // 가해자(Source/Instigator) 정보를 마스터 컨텍스트에 박제
+                MasterSpecHandle.Data->GetContext().AddInstigator(OwnerActor, OwnerActor);
+                MasterSpecHandle.Data->GetContext().AddSourceObject(OwnerActor);
 
-                float FinalDamage = BaseDamageValue;
-                
-                // 카드 증강 사양 반영: Applied_Aladdin_MercyMirage 증강 카드가 활성화되어 있다면 지니의 마지막 3타 강타 대미지를 정확히 2배 증폭합니다.
-                if (SmashIndex == 3 && SourceASC->HasMatchingGameplayTag(FTTags::FTAugments::Applied_Aladdin_MercyMirage))
+                for (const FOverlapResult& Result : OverlapResults)
                 {
-                    FinalDamage *= 2.0f;
-                }
+                    AActor* TargetActor = Result.GetActor();
+                    if (!IsValid(TargetActor)) continue;
 
-                if (DamageGameplayEffectClass)
-                {
-                    FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(DamageGameplayEffectClass, GetAbilityLevel());
-                    if (DamageSpecHandle.IsValid())
+                    UAbilitySystemComponent* TargetASC = TargetActor->GetComponentByClass<UAbilitySystemComponent>();
+                    if (TargetASC)
                     {
-                        DamageSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, FinalDamage);
-                        TargetASC->ApplyGameplayEffectSpecToSelf(*DamageSpecHandle.Data.Get());
+                        // AOS 피아식별 안전망: 아군 사선 관통 및 오사 차단
+                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
+                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
+
+                        // 타깃 사망 시 과격 시체 구타 방지
+                        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
+
+                        // 증강 카드 및 3타 여부에 따른 대미지 정산
+                        float FinalDamage = BaseDamageValue;
+                        if (SmashIndex == 3 && SourceASC->HasMatchingGameplayTag(FTTags::FTAugments::Applied_Aladdin_MercyMirage))
+                        {
+                            FinalDamage *= 2.0f;
+                        }
+
+                        //  [초고속 장부 돌려막기 적용]: 복사 생성자를 기반으로 가벼운 스택 사본을 찍어내어 타격 주입
+                        FGameplayEffectSpec LocalSpec(*MasterSpecHandle.Data.Get());
+                        FGameplayEffectContextHandle LocalContext = LocalSpec.GetContext().Duplicate();
+
+                        // 피해 가중치(FinalDamage)를 동적으로 사본 장부에 덧씌웁니다.
+                        LocalSpec.SetSetByCallerMagnitude(FTTags::FTCombat::Damage, FinalDamage);
+
+                        // 타깃 적중 히트 결과 기록
+                        FHitResult IndividualHit;
+                        IndividualHit.HitObjectHandle = TargetActor;
+                        IndividualHit.Location = TargetActor->GetActorLocation();
+                        IndividualHit.ImpactPoint = TargetActor->GetActorLocation();
+                        
+                        LocalContext.AddHitResult(IndividualHit, true);
+                        LocalSpec.SetContext(LocalContext);
+
+                        //  공격자의 시스템으로 타깃의 ASC 장부에 직통 대미지 집행!
+                        SourceASC->ApplyGameplayEffectSpecToTarget(LocalSpec, TargetASC);
                     }
                 }
             }
@@ -235,7 +258,7 @@ void UFT_AladdinUltimateAbility::EndAbility(const FGameplayAbilitySpecHandle Han
     if (SourceASC)
     {
         SourceASC->RemoveLooseGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
-        // 자가 수급 전선 초기화 마감: 어빌리티 최종 마감 시점에 부모가 동적으로 얹어두었던 글로벌 궁극기 분류 태그를 청정하게 동시 해제 수거하여, 다음 궁극기 게이지 수급 전선에 락이 걸리지 않도록 멸균 처리합니다.
+        // 자가 수급 전선 초기화 마감: 어빌리티 최종 마감 시점에 글로벌 궁극기 분류 태그를 청정하게 동시 해제 수거합니다.
         SourceASC->RemoveLooseGameplayTag(FTTags::FTAbilities::UltimateSkill);
     }
     CurrentWishCount = 0;
