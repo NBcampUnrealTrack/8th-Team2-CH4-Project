@@ -1,137 +1,289 @@
 #include "Level/FTMidAltar.h"
 #include "Components/StaticMeshComponent.h"
-#include "Components/BoxComponent.h"
+#include "Components/SphereComponent.h"
 #include "AbilitySystem/FT_AbilitySystemComponent.h"
 #include "AbilitySystem/FT_AttributeSet.h"
 #include "GameplayTags/FTTags.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Net/UnrealNetwork.h"
+#include "GameFramework/Pawn.h"
+#include "Character/FTPlayerState.h"
 
 AFTMidAltar::AFTMidAltar()
 {
-    PrimaryActorTick.bCanEverTick = true; // 시뮬레이션 컬러 보간을 위해 틱 활성화
+    PrimaryActorTick.bCanEverTick = true;
+    bReplicates = true;
 
-    AltarMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AltarMesh")); // 메시 컴포넌트 생성
-    RootComponent = AltarMesh; // 루트 컴포넌트 지정
+    AltarMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AltarMesh"));
+    RootComponent = AltarMesh;
 
-    CaptureVolume = CreateDefaultSubobject<UBoxComponent>(TEXT("CaptureVolume")); // 콜리전 컴포넌트 생성
-    CaptureVolume->SetupAttachment(RootComponent); // 루트에 부착
-    CaptureVolume->SetCollisionProfileName(TEXT("Trigger")); // 콜리전 프로파일 트리거로 세팅
+    HologramRingMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HologramRingMesh"));
+    HologramRingMesh->SetupAttachment(RootComponent);
+    HologramRingMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    AbilitySystemComponent = CreateDefaultSubobject<UFT_AbilitySystemComponent>(TEXT("AbilitySystemComponent")); // ASC 생성
-    AbilitySystemComponent->SetIsReplicated(true); // 복제 활성화
-    AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal); // AI/오브젝트 규격 설정
+    // USphereComponent 타입으로 형 변환 불일치가 없도록 정상 생성합니다.
+    CaptureVolume = CreateDefaultSubobject<USphereComponent>(TEXT("CaptureVolume"));
+    CaptureVolume->SetupAttachment(RootComponent);
+    CaptureVolume->SetCollisionProfileName(TEXT("Trigger"));
 
-    AttributeSet = CreateDefaultSubobject<UFT_AttributeSet>(TEXT("AttributeSet")); // 어트리뷰트 생성
+    AbilitySystemComponent = CreateDefaultSubobject<UFT_AbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+    AbilitySystemComponent->SetIsReplicated(true);
+    AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
-    AltarTeam = EFTAltarTeam::None; // 기본 진영 상태를 미점령(None)으로 초기화
-    TeamColorParameterName = TEXT("TeamColor"); // 파라미터 연동 네임 기본값 설정
+    AttributeSet = CreateDefaultSubobject<UFT_AttributeSet>(TEXT("AttributeSet"));
+
+    AltarTeam = EFTAltarTeam::None;
+    CurrentControllingTeam = EFTAltarTeam::None;
+    CurrentState = EFTAltarState::Neutral;
+    CaptureProgress = 0.0f;
+
+    TeamColorParameterName = TEXT("TeamColor");
+    ProgressParameterName = TEXT("Progress");
+    ContestedParameterName = TEXT("IsContested");
     
-    NeutralColor = FLinearColor(0.8f, 0.8f, 0.8f, 1.0f); // 기본 상태 색상을 하얀색으로 지정
-    BlueTeamColor = FLinearColor(0.0f, 0.2f, 1.0f, 1.0f); // 블루팀 컬러 기본값 설정
-    RedTeamColor = FLinearColor(1.0f, 0.05f, 0.0f, 1.0f); // 레드팀 컬러 기본값 설정
-    
-    bEnableSimulation = true; // 에디터 가시성 테스트를 위해 초기값을 트루로 설정
-    SimElapsedTime = 0.0f; // 시뮬레이션 타이머 초기화
+    NeutralColor = FLinearColor(0.2f, 0.2f, 0.2f, 1.0f);
+    BlueTeamColor = FLinearColor(0.0f, 0.2f, 1.0f, 1.0f);
+    RedTeamColor = FLinearColor(1.0f, 0.05f, 0.0f, 1.0f);
+
+    MaxCaptureTime = 8.0f;
+    CaptureDecayMultiplier = 1.5f;
 }
 
+// 폰의 컴포넌트 정보 및 팀 정보를 가져오는 함수입니다.
 UAbilitySystemComponent* AFTMidAltar::GetAbilitySystemComponent() const
 {
-    return AbilitySystemComponent; // GAS 인터페이스 규격에 따른 ASC 반환
+    return AbilitySystemComponent;
 }
 
+// 피아식별 팀 ID를 변경합니다.
 void AFTMidAltar::SetGenericTeamId(const FGenericTeamId& InTeamID)
 {
-    TeamId = InTeamID; // 팀 ID 설정
+    TeamId = InTeamID;
 }
 
+// 내부 팀 ID 값을 외부에 리턴합니다.
 FGenericTeamId AFTMidAltar::GetGenericTeamId() const
 {
-    return TeamId; // 팀 ID 반환
+    return TeamId;
 }
 
+// 네트워크 멤버 변수를 동기화 세트에 등록합니다.
+void AFTMidAltar::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(AFTMidAltar, CurrentState);
+    DOREPLIFETIME(AFTMidAltar, AltarTeam);
+    DOREPLIFETIME(AFTMidAltar, CurrentControllingTeam);
+    DOREPLIFETIME(AFTMidAltar, CaptureProgress);
+}
+
+// 다음 매치 재개방 타이밍에 회색 상태로 되돌리고 잠금을 해제합니다.
+void AFTMidAltar::OpenAltar()
+{
+    if (!HasAuthority()) return;
+
+    AltarTeam = EFTAltarTeam::None;
+    CurrentControllingTeam = EFTAltarTeam::None;
+    CurrentState = EFTAltarState::Neutral;
+    CaptureProgress = 0.0f;
+
+    UpdateAltarVisuals();
+}
+
+// 초기화 연동 및 클라이언트 바닥/공중용 다이내믹 머티리얼을 캐싱 등록합니다.
 void AFTMidAltar::BeginPlay()
 {
-    Super::BeginPlay(); // 부모 BeginPlay 호출
+    Super::BeginPlay();
 
-    CaptureVolume->OnComponentBeginOverlap.AddDynamic(this, &AFTMidAltar::OnOverlapBegin); // 충돌 이벤트 바인딩
-
-    if (AltarMesh && AltarMesh->GetMaterial(0)) // 머티리얼 유효성 확인
+    if (HasAuthority())
     {
-        DynamicAltarMaterial = UMaterialInstanceDynamic::Create(AltarMesh->GetMaterial(0), this); // 다이내믹 인스턴스 생성
-        if (DynamicAltarMaterial) // 인스턴스 생성 성공 검증
+        CaptureVolume->OnComponentBeginOverlap.AddDynamic(this, &AFTMidAltar::OnOverlapBegin);
+        CaptureVolume->OnComponentEndOverlap.AddDynamic(this, &AFTMidAltar::OnOverlapEnd);
+    }
+
+    if (AltarMesh)
+    {
+        DynamicAltarMaterial = AltarMesh->CreateDynamicMaterialInstance(0);
+    }
+
+    if (HologramRingMesh)
+    {
+        DynamicHologramMaterial = HologramRingMesh->CreateDynamicMaterialInstance(0);
+    }
+
+    if (AbilitySystemComponent)
+    {
+        AbilitySystemComponent->InitAbilityActorInfo(this, this);
+        AttributeSet->InitMaxHealth(10000.0f);
+        AttributeSet->InitHealth(10000.0f);
+    }
+
+    UpdateAltarVisuals();
+}
+
+// 매 틱 연산하며, Locked가 아닐 때 점령도 데이터 판별 및 동적 보간을 수행합니다.
+void AFTMidAltar::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    if (HasAuthority() && CurrentState != EFTAltarState::Locked)
+    {
+        ProcessCaptureRules(DeltaTime);
+    }
+
+    UpdateAltarVisuals();
+}
+
+// 구역 감지 시 소속 팀 정보를 안전히 검증한 액터들만 배열에 등록합니다.
+void AFTMidAltar::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+    if (!HasAuthority()) return;
+
+    bool bValid = false;
+    GetCharacterTeam(OtherActor, bValid);
+    if (OtherActor && OtherActor != this && bValid)
+    {
+        OverlappingPlayers.AddUnique(OtherActor);
+    }
+}
+
+// 구역 이탈 발생 감지 시 인스턴스를 관리 대열 목록에서 완전히 소거합니다.
+void AFTMidAltar::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+    if (!HasAuthority()) return;
+
+    if (OtherActor)
+    {
+        OverlappingPlayers.Remove(OtherActor);
+    }
+}
+
+// 오버워치 룰셋(밀려났을 시 감소, 경쟁 시 대기, 충돌 구역 퇴장 시 상태 유지)을 직접 판정합니다.
+void AFTMidAltar::ProcessCaptureRules(float DeltaTime)
+{
+    int32 BlueTeamCount = 0;
+    int32 RedTeamCount = 0;
+
+    for (int32 i = OverlappingPlayers.Num() - 1; i >= 0; --i)
+    {
+        AActor* Actor = OverlappingPlayers[i];
+        if (!IsValid(Actor))
         {
-            AltarMesh->SetMaterial(0, DynamicAltarMaterial); // 메시에 할당
-            UpdateAltarColor(NeutralColor); // 초기 색상을 하얀색으로 설정
+            OverlappingPlayers.RemoveAt(i);
+            continue;
+        }
+
+        bool bValid = false;
+        EFTTeam Team = GetCharacterTeam(Actor, bValid);
+        if (bValid)
+        {
+            if (Team == EFTTeam::Blue) BlueTeamCount++;
+            else if (Team == EFTTeam::Red) RedTeamCount++;
         }
     }
 
-    if (AbilitySystemComponent) // GAS 초기화 검증
+    if (BlueTeamCount > 0 && RedTeamCount > 0)
     {
-        AbilitySystemComponent->InitAbilityActorInfo(this, this); // 액터 정보 설정
-        AttributeSet->InitMaxHealth(10000.0f); // 최대 내구도 초기화
-        AttributeSet->InitHealth(10000.0f); // 현재 내구도 초기화
+        CurrentState = EFTAltarState::Contested;
+        return;
+    }
+
+    bool bHasPlayers = (BlueTeamCount > 0 || RedTeamCount > 0);
+    if (!bHasPlayers)
+    {
+        if (CurrentState == EFTAltarState::Contested)
+        {
+            CurrentState = EFTAltarState::Progressing;
+        }
+        return;
+    }
+
+    EFTAltarTeam ActiveTeam = (BlueTeamCount > 0) ? EFTAltarTeam::BlueTeam : EFTAltarTeam::RedTeam;
+    CurrentState = EFTAltarState::Progressing;
+
+    if (CurrentControllingTeam == EFTAltarTeam::None)
+    {
+        CurrentControllingTeam = ActiveTeam;
+        CaptureProgress += DeltaTime / MaxCaptureTime;
+    }
+    else if (CurrentControllingTeam == ActiveTeam)
+    {
+        CaptureProgress += DeltaTime / MaxCaptureTime;
+        if (CaptureProgress >= 1.0f)
+        {
+            CaptureProgress = 1.0f;
+            AltarTeam = ActiveTeam;
+            CurrentState = EFTAltarState::Locked;
+        }
+    }
+    else
+    {
+        CaptureProgress -= (DeltaTime / MaxCaptureTime) * CaptureDecayMultiplier;
+        if (CaptureProgress <= 0.0f)
+        {
+            CaptureProgress = 0.0f;
+            CurrentControllingTeam = ActiveTeam;
+        }
+    }
+
+    CaptureProgress = FMath::Clamp(CaptureProgress, 0.0f, 1.0f);
+}
+
+// 실시간 상태 값들을 바닥과 공중 장막 머티리얼 인스턴스에 적용합니다.
+void AFTMidAltar::UpdateAltarVisuals()
+{
+    FLinearColor MatColor = NeutralColor;
+    if (CurrentControllingTeam == EFTAltarTeam::BlueTeam)
+    {
+        MatColor = BlueTeamColor;
+    }
+    else if (CurrentControllingTeam == EFTAltarTeam::RedTeam)
+    {
+        MatColor = RedTeamColor;
+    }
+
+    if (CurrentState == EFTAltarState::Locked)
+    {
+        MatColor = (AltarTeam == EFTAltarTeam::BlueTeam) ? BlueTeamColor : RedTeamColor;
+    }
+
+    float IsContestedValue = (CurrentState == EFTAltarState::Contested) ? 1.0f : 0.0f;
+
+    if (DynamicAltarMaterial)
+    {
+        DynamicAltarMaterial->SetVectorParameterValue(TeamColorParameterName, MatColor);
+        DynamicAltarMaterial->SetScalarParameterValue(ProgressParameterName, CaptureProgress);
+        DynamicAltarMaterial->SetScalarParameterValue(ContestedParameterName, IsContestedValue);
+    }
+
+    if (DynamicHologramMaterial)
+    {
+        DynamicHologramMaterial->SetVectorParameterValue(TeamColorParameterName, MatColor);
+        DynamicHologramMaterial->SetScalarParameterValue(ProgressParameterName, CaptureProgress);
+        DynamicHologramMaterial->SetScalarParameterValue(ContestedParameterName, IsContestedValue);
     }
 }
 
-void AFTMidAltar::Tick(float DeltaTime)
+// 폰의 소속을 판단하여 Blue 혹은 Red EFTTeam 형태로 반정형 매핑해 리턴합니다.
+EFTTeam AFTMidAltar::GetCharacterTeam(AActor* Actor, bool& bIsValid) const
 {
-    Super::Tick(DeltaTime); // 부모 틱 호출
+    bIsValid = false;
+    APawn* Pawn = Cast<APawn>(Actor);
+    if (!Pawn) return EFTTeam::Blue;
 
-    if (bEnableSimulation) // 시뮬레이션 플래그가 켜져 있을 때만 작동
-    {
-        HandleSimulation(DeltaTime); // 타임라인 동적 컬러 변환 실행
-    }
+    APlayerState* PS = Pawn->GetPlayerState();
+    if (!PS) return EFTTeam::Blue;
+
+    AFTPlayerState* FTPS = Cast<AFTPlayerState>(PS);
+    if (!FTPS) return EFTTeam::Blue;
+
+    bIsValid = true;
+    return FTPS->GetTeam();
 }
 
-void AFTMidAltar::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+// 네트워크 통신 수신 즉시 클라이언트 렌더링 동적 머티리얼을 업데이트합니다.
+void AFTMidAltar::OnRep_CaptureData()
 {
-    if (bEnableSimulation && OtherActor && OtherActor != this) // 외부 액터 유효성 검증
-    {
-        bEnableSimulation = false; // 상호작용 발생 시 자동 시뮬레이션 즉각 정지
-        UpdateAltarColor(NeutralColor); // 상태 조정을 위해 하얀색으로 초기화
-    }
-}
-
-void AFTMidAltar::UpdateAltarColor(FLinearColor NewColor)
-{
-    if (DynamicAltarMaterial) // 다이내믹 머티리얼 유효성 검사
-    {
-        DynamicAltarMaterial->SetVectorParameterValue(TeamColorParameterName, NewColor); // 파라미터에 색상 적용
-    }
-}
-
-void AFTMidAltar::HandleSimulation(float DeltaTime)
-{
-    SimElapsedTime += DeltaTime; // 경과 시간 누적
-
-    if (SimElapsedTime <= 10.0f) // 1단계: 0초 ~ 10초 미점령 상태
-    {
-        UpdateAltarColor(NeutralColor); // 하얀색 유지
-    }
-    else if (SimElapsedTime > 10.0f && SimElapsedTime <= 15.0f) // 2단계: 10초 ~ 15초 레드팀 점령 중
-    {
-        float Alpha = (SimElapsedTime - 10.0f) / 5.0f; // 5초 동안의 비율 산출
-        FLinearColor BlendedColor = FLinearColor::LerpUsingHSV(NeutralColor, RedTeamColor, Alpha); // FVector4를 FLinearColor로 정정
-        UpdateAltarColor(BlendedColor); // 머티리얼 갱신
-    }
-    else if (SimElapsedTime > 10.0f && SimElapsedTime <= 20.0f) // 고정 상태 유지 구간 추가 판정
-    {
-        UpdateAltarColor(RedTeamColor);
-    }
-    else if (SimElapsedTime > 20.0f && SimElapsedTime <= 25.0f) // 3단계: 20초 ~ 25초 블루팀 전환 보간
-    {
-        float Alpha = (SimElapsedTime - 20.0f) / 5.0f; // 5초 보간
-        FLinearColor BlendedColor = FLinearColor::LerpUsingHSV(RedTeamColor, BlueTeamColor, Alpha); // FVector4를 FLinearColor로 정정
-        UpdateAltarColor(BlendedColor); // 머티리얼 갱신
-    }
-    else if (SimElapsedTime > 25.0f && SimElapsedTime <= 30.0f) // 4단계: 25초 ~ 30초 점멸 효과 연출 구간
-    {
-        float TargetAlpha = (FMath::Sin(SimElapsedTime * 10.0f) + 1.0f) * 0.5f; // 사인파를 이용한 깜빡임 계수 추출
-        FLinearColor BlendedColor = FLinearColor::LerpUsingHSV(BlueTeamColor, NeutralColor, TargetAlpha * 0.5f); // FVector4를 FLinearColor로 정정
-        UpdateAltarColor(BlendedColor); // 머티리얼 갱신
-    }
-    else // 루프 구간 분기
-    {
-        SimElapsedTime = 10.0f; // 10초 시점(레드 점령 시작)으로 타이머를 꺾어 루프 구현
-    }
+    UpdateAltarVisuals();
 }
