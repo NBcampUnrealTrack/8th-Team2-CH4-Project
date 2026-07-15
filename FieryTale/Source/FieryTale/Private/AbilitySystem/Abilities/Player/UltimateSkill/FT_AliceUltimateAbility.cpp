@@ -9,6 +9,7 @@
 #include "GameplayTags/FTTags.h"
 #include "TimerManager.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Engine/Engine.h"
 
 UFT_AliceUltimateAbility::UFT_AliceUltimateAbility()
 {
@@ -22,6 +23,9 @@ UFT_AliceUltimateAbility::UFT_AliceUltimateAbility()
 
     // 시전 중임을 알리는 태그를 채널링 동안 소유하도록 락인합니다.
     ActivationOwnedTags.AddTag(FTTags::FTCombat::Skill_Channelling);
+
+    // 반경 기본값 설정
+    TimeStopRadius = 600.0f;
 }
 
 void UFT_AliceUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -91,7 +95,7 @@ void UFT_AliceUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
                         AActor* TargetActor = Result.GetActor();
                         if (!IsValid(TargetActor)) continue;
 
-                        UAbilitySystemComponent* TargetASC = TargetActor->GetComponentByClass<UAbilitySystemComponent>();
+                        UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
                         if (TargetASC)
                         {
                             if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;

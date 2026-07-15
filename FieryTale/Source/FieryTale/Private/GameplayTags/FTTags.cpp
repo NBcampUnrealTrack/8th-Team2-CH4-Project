@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "GameplayTags/FTTags.h"
@@ -63,6 +63,7 @@ namespace FTTags
     namespace FTCombat
     {
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Damage, "FTTags.FTCombat.Damage", "SetByCaller 우체통을 통해 마스터 속성 집합으로 피해량을 실시간 배달하는 메타 태그");
+       UE_DEFINE_GAMEPLAY_TAG_COMMENT(MovementPenalty, "FTTags.FTCombat.MovementPenalty", "SetByCaller 우체통을 통해 이동 속도 페널티 값을 실시간 배달하는 메타 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(Knockback, "FTTags.FTCombat.Knockback", "피격 대상에게 물리적 척력 및 밀쳐내기 강도를 전송하는 마스터 넉백 태그");
        UE_DEFINE_GAMEPLAY_TAG_COMMENT(UltimateCost, "FTTags.FTCombat.UltimateCost", "궁극기 시전 시 자원 게이지를 차감 청소 초기화하기 위한 비용 전달용 마스터 태그");
 

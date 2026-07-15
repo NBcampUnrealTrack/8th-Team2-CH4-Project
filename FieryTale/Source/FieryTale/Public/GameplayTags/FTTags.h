@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -65,6 +65,7 @@ namespace FTTags
     namespace FTCombat
     {
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Damage);
+       UE_DECLARE_GAMEPLAY_TAG_EXTERN(MovementPenalty);
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(Knockback);
        UE_DECLARE_GAMEPLAY_TAG_EXTERN(UltimateCost);
 

@@ -50,6 +50,21 @@ bool UFT_UltimateGameplayAbility::CheckCost(const FGameplayAbilitySpecHandle Han
 void UFT_UltimateGameplayAbility::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
 {
     Super::ApplyCost(Handle, ActorInfo, ActivationInfo);
+
+    UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+    if (ASC && CostGameplayEffectClass)
+    {
+        FGameplayEffectSpecHandle CostSpecHandle = MakeOutgoingGameplayEffectSpec(CostGameplayEffectClass, GetAbilityLevel());
+        if (CostSpecHandle.IsValid())
+        {
+            const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(ASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
+            float MaxGaugeCost = AttributeSet ? AttributeSet->GetMaxUltimateGauge() : 100.0f;
+
+            // 소모량을 설정합니다.
+            CostSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::UltimateCost, MaxGaugeCost);
+            ASC->ApplyGameplayEffectSpecToSelf(*CostSpecHandle.Data.Get());
+        }
+    }
 }
 
 void UFT_UltimateGameplayAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
@@ -59,21 +74,6 @@ void UFT_UltimateGameplayAbility::ActivateAbility(const FGameplayAbilitySpecHand
     UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (ASC)
     {
-        // 궁극기 게이지를 소모하는 이펙트를 적용합니다.
-        if (CostGameplayEffectClass)
-        {
-            FGameplayEffectSpecHandle CostSpecHandle = MakeOutgoingGameplayEffectSpec(CostGameplayEffectClass, GetAbilityLevel());
-            if (CostSpecHandle.IsValid())
-            {
-                const UFT_AttributeSet* AttributeSet = Cast<UFT_AttributeSet>(ASC->GetAttributeSet(UFT_AttributeSet::StaticClass()));
-                float MaxGaugeCost = AttributeSet ? AttributeSet->GetMaxUltimateGauge() : 100.0f;
-
-                // 소모량을 설정합니다.
-                CostSpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::UltimateCost, MaxGaugeCost);
-                ASC->ApplyGameplayEffectSpecToSelf(*CostSpecHandle.Data.Get());
-            }
-        }
-        
         // 어빌리티 활성화 시 궁극기 상태 태그를 부여합니다.
         ASC->AddLooseGameplayTag(FTTags::FTAbilities::UltimateSkill);
     }
