@@ -109,10 +109,15 @@ namespace FTTags
 	
 }
 
-namespace FTGameplayCue
+//	주의: 이 네임스페이스 이름은 반드시 cpp의 정의부(namespace GameplayCue)와 일치해야 링크된다.
+//	태그 문자열도 "GameplayCue.*" 루트여야 GameplayCueManager가 라우팅한다(FTTags.* 루트는 무시됨).
+namespace GameplayCue
 {
 	// 미니언 히트
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Minion_AttackHit);
+
+	//	[예시 1] 앨리스 스킬 시전 순간의 연출 큐. Notify(GCN_Alice_SkillCast)를 GameplayCueManager가 소프트 로드해 재생한다.
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Alice_SkillCast);
 	// 공용 디버프 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Stunned);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Debuff_Rooted);

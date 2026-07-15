@@ -111,6 +111,9 @@ namespace GameplayCue
 {
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Minion_AttackHit, "GameplayCue.Minion.AttackHit", "미니언 평타 적중 및 투사체 폭발 시 시각/청각 연출 격발용 큐");
 
+	//	[예시 1] 앨리스 스킬 시전 연출 큐. FT_AliceSkill::ActivateAbility에서 ExecuteGameplayCue로 격발한다.
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_SkillCast, "GameplayCue.Alice.SkillCast", "앨리스 스킬 시전 순간의 머즐/차지 연출 격발용 큐");
+
 	// 공용 디버프 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Stunned, "GameplayCue.Debuff.Stunned", "기절: 모든 행동이 불가능해지는 상태이상 디버프 태그");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Rooted, "GameplayCue.Debuff.Rooted", "속박: 이동이 불가능해지는 상태이상 디버프 태그");

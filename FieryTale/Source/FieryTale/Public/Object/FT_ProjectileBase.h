@@ -11,6 +11,7 @@
 class UProjectileMovementComponent;
 class USphereComponent;
 class UStaticMeshComponent; // 스태틱 메시 전방 선언 누락 균열 보수 완료
+class UNiagaraSystem;
 
 UCLASS()
 class FIERYTALE_API AFT_ProjectileBase : public AActor
@@ -52,6 +53,13 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FieryTale | Component")
     TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
+
+    //	[예시 2] 적중 시 재생할 임팩트 이펙트 (소프트 참조).
+    //	소프트 참조라 투사체 클래스가 로드될 때 함께 로드되지 않고, 최초 사용 시점에 지연 로드된다 →
+    //	평소엔 로딩 히치가 생길 수 있는 대상. 이 에셋을 캐릭터 데이터의 PreloadAssets에 넣어 아레나 시작 시 미리
+    //	올려두면, 아래 Destroyed()의 .Get()이 즉시 반환되어 적중 순간 히치가 사라진다.
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | FX")
+    TSoftObjectPtr<UNiagaraSystem> HitEffect;
 
 private:
     /** 물리 기동 컴포넌트와 콜리전을 서버에서 즉각 철거 요청하는 마감 함수 */

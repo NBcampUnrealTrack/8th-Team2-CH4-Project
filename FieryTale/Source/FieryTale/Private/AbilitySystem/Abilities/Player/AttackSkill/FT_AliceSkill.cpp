@@ -36,6 +36,20 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         return;
     }
 
+    //	[예시 1] 시전 순간의 연출을 GameplayCue로 격발한다.
+    //	GameplayCueManager가 이 태그(GameplayCue.Alice.SkillCast)의 Notify(GCN_Alice_SkillCast)를 소프트 로드해 재생한다.
+    //	그 Notify가 참조하는 Niagara/사운드를 캐릭터 데이터의 PreloadAssets에 넣어두면, 아레나 시작 시 미리 로드되어
+    //	최초 시전 시의 로딩 히치가 사라진다. (하드 참조와 달리 큐 에셋은 평소엔 지연 로드되므로 프리로드가 실효를 갖는다.)
+    if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+    {
+        FGameplayCueParameters CueParams;
+        if (const AActor* Avatar = GetAvatarActorFromActorInfo())
+        {
+            CueParams.Location = Avatar->GetActorLocation();
+        }
+        ASC->ExecuteGameplayCue(GameplayCue::Alice_SkillCast, CueParams);
+    }
+
     bool bHasVisualTask = false;
     if (AttackMontage)
     {

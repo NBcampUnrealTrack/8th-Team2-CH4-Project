@@ -12,6 +12,8 @@
 #include "GameplayTags/FTTags.h"
 #include "TimerManager.h" // 💡 [넷코드 유실 가드용 타이머 헤더 주입]
 #include "Engine/World.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 
 AFT_ProjectileBase::AFT_ProjectileBase()
 {
@@ -225,6 +227,22 @@ void AFT_ProjectileBase::Destroyed()
     if (bIsExplodedOnClient)
     {
         // 런타임 이펙트 사운드/나이아가라 연출 구역
+        // [예시 2] 적중 임팩트 이펙트 재생.
+        //  - .Get()은 "이미 로드된" 경우에만 인스턴스를 반환한다. 아레나 프리로드로 미리 올려뒀으면 즉시 반환되어 히치가 없다.
+        //  - 프리로드가 안 된 경우에만 폴백으로 동기 로드해 최소한 재생은 보장한다(이 폴백 경로에서만 첫 회 히치 발생).
+        //  - 데디케이티드 서버는 렌더링하지 않으므로 스폰하지 않는다(리슨 서버 호스트는 렌더링하므로 진행).
+        if (GetNetMode() != NM_DedicatedServer && !HitEffect.IsNull())
+        {
+            UNiagaraSystem* Effect = HitEffect.Get();
+            if (!Effect)
+            {
+                Effect = HitEffect.LoadSynchronous();
+            }
+            if (Effect)
+            {
+                UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Effect, GetActorLocation(), GetActorRotation());
+            }
+        }
     }
 
     Super::Destroyed();
