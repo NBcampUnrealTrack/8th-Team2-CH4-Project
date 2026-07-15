@@ -17,6 +17,7 @@ class UInputAction;
 class UFTLobbyWidget;
 class UFTChatWidget;
 class UFTScoreboardWidget;
+class UFTDeathWidget;
 
 struct FFTCharacterData;
 class UFTHUDLayoutSubsystem;
@@ -61,9 +62,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Character")
 	TSubclassOf<AFTPlayerCharacterBase> CharacterClassToSpawn;
 
-	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 클래스. 정식에는 삭제 예정
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<UUserWidget> DeathOverlayClass;
+	TSubclassOf<UFTDeathWidget> DeathOverlayClass;
+
+	// RespawnAvailableTime(서버 시각 기준 부활 가능 시각)을 읽기 위한 접근자. 사망 위젯이 NativeTick에서 폴링한다.
+	float GetRespawnAvailableTime() const { return RespawnAvailableTime; }
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> ArenaHUDWidget;
@@ -120,13 +123,18 @@ protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnRep_Pawn() override;
 	virtual void SetupInputComponent() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// 리스폰 타이머 핸들
 	FTimerHandle RespawnTimerHandle;
 
-	// TODO:: 사망 상태 표시 강조를 위한 임시 위젯 인스턴스. 정식에는 삭제 예정
+	// 부활 가능 서버 시각(GetServerWorldTimeSeconds() 기준). 소유 클라이언트에게만 복제되어
+	// 사망 위젯이 남은 부활 시간을 계산하는 데 사용한다.
+	UPROPERTY(Replicated)
+	float RespawnAvailableTime = 0.f;
+
 	UPROPERTY()
-	TObjectPtr<UUserWidget> DeathOverlayWidgetInstance;
+	TObjectPtr<UFTDeathWidget> DeathOverlayWidgetInstance;
 
 	UPROPERTY()
 	TObjectPtr<UUserWidget> ArenaHUDWidgetInstance;

@@ -9,6 +9,7 @@
 
 class UImage;
 class UTextBlock;
+class UBorder;
 class UAbilitySystemComponent;
 class UMaterialInstanceDynamic;
 class AFTPlayerState;
@@ -41,6 +42,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> DeadText;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UBorder> HealthBarBorder;
 
 private:
 	void BindToAttributes(UAbilitySystemComponent* InASC);

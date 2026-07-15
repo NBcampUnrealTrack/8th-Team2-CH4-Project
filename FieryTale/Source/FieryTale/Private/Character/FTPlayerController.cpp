@@ -30,6 +30,9 @@
 #include "Lobby/FTLobbyGameMode.h"
 #include "Online/FTSessionSubsystem.h"
 #include "UI/FTResultWidget.h"
+#include "AbilitySystem/Abilities/Player/UI/FTDeathWidget.h"
+#include "Net/UnrealNetwork.h"
+#include "GameFramework/GameStateBase.h"
 
 DEFINE_LOG_CATEGORY(FTPlayerController);
 
@@ -37,6 +40,13 @@ AFTPlayerController::AFTPlayerController(const FObjectInitializer& Initializer)
 	:Super(Initializer)
 {
 	RespawnDelay = 5.0f;
+}
+
+void AFTPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME_CONDITION(AFTPlayerController, RespawnAvailableTime, COND_OwnerOnly);
 }
 
 void AFTPlayerController::SpawnCharacter(const FVector& InSpawnLocation, const FRotator& SpawnRotation)
@@ -120,6 +130,8 @@ void AFTPlayerController::ExecuteRespawn()
 		CurrentCharacter->TeleportTo(RespawnLocation, RespawnRotation);
 		CurrentCharacter->Revive();
 	}
+
+	RespawnAvailableTime = 0.f;
 }
 
 void AFTPlayerController::BeginPlay()
@@ -367,7 +379,13 @@ void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter, 
 		{
 			return;
 		}
-	
+
+		// 부활 가능 서버 시각을 계산해 소유 클라이언트에 복제한다(사망 위젯 카운트다운용).
+		if (AGameStateBase* GS = GetWorld()->GetGameState())
+		{
+			RespawnAvailableTime = GS->GetServerWorldTimeSeconds() + RespawnDelay;
+		}
+
 		GetWorldTimerManager().SetTimer(
 			RespawnTimerHandle, 
 			this, 
@@ -456,7 +474,7 @@ void AFTPlayerController::OnDeadTagChanged(const FGameplayTag Tag, int32 NewCoun
 	{
 		if (DeathOverlayClass)
 		{
-			DeathOverlayWidgetInstance = CreateWidget<UUserWidget>(this, DeathOverlayClass);
+			DeathOverlayWidgetInstance = CreateWidget<UFTDeathWidget>(this, DeathOverlayClass);
 			if (DeathOverlayWidgetInstance)
 			{
 				DeathOverlayWidgetInstance->AddToViewport();

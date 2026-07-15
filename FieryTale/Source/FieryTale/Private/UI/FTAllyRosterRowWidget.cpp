@@ -8,6 +8,7 @@
 #include "AbilitySystemComponent.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Components/Border.h"
 #include "GameplayTags/FTTags.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
@@ -149,6 +150,10 @@ void UFTAllyRosterRowWidget::OnDeathTagChanged(const FGameplayTag Tag, int32 New
 	if (HealthBarBackdrop)
 	{
 		HealthBarBackdrop->SetVisibility(AliveVisibility);
+	}
+	if (HealthBarBorder)
+	{
+		HealthBarBorder->SetVisibility(AliveVisibility);
 	}
 	if (HealthText)
 	{

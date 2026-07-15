@@ -26,7 +26,7 @@ class FIERYTALE_API UFTUltimateGaugeWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	//	HUD/컨트롤러가 ASC를 직접 알고 있을 때 명시적으로 초기화 (선택)
+	//	HUD/ㅡ컨트롤러가 ASC를 직접 알고 있을 때 명시적으로 초기화 (선택)
 	void InitializeWithAbilitySystem(UAbilitySystemComponent* InASC);
 
 protected:
