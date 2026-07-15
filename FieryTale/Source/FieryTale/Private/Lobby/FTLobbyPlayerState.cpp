@@ -50,6 +50,7 @@ void AFTLobbyPlayerState::OnRep_IsReady()
 	//*/
 	FT_LOG(this, EFTLogLevel::Log, TEXT("[Ready] 4) 복제 수신(클라) OnRep_IsReady: %s → %s"),
 		*GetPlayerName(), bIsReady ? TEXT("Ready") : TEXT("NotReady"));
+	OnReadyStateChanged.Broadcast();
 }
 
 void AFTLobbyPlayerState::SetCharacterType(EFTCharacterType InCharacterType)
