@@ -50,11 +50,33 @@ void UGEEC_Damage::Execute_Implementation(const FGameplayEffectCustomExecutionPa
         return;
     }
     
-    // [특수 기획 사양: 가구야 반격 가드 가동] 
-    // 적 영웅 가구야가 반격 가드 태세 버프 태그(CounterReady) 상태라면 대미지 연산을 즉시 소멸 무효화합니다.
+    // [특수 기획 사양: 가구야 반격 가드 가동 (전방 120도)]
+    // 적 영웅 가구야가 반격 가드 태세 버프 태그(CounterReady) 상태라면 전방 120도 내의 대미지만 무효화합니다.
     if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Buff::CounterReady))
     {
-        return; 
+        AActor* SourceActor = ExecutionParams.GetOwningSpec().GetContext().GetInstigator();
+        AActor* TargetActor = TargetASC->GetAvatarActor();
+        
+        if (SourceActor && TargetActor)
+        {
+            FVector TargetForward = TargetActor->GetActorForwardVector();
+            FVector DirectionToAttacker = (SourceActor->GetActorLocation() - TargetActor->GetActorLocation()).GetSafeNormal();
+            
+            // 2D 평면(Z축 배제)에서의 방향 계산으로 고저차 오류 방지
+            TargetForward.Z = 0.0f;
+            TargetForward.Normalize();
+            DirectionToAttacker.Z = 0.0f;
+            DirectionToAttacker.Normalize();
+
+            float DotProduct = FVector::DotProduct(TargetForward, DirectionToAttacker);
+            
+            // Cos(60도) = 0.5. 즉 내적 값이 0.5 이상이면 정면 120도(좌우 60도) 이내에 적이 있다는 뜻입니다.
+            if (DotProduct >= 0.5f)
+            {
+                return; // 정면 대미지 흡수 완료
+            }
+            // 120도 바깥(뒤통수 등)에서 온 공격이면 return하지 않고 통과시켜 대미지를 입게 합니다.
+        }
     }
 
     // [특수 기획 사양: 레드후드 구르기 회피 가동]

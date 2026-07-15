@@ -35,6 +35,9 @@ protected:
     UFUNCTION()
     void OnGuardInterrupted();
 
+    /** 다른 스킬이나 평타 사용 시 방벽을 해제하기 위한 콜백입니다. */
+    void OnAnyAbilityActivated(UGameplayAbility* ActivatedAbility);
+
 protected:
     /** 방벽 지속 타이머 핸들 */
     FTimerHandle BulwarkDurationTimerHandle;
@@ -50,4 +53,15 @@ protected:
 
     /** 이동 속도 감소 이펙트 핸들 */
     FActiveGameplayEffectHandle MovementPenaltyActiveHandle;
+
+    /** 전방에 생성될 거대 방벽 액터 클래스 */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Bulwark Spec")
+    TSubclassOf<AActor> BulwarkShieldClass;
+
+    /** 실제 스폰되어 유지 중인 방벽 액터 포인터 */
+    UPROPERTY()
+    AActor* SpawnedShieldActor;
+
+    /** 타 스킬 감지용 델리게이트 핸들 보관 */
+    FDelegateHandle AbilityActivatedHandle;
 };

@@ -13,6 +13,7 @@
 
 UFT_KaguyaBulwarkAbility::UFT_KaguyaBulwarkAbility()
     : MaxDuration(4.0f)
+    , SpawnedShieldActor(nullptr)
 {
     // 인스턴싱 및 네트워크 실행 정책을 설정합니다.
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -83,6 +84,30 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
     // 방벽 지속 타이머 설정
     if (GetWorld())
     {
+        // 1P 서버 권한 확인 후 거대 방패 액터 스폰
+        if (Character->HasAuthority() && BulwarkShieldClass)
+        {
+            FActorSpawnParameters SpawnParams;
+            SpawnParams.Owner = Character;
+            SpawnParams.Instigator = Character;
+            SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+            // 캐릭터 정면 방향으로 살짝 앞쪽에 배치
+            FVector SpawnLocation = Character->GetActorLocation() + (Character->GetActorForwardVector() * 100.0f);
+            FRotator SpawnRotation = Character->GetActorRotation();
+
+            SpawnedShieldActor = GetWorld()->SpawnActor<AActor>(BulwarkShieldClass, SpawnLocation, SpawnRotation, SpawnParams);
+            
+            if (SpawnedShieldActor)
+            {
+                // 캐릭터에 부착하여 이동/회전을 따라가도록 처리
+                SpawnedShieldActor->AttachToActor(Character, FAttachmentTransformRules::KeepWorldTransform);
+            }
+        }
+
+        // 타 스킬/평타 사용 시 방벽 해제를 위한 델리게이트 리스너 등록
+        AbilityActivatedHandle = SourceASC->AbilityActivatedCallbacks.AddUObject(this, &UFT_KaguyaBulwarkAbility::OnAnyAbilityActivated);
+
         GetWorld()->GetTimerManager().SetTimer(
             BulwarkDurationTimerHandle, 
             this, 
@@ -90,6 +115,23 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
             MaxDuration, 
             false
         );
+    }
+}
+
+void UFT_KaguyaBulwarkAbility::OnAnyAbilityActivated(UGameplayAbility* ActivatedAbility)
+{
+    // 자기 자신(방벽 스킬)이 아닌 다른 스킬이나 평타가 발동되었을 때
+    if (ActivatedAbility && ActivatedAbility != this)
+    {
+        // 평타 또는 스킬 태그를 가진 어빌리티인지 확인
+        if (ActivatedAbility->GetAssetTags().HasTag(FTTags::FTAbilities::AttackSkill) ||
+            ActivatedAbility->GetAssetTags().HasTag(FTTags::FTAbilities::NormalAttack) ||
+            ActivatedAbility->GetAssetTags().HasTag(FTTags::FTAbilities::UtilSkill) ||
+            ActivatedAbility->GetAssetTags().HasTag(FTTags::FTAbilities::UltimateSkill))
+        {
+            // 방벽 즉시 해제 (강제 취소)
+            CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
+        }
     }
 }
 
@@ -116,9 +158,22 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
         BulwarkDurationTimerHandle.Invalidate();
     }
 
+    // 방패 액터 파괴
+    if (SpawnedShieldActor)
+    {
+        SpawnedShieldActor->Destroy();
+        SpawnedShieldActor = nullptr;
+    }
+
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
     if (SourceASC)
     {
+        // 델리게이트 리스너 해제
+        if (AbilityActivatedHandle.IsValid())
+        {
+            SourceASC->AbilityActivatedCallbacks.Remove(AbilityActivatedHandle);
+            AbilityActivatedHandle.Reset();
+        }
         // 채널링 태그 및 이동 속도 감소 이펙트 제거
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
         
