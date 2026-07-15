@@ -21,7 +21,8 @@ enum class EFTAltarState : uint8
     Neutral, // 아무도 점령하지 않은 상태
     Progressing, // 한 팀에 의해 점령이 가산 혹은 감산되는 상태
     Contested, // 양 팀 플레이어가 동시 진입하여 대치 중인 상태
-    Locked // 점령이 완전히 완료되어 잠긴 상태
+    Captured, // 점령이 완전히 완료되어 소유권이 확정된 상태
+    Locked // 점령 완료 후 지정 시간 동안 비활성화된 잠금 상태
 };
 
 UCLASS()
@@ -42,7 +43,7 @@ public:
     // 제단에 부여된 고유 팀 ID를 반환하는 함수입니다.
     virtual FGenericTeamId GetGenericTeamId() const override;
 
-    // 점령 완료된 제단을 다음 세션을 위해 완전히 재개방하고 초기화하는 함수입니다.
+    // 거점 점령 상태를 완전히 초기화하고 재개방하는 함수입니다.
     UFUNCTION(BlueprintAuthorityOnly, BlueprintCallable, Category = "FieryTale|Altar")
     void OpenAltar();
 
@@ -105,6 +106,14 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Altar")
     float CaptureDecayMultiplier;
 
+    // 점령 완료 시 거점이 영구 잠금 상태로 유지되는 총 시간입니다. (초 단위, 기본값 60초)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|Altar")
+    float LockDuration;
+
+    // 거점 점령 완료 시 승리 팀 구역 내 플레이어들에게 부여할 GAS 버프 클래스입니다.
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FieryTale|GAS")
+    TSubclassOf<class UGameplayEffect> CaptureBuffClass;
+
     // 범위 진입 시 작동할 다이내믹 바인딩 이벤트 함수입니다.
     UFUNCTION()
     void OnOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -146,7 +155,7 @@ private:
     UPROPERTY(ReplicatedUsing = OnRep_CaptureData)
     EFTAltarState CurrentState;
 
-    // 네트워크 동기화를 지원하는 현재 제단 소유 진영 정보 변수입니다.
+    // 네트워크 동기화를 지원하는 현재 제단 최종 소유 진영 정보 변수입니다.
     UPROPERTY(ReplicatedUsing = OnRep_CaptureData)
     EFTAltarTeam AltarTeam;
 
@@ -154,7 +163,11 @@ private:
     UPROPERTY(ReplicatedUsing = OnRep_CaptureData)
     EFTAltarTeam CurrentControllingTeam;
 
-    // 실시간 거점의 점령 누적 백분율 수치 변수입니다.
+    // 실시간 거점의 점령 누적 백분율 혹은 잠금 진행도 수치 변수입니다.
     UPROPERTY(ReplicatedUsing = OnRep_CaptureData)
     float CaptureProgress;
+
+    // 잠금 상태 진입 시 차감되는 실시간 남은 대기 시간 변수입니다.
+    UPROPERTY(ReplicatedUsing = OnRep_CaptureData)
+    float RemainingLockTime;
 };
