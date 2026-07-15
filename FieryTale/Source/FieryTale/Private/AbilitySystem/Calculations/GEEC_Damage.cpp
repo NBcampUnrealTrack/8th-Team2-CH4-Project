@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "AbilitySystem/Calculations/GEEC_Damage.h"
 #include "AbilitySystem/FT_AttributeSet.h"
@@ -55,6 +55,13 @@ void UGEEC_Damage::Execute_Implementation(const FGameplayEffectCustomExecutionPa
     if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Buff::CounterReady))
     {
         return; 
+    }
+
+    // [특수 기획 사양: 레드후드 구르기 회피 가동]
+    // 적이 구르기(Evading) 중이라면 모든 대미지 판정을 완벽히 흡수(무시)합니다. (회피 무적 I-Frame)
+    if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Buff::Evading))
+    {
+        return;
     }
 
     const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
