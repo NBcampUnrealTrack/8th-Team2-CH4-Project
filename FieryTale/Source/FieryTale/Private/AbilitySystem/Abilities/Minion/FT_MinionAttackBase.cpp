@@ -122,11 +122,14 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
 
     // AI 타깃 검증
     AActor* TargetActor = AIC->GetFocusActor();
-    if (!IsValid(TargetActor)) return; 
-
-    // 사망한 타깃 제외
+    if (!IsValid(TargetActor))
+    {
+        return;
+    }
+    // 사망한 타깃 혹은 무력화된 타워 제외
     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
-    if (TargetASC && TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
+    if (TargetASC && (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead) ||
+                      TargetASC->HasMatchingGameplayTag(FTTags::FTCombat::Structure_Muted)))
     {
         return;
     }

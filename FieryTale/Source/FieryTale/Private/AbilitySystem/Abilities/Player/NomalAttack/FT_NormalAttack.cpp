@@ -122,8 +122,10 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
 void UFT_NormalAttack::ExecuteWeaponHitDetection(UFT_WeaponData* InWeaponData, AFTPlayerCharacterBase* InCharacter)
 {
-    if (!InWeaponData || !InCharacter) return;
-
+    if (!InWeaponData || !InCharacter)
+    {
+        return;
+    }
     FVector StartLocation = InCharacter->GetWeaponMuzzleLocation();
     FVector ForwardVector = InCharacter->GetActorForwardVector();
 
@@ -143,8 +145,11 @@ void UFT_NormalAttack::ExecuteWeaponHitDetection(UFT_WeaponData* InWeaponData, A
 
 void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPlayerCharacterBase* InCharacter, const FVector& Start, const FVector& Forward)
 {
-    if (!InWeaponData || !InCharacter || !GetWorld()) return;
-
+    if (!InWeaponData || !InCharacter || !GetWorld())
+    {
+        return;
+    }
+    
     // 탄퍼짐 적용
     FVector FinalForward = Forward;
     UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
@@ -209,8 +214,11 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
             }
         }
 
-        if (!BaseDamageEffectClass) return;
-
+        if (!BaseDamageEffectClass)
+        {
+            return;
+        }
+        
         FGameplayEffectContextHandle EffectContext = MyASC->MakeEffectContext();
         EffectContext.AddSourceObject(InCharacter);
         FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
@@ -226,10 +234,15 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 
 void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPlayerCharacterBase* InCharacter, const FVector& Start, const FVector& Forward)
 {
-    if (!InWeaponData || !InCharacter || !GetWorld() || !BaseDamageEffectClass) return;
-
-    if (!InWeaponData->ProjectileClass) return;
-
+    if (!InWeaponData || !InCharacter || !GetWorld() || !BaseDamageEffectClass)
+    {
+        return;
+    }
+    
+    if (!InWeaponData->ProjectileClass)
+    {
+        return;
+    }
     UWorld* World = GetWorld();
 
     // 단발 투사체 스폰
@@ -370,8 +383,10 @@ void UFT_NormalAttack::OnAttackMontageFinished()
 
 void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayerCharacterBase* InCharacter)
 {
-    if (!InWeaponData || !InCharacter || !GetWorld() || !BaseDamageEffectClass) return;
-
+    if (!InWeaponData || !InCharacter || !GetWorld() || !BaseDamageEffectClass)
+    {
+        return;
+    }
     FVector StartLocation = InCharacter->GetWeaponMuzzleLocation();
     FVector ForwardVector = InCharacter->GetActorForwardVector();
 
@@ -393,16 +408,20 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
     if (bHit)
     {
         UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
-        if (!MyASC) return;
-
+        if (!MyASC)
+        {
+            return;
+        }
         FGameplayAbilityTargetDataHandle TargetDataHandle;
         FGameplayAbilityTargetData_ActorArray* ActorArrayData = new FGameplayAbilityTargetData_ActorArray();
 
         for (const FOverlapResult& Result : OverlapResults)
         {
             AActor* HitActor = Result.GetActor();
-            if (!HitActor) continue;
-
+            if (!HitActor)
+            {
+                continue;
+            }
             UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
             
             if (TargetASC)

@@ -61,7 +61,8 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
 
     if (InstigatorASC && TargetASC)
     {
-        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
+        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead) ||
+            TargetASC->HasMatchingGameplayTag(FTTags::FTCombat::Structure_Muted))
         {
             ExplodeAndDestroy();
             return;

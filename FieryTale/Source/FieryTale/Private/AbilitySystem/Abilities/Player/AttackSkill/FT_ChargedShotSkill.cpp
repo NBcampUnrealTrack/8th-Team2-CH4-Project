@@ -89,7 +89,10 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
 {
     UWorld* World = GetWorld();
     UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
-    if (!World || !InCharacter || !MyASC || !DamageEffectClass) return;
+    if (!World || !InCharacter || !MyASC || !DamageEffectClass)
+    {
+        return;
+    }
 
     // 타격 범위 내 대상 탐색
     FCollisionQueryParams QueryParams;
@@ -109,12 +112,17 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
     DrawDebugSphere(World, TargetCenterLocation, SkillRadius, 16, FColor::Orange, false, 2.0f, 0, 3.0f);
 #endif
 
-    if (!bHit) return;
+    if (!bHit)
+    {
+        return;
+    }
 
     // 대미지 이펙트 마스터 스펙 생성
     FGameplayEffectSpecHandle MasterSpecHandle = MakeOutgoingGameplayEffectSpec(DamageEffectClass, GetAbilityLevel());
-    if (!MasterSpecHandle.IsValid() || !MasterSpecHandle.Data.IsValid()) return;
-
+    if (!MasterSpecHandle.IsValid() || !MasterSpecHandle.Data.IsValid())
+    {
+        return;
+    }
     // 마스터 스펙에 정보 설정
     MasterSpecHandle.Data->GetContext().AddInstigator(InCharacter, InCharacter);
     MasterSpecHandle.Data->GetContext().AddSourceObject(InCharacter);
@@ -132,14 +140,23 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
 
         // 피아 식별 검증
         bool bIsSameTeam = false;
-        if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsSameTeam = true;
-        else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsSameTeam = true;
-
-        if (bIsSameTeam) continue;
-
+        if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+        {
+            bIsSameTeam = true;
+        }
+        else if (MyASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+        {
+            bIsSameTeam = true;
+        }
+        if (bIsSameTeam)
+        {
+            continue;
+        }
         // 생존 여부 검증
-        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
-
+        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
+        {
+            continue;
+        }
         // 넉백 벡터 계산
         FVector TargetActorLoc = HitActor->GetActorLocation();
         FVector KnockbackDirection = TargetActorLoc - TargetCenterLocation; 
