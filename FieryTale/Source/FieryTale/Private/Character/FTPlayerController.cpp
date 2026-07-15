@@ -605,6 +605,8 @@ void AFTPlayerController::InitializeLobbyLocal()
 			SetViewTarget(FoundCameras[0]); 
 		}
 	}
+	
+	RequestSetCharacter(EFTCharacterType::Alice);
 }
 
 void AFTPlayerController::LeaveLobby()
