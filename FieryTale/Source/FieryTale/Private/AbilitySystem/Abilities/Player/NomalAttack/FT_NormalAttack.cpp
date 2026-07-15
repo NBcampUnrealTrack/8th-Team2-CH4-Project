@@ -78,8 +78,12 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
     if (MovementPenaltyGameplayEffectClass)
     {
         FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(MovementPenaltyGameplayEffectClass, GetAbilityLevel());
-        if (PenaltySpecHandle.IsValid())
+        if (PenaltySpecHandle.IsValid() && PenaltySpecHandle.Data.IsValid())
         {
+            // 웨폰 데이터의 이동 속도 배율 값을 그대로 적용합니다. (0이면 이동 불가)
+            float SpeedMulti = WeaponData->MovementSpeedMultiplier;
+            PenaltySpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::MovementPenalty, SpeedMulti);
+            
             MovementPenaltyActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*PenaltySpecHandle.Data.Get());
         }
     }
