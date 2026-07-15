@@ -7,6 +7,9 @@
 #include "Character/FTCharacterTypes.h"
 #include "FTArenaGameState.generated.h"
 
+class UDataTable;
+struct FStreamableHandle;
+
 /**
  * 
  */
@@ -55,5 +58,25 @@ protected:
 
 	UPROPERTY(Replicated)
 	int32 RedTeamKills = 0;
-	
+
+	//	게임에 존재하는 캐릭터들의 PreloadAssets를 조회할 캐릭터 데이터테이블.
+	//	BP_ArenaGameState의 Class Defaults에서 DT_CharacterData를 지정한다.
+	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|Preload")
+	TObjectPtr<UDataTable> CharacterDataTable;
+
+private:
+	//	매치가 InProgress로 전환된 직후, 게임에 존재하는 캐릭터들의 PreloadAssets를
+	//	각 머신에서 로컬로 1회 비동기 로딩한다(OnRep_CurrentMatchState에서 호출 → 서버·전 클라 실행).
+	void PreloadActiveCharacterAssets();
+
+	//	비동기 프리로드 완료 콜백 (로그용).
+	void OnPreloadComplete();
+
+	//	로드한 에셋을 매치 동안 메모리에 붙잡아두는 핸들 — 이 핸들이 살아있는 한 로드 상태가 유지되고,
+	//	핸들이 소멸하면 다른 참조가 없는 에셋은 GC 대상이 된다.
+	TSharedPtr<FStreamableHandle> PreloadHandle;
+
+	//	InProgress에서 프리로드를 이미 시작했는지 (중복 실행 방지).
+	bool bPreloadStarted = false;
+
 };

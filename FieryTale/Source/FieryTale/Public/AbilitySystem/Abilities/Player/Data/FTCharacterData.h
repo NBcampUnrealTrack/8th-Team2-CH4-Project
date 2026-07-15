@@ -108,4 +108,11 @@ struct FFTCharacterData : public FTableRowBase
 	// 초상화 아이콘
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Character")
 	TSoftObjectPtr<UTexture2D> PortraitIcon;
+
+	// --- 프리로딩 ---
+	//	이 캐릭터가 게임에 존재할 때 아레나 시작 직후 미리 비동기 로딩해둘 에셋 목록.
+	//	스킬/피격 이펙트(Niagara), 머티리얼, 사운드 등 "게임 중 확실히 쓰일" 무거운 에셋을 넣어두면
+	//	최초 사용 시점의 로딩 히치를 방지한다. (타입 무관 — UObject 에셋이면 무엇이든 가능)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Preload")
+	TArray<TSoftObjectPtr<UObject>> PreloadAssets;
 };
