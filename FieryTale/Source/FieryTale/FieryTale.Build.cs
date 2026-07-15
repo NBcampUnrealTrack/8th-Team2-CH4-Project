@@ -21,7 +21,8 @@ public class FieryTale : ModuleRules
 			"UMG",                   // 위젯 UI (UUserWidget, Button, TextBlock, ScrollBox 등)
 			"Slate",                 // UMG 하부 UI 프레임워크 (입력 모드, 위젯 포커스 등)
 			"SlateCore",             // Slate 코어 타입/리플렉션 enum (ETextCommit 등) — UFUNCTION 파라미터 링크용
-			"OnlineSubsystem",       // 온라인 세션 인터페이스 (IOnlineSession) — 세션 생성/검색/입장
+			"OnlineSubsystem",		// 온라인 세션 인터페이스 (IOnlineSession) — 세션 생성/검색/입장
+			"OnlineSubsystemEOS",   // EOS 구현체
 			"OnlineSubsystemUtils",   // 온라인 보조 유틸 (접속 주소 해석 등)
             "GeometryCollectionEngine",// 카오스 디스트럭션을 위한 모듈
             "ChaosSolverEngine",	  // 카오스 디스트럭션 물리 연산을 위한 모듈

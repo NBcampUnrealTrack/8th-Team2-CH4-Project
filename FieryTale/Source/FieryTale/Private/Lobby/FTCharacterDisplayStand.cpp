@@ -27,13 +27,12 @@ void AFTCharacterDisplayStand::UpdateCharacter(EFTCharacterType NewType)
 {
 	if (SpawnedCharacter)
 	{
+		if (SceneCaptureComp)
+		{
+			SceneCaptureComp->ShowOnlyActors.Remove(SpawnedCharacter);
+		}
 		SpawnedCharacter->Destroy();
 		SpawnedCharacter = nullptr;
-	}
-	
-	if (SceneCaptureComp)
-	{
-		SceneCaptureComp->ShowOnlyActors.Empty();
 	}
 	
 	if (NewType == EFTCharacterType::None || !CharacterClasses.Contains(NewType))
