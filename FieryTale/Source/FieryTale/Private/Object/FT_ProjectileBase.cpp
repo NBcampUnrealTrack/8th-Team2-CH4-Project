@@ -49,12 +49,21 @@ void AFT_ProjectileBase::BeginPlay()
 
 void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-    if (IsActorBeingDestroyed() || bExploded) return;
+    if (IsActorBeingDestroyed() || bExploded)
+    {
+        return;
+    }
 
-    if (!OtherActor || OtherActor == GetOwner() || OtherActor == GetInstigator()) return;
+    if (!OtherActor || OtherActor == GetOwner() || OtherActor == GetInstigator())
+    {
+        return;
+    }
 
     AActor* MyInstigator = GetInstigator();
-    if (!MyInstigator) return;
+    if (!ensureAlwaysMsgf(MyInstigator, TEXT("FT_ProjectileBase [%s] has no valid Instigator!"), *GetName()))
+    {
+        return;
+    }
 
     UAbilitySystemComponent* InstigatorASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(MyInstigator);
     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor);
@@ -69,10 +78,19 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
         }
 
         bool bIsSameTeam = false;
-        if (InstigatorASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsSameTeam = true;
-        else if (InstigatorASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsSameTeam = true;
+        if (InstigatorASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+        {
+            bIsSameTeam = true;
+        }
+        else if (InstigatorASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+        {
+            bIsSameTeam = true;
+        }
 
-        if (bIsSameTeam) return;
+        if (bIsSameTeam)
+        {
+            return;
+        }
     }
     
     // =========================================================================
@@ -148,13 +166,19 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
 
 void AFT_ProjectileBase::OnProjectileHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-    if (IsActorBeingDestroyed() || bExploded) return;
+    if (IsActorBeingDestroyed() || bExploded)
+    {
+        return;
+    }
     ExplodeAndDestroy();
 }
 
 void AFT_ProjectileBase::ExplodeAndDestroy()
 {
-    if (bExploded) return;
+    if (bExploded)
+    {
+        return;
+    }
 
     if (HasAuthority())
     {

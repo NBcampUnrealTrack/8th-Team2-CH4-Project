@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Object/FT_MinionSpawner.h"
@@ -42,7 +42,10 @@ void AFT_MinionSpawner::BeginPlay()
 
 void AFT_MinionSpawner::TriggerMinionWave()
 {
-    if (!GetWorld() || !InitialWayPoint || !MasterMinionClass) return;
+    if (!GetWorld() || !InitialWayPoint || !MasterMinionClass)
+    {
+        return;
+    }
 
     TArray<UFT_MinionData*> NewWaveQueue;
 
@@ -112,7 +115,10 @@ void AFT_MinionSpawner::TriggerMinionWave()
 
 void AFT_MinionSpawner::OnMinionAssetsLoaded(TArray<FSoftObjectPath> LoadedAssetPaths, FGameplayTag TeamTag)
 {
-    if (!GetWorld()) return;
+    if (!GetWorld())
+    {
+        return;
+    }
 
     ActiveStreamableHandles.RemoveAll([](const TSharedPtr<FStreamableHandle>& Handle) {
         return !Handle.IsValid() || Handle->IsActive() == false;
@@ -142,7 +148,10 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
 {
     if (!GetWorld() || ActiveDataQueue.Num() == 0)
     {
-        if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(SequentialSpawnTimerHandle);
+        if (GetWorld())
+        {
+            GetWorld()->GetTimerManager().ClearTimer(SequentialSpawnTimerHandle);
+        }
         
         // 💡 모든 큐 사출이 완전히 마감된 시점에 정확하게 마스터 장부 밸브를 False로 리셋합니다.
         bIsAlreadySpawning = false; 
@@ -152,7 +161,10 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
     UFT_MinionData* TargetData = ActiveDataQueue[0];
     ActiveDataQueue.RemoveAt(0);
 
-    if (!TargetData) return;
+    if (!TargetData)
+    {
+        return;
+    }
 
     // 물리 동결 방어선 타설: 스포너 위치 기준 좌우 분산 오프셋 주입
     FVector SpawnerLocation = GetActorLocation();

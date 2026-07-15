@@ -93,13 +93,22 @@ void UFT_AliceUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
                     for (const FOverlapResult& Result : OverlapResults)
                     {
                         AActor* TargetActor = Result.GetActor();
-                        if (!IsValid(TargetActor)) continue;
+                        if (!IsValid(TargetActor))
+                        {
+                            continue;
+                        }
 
                         UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
-                        if (TargetASC)
+                        if (TargetASC && SourceASC)
                         {
-                            if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
-                            if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
+                            if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+                            {
+                                continue;
+                            }
+                            if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+                            {
+                                continue;
+                            }
 
                             // 생성된 이펙트 인스턴스를 재사용하여 디버프를 적용합니다.
                             FGameplayEffectSpec LocalSpec(*MasterDebuffSpecHandle.Data.Get());

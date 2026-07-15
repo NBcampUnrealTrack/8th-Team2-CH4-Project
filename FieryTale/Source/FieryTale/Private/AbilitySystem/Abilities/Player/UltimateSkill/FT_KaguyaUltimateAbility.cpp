@@ -118,17 +118,29 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
             for (const FOverlapResult& Result : OverlapResults)
             {
                 AActor* HitActor = Result.GetActor();
-                if (!IsValid(HitActor)) continue;
+                if (!IsValid(HitActor))
+                {
+                    continue;
+                }
 
                 UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
-                if (TargetASC)
+                if (TargetASC && SourceASC)
                 {
                     // 피아 식별 필터 레이어를 가동하여 아군 타격 피해를 완벽히 격리 차단합니다.
-                    if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
-                    if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
+                    if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+                    {
+                        continue;
+                    }
+                    if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+                    {
+                        continue;
+                    }
                     
                     // 이미 사망 상태인 타깃 시체 구타 차단
-                    if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
+                    if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
+                    {
+                        continue;
+                    }
 
                     // 공통 피격 히트 결과 장부 스냅샷 생성
                     FHitResult IndividualHit;

@@ -133,10 +133,16 @@ void UFT_ChargedShotSkill::ExecuteGeniusCrushLogic(const FVector& TargetCenterLo
     for (const FOverlapResult& Result : OverlapResults)
     {
         AActor* HitActor = Result.GetActor();
-        if (!IsValid(HitActor)) continue;
+        if (!IsValid(HitActor))
+        {
+            continue;
+        }
 
         UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
-        if (!TargetASC) continue;
+        if (!TargetASC)
+        {
+            continue;
+        }
 
         // 피아 식별 검증
         bool bIsSameTeam = false;

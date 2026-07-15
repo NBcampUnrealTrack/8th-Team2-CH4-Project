@@ -145,10 +145,16 @@ void UFT_Minion_Brain::ExecuteAILogic()
 
         for (AActor* PerceivedActor : PotentialTargets)
         {
-            if (!IsValid(PerceivedActor) || PerceivedActor == AvatarChar) continue;
+            if (!IsValid(PerceivedActor) || PerceivedActor == AvatarChar)
+            {
+                continue;
+            }
 
             UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(PerceivedActor);
-            if (!TargetASC) continue;
+            if (!TargetASC)
+            {
+                continue;
+            }
 
             if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead) ||
                 TargetASC->HasMatchingGameplayTag(FTTags::FTCombat::Structure_Muted))

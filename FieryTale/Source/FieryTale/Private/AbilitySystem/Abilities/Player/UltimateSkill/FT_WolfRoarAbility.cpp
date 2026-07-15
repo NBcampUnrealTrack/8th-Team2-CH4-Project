@@ -111,26 +111,36 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
                 for (const FOverlapResult& Result : OverlapResults)
                 {
                     AActor* TargetActor = Result.GetActor();
-                    if (!IsValid(TargetActor)) continue;
+                    if (!IsValid(TargetActor))
+                    {
+                        continue;
+                    }
 
-                    FVector TargetDirection = (TargetActor->GetActorLocation() - StartLocation);
-                    TargetDirection.Z = 0.f; // 수평 조준 보정
-                    TargetDirection.Normalize();
-
-                    float CurrentDot = FVector::DotProduct(ForwardVector, TargetDirection);
-
-                    // 부채꼴 외각 대상 즉각 제외
-                    if (CurrentDot < DotThreshold) continue;
+                    // 도트 내적 계산을 통해 자신 앞의 일정 각도 내에 있는지 확인합니다.
+                    FVector DirectionToTarget = (TargetActor->GetActorLocation() - OwnerActor->GetActorLocation()).GetSafeNormal();
+                    float CurrentDot = FVector::DotProduct(ForwardVector, DirectionToTarget);
+                    
+                    if (CurrentDot < DotThreshold)
+                    {
+                        continue;
+                    }
 
                     UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
-                    if (TargetASC)
+                    if (TargetASC && SourceASC)
                     {
-                        // 아군 타격을 방지합니다.
-                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
-                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
-
-                        // 대상이 이미 사망했는지 확인합니다.
-                        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
+                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+                        {
+                            continue;
+                        }
+                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+                        {
+                            continue;
+                        }
+                        
+                        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
+                        {
+                            continue;
+                        }
 
                         // 공통 히트 결과를 생성합니다.
                         FHitResult IndividualHit;

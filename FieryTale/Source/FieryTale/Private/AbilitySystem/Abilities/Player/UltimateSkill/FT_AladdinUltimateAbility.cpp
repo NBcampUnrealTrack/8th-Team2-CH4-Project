@@ -168,7 +168,10 @@ void UFT_AladdinUltimateAbility::ResetComboState()
 
 void UFT_AladdinUltimateAbility::ExecuteGenieSmash(AActor* OwnerActor, UAbilitySystemComponent* SourceASC, int32 SmashIndex)
 {
-    if (!IsValid(OwnerActor) || !SourceASC || !OwnerActor->GetWorld()) return;
+    if (!IsValid(OwnerActor) || !SourceASC || !OwnerActor->GetWorld())
+    {
+        return;
+    }
 
     FVector StartLocation = OwnerActor->GetActorLocation();
     FVector ForwardVector = OwnerActor->GetActorForwardVector();
@@ -210,17 +213,29 @@ void UFT_AladdinUltimateAbility::ExecuteGenieSmash(AActor* OwnerActor, UAbilityS
                 for (const FOverlapResult& Result : OverlapResults)
                 {
                     AActor* TargetActor = Result.GetActor();
-                    if (!IsValid(TargetActor)) continue;
+                    if (!IsValid(TargetActor))
+                    {
+                        continue;
+                    }
 
-                    UAbilitySystemComponent* TargetASC = TargetActor->GetComponentByClass<UAbilitySystemComponent>();
-                    if (TargetASC)
+                    UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
+                    if (TargetASC && SourceASC)
                     {
                         // 아군 타격을 방지합니다.
-                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) continue;
-                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) continue;
+                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue))
+                        {
+                            continue;
+                        }
+                        if (SourceASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red) && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red))
+                        {
+                            continue;
+                        }
 
                         // 대상이 이미 사망했는지 확인합니다.
-                        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
+                        if (TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
+                        {
+                            continue;
+                        }
 
                         // 증강 및 콤보에 따른 대미지 보정 연산입니다.
                         float FinalDamage = BaseDamageValue;
