@@ -130,10 +130,20 @@ protected:
     /** 💡 [보조무기 컴포넌트] */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Minion | Visual")
     TObjectPtr<UStaticMeshComponent> SecondaryWeaponComponent;
+    
+    /** 피아 식별을 위한 덮어쓰기 머티리얼 */
+    /* 데이터 테이블에서 가져올 것 */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Minion | Visual")
+    TObjectPtr<UMaterialInterface> MinionMaterialOverride;
 
 private:
     /** 주입된 데이터 에셋 수치 동기화, 피아식별 태그 낙인, AI 브레인 시동을 원자적으로 통합 처리하는 공정 함수 */
     void InitializeMinionInfrastructures();
+
+    /** 데이터 에셋의 덮어쓰기 머티리얼로 MID를 생성해 팀 색상 스칼라(isRedTeam)를 주입하고 메쉬 전 슬롯에 적용한다.
+     *  반드시 스켈레탈 메쉬가 확정된 뒤(InitializeMinionInfrastructures 내부)에 호출해야 SetSkeletalMesh에 덮어써지지 않으며,
+     *  서버·클라 양단에서 실행되는 경로라 팀 색상이 모든 화면에 무결하게 반영된다. */
+    void ApplyTeamColorOverride();
     
     /** 💡 [클라이언트 동기화 배관 명세]: Dead 태그 추가 시 서버/클라이언트 양단 각자 로컬 충돌체를 완전 파기해 줄 델리게이트 콜백 */
     void OnDeadTagChanged(const FGameplayTag CallbackTag, int32 NewCount);

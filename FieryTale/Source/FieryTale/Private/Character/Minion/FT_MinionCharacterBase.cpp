@@ -12,7 +12,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTags/FTTags.h"
-#include "Net/UnrealNetwork.h" 
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
 
 AFT_MinionCharacterBase::AFT_MinionCharacterBase()
@@ -158,7 +159,12 @@ void AFT_MinionCharacterBase::InitializeMinionInfrastructures()
             if (GetMesh())
             {
                 GetMesh()->SetSkeletalMesh(TargetMesh);
-                
+
+                // 팀 색상(피아식별) 머티리얼 적용 — 반드시 SetSkeletalMesh 이후여야 새 메쉬의 머티리얼이 초기화되지 않는다.
+                // 이 함수(InitializeMinionInfrastructures)는 서버(PossessedBy)·클라이언트(OnRep_MinionData) 양단에서 실행되므로
+                // 모든 화면에서 팀 색상이 동일하게 반영된다.
+                ApplyTeamColorOverride();
+
                 // AnimBP 누락 완전 진화 배관
                 if (!MinionData->MinionAnimClass.IsNull())
                 {
@@ -340,7 +346,50 @@ void AFT_MinionCharacterBase::SetMinionDataAndTeam(UFT_MinionData* InMinionData,
     // 뇌 충돌 스팸 방어용 순수 장부 이식
     MinionData = InMinionData;
     MinionTeamTag = InTeamTag;
-}   
+
+    //	덮어쓰기 머티리얼이 있을 경우 MID를 생성하고 팀 색상 변수(isRedTeam)에 태그에 맞는 값을 주입한다.
+    //	단, 실제 적용은 여기가 아니라 ApplyTeamColorOverride()에서 한다:
+    //	 - 이 함수는 스포너의 Deferred 스폰 직후(서버 전용) 호출되어 스켈레탈 메쉬가 아직 확정되지 않았고,
+    //	   이후 InitializeMinionInfrastructures의 SetSkeletalMesh가 머티리얼을 초기화하므로 여기서 걸어도 덮어써진다.
+    //	 - 또한 이 함수는 서버에서만 실행되어 클라이언트에는 팀 색상이 반영되지 않는다.
+    //	따라서 메쉬가 확정되고 서버·클라 양단에서 실행되는 InitializeMinionInfrastructures()에서 처리한다.
+}
+
+void AFT_MinionCharacterBase::ApplyTeamColorOverride()
+{
+    //	덮어쓰기 머티리얼이 지정된 경우에만 팀 색상 MID를 적용한다(없으면 메쉬 원본 머티리얼을 그대로 유지).
+    if (!MinionData || MinionData->MinionMaterialOverride.IsNull() || !GetMesh())
+    {
+        return;
+    }
+
+    UMaterialInterface* BaseOverride = MinionData->MinionMaterialOverride.LoadSynchronous();
+    if (!BaseOverride)
+    {
+        return;
+    }
+
+    //	팀 태그로 색상 스칼라 값을 결정한다 — 레드=1, 그 외(블루/미지정)=0.
+    const bool bIsRedTeam = (MinionTeamTag == FTTags::FTFaction::Team_Red);
+
+    //	덮어쓰기 머티리얼로 MID를 생성하고 팀 색상 변수(isRedTeam)를 주입한다.
+    UMaterialInstanceDynamic* TeamMID = UMaterialInstanceDynamic::Create(BaseOverride, this);
+    if (!TeamMID)
+    {
+        return;
+    }
+    TeamMID->SetScalarParameterValue(TEXT("isRedTeam"), bIsRedTeam ? 1.0f : 0.0f);
+
+    //	피아식별용 단일 오버라이드이므로 메쉬의 모든 머티리얼 슬롯에 같은 MID를 덮어씌운다.
+    const int32 NumMaterials = GetMesh()->GetNumMaterials();
+    for (int32 SlotIndex = 0; SlotIndex < NumMaterials; ++SlotIndex)
+    {
+        GetMesh()->SetMaterial(SlotIndex, TeamMID);
+    }
+
+    //	적용된 MID를 본체 멤버에 캐싱한다(이후 참조/재조정용).
+    MinionMaterialOverride = TeamMID;
+}
 
 void AFT_MinionCharacterBase::Die(AController* KillerController)
 {

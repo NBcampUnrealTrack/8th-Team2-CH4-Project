@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -7,6 +7,7 @@
 #include "Engine/DataAsset.h"
 #include "FT_MinionData.generated.h"
 
+class UMaterialInstance;
 class UGameplayAbility;
 class USkeletalMesh;
 class AFT_ProjectileBase;
@@ -29,6 +30,10 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
     TSoftObjectPtr<USkeletalMesh> MinionMesh;
 
+    /** 미니언 머티리얼 덮어쓰기 (피아식별을 위한)*/
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
+    TSoftObjectPtr<UMaterialInstance> MinionMaterialOverride;
+    
     /** 애니메이션 블루프린트 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | Visual")
     TSoftClassPtr<UAnimInstance> MinionAnimClass;

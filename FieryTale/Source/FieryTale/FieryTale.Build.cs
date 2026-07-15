@@ -27,7 +27,8 @@ public class FieryTale : ModuleRules
             "GeometryCollectionEngine",// 카오스 디스트럭션을 위한 모듈
             "ChaosSolverEngine",	  // 카오스 디스트럭션 물리 연산을 위한 모듈
             "ChaosCaching",			 // 카오스 디스트럭션 물리 연산 베이킹을 위한 모듈
-            "NavigationSystem"
+            "NavigationSystem",
+            "Niagara"                // 나이아가라 이펙트 스폰 (UNiagaraSystem, UNiagaraFunctionLibrary) — 투사체 임팩트 등
         });
 
 		// AI 시스템 (AIController/내비게이션 등). 모듈 내부에서만 사용하므로 Private.
