@@ -35,7 +35,7 @@ void AFT_MinionSpawner::BeginPlay()
             &AFT_MinionSpawner::TriggerMinionWave,
             WaveInterval,
             true,
-            1.0f
+            InitialSpawnDelay
         );
     }
 }

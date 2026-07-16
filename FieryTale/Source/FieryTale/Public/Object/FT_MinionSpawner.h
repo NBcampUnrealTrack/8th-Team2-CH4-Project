@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -41,6 +41,10 @@ protected:
     /** 웨이브가 격발되는 정기 주기 (초 단위, 기본 30초) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Spawner | Time")
     float WaveInterval = 30.0f;
+
+    /** 게임 시작 후 첫 번째 웨이브가 등장하기까지의 최초 대기 시간 (초 단위) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Spawner | Time")
+    float InitialSpawnDelay = 10.0f;
 
     /** 대열 내에서 미니언이 한 마리씩 순차 소환되는 마진 간격 (초 단위, 기본 0.5초) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Spawner | Time")
