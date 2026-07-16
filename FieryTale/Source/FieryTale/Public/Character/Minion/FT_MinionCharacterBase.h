@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
@@ -56,7 +56,7 @@ public:
      */
     void LaunchMinionInfrastructure();
     
-    FORCEINLINE TSubclassOf<class AFT_ProjectileBase> GetMinionProjectileClass() const { return MinionProjectileClass; }
+    FORCEINLINE TSoftClassPtr<class AFT_ProjectileBase> GetMinionProjectileClass() const { return MinionProjectileClass; }
 
     /** 💡 [2단계: 데이터 에셋 Getter 뚫기 완착] 
      *  미니언 뇌(Brain)에서 미니언의 데이터 에셋을 실시간으로 읽어가 사거리를 제어하도록 주소를 오픈합니다. */
@@ -121,7 +121,7 @@ protected:
     TObjectPtr<AFT_WayPoint> CurrentTargetWayPoint;
     
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Minion | GAS")
-    TSubclassOf<class AFT_ProjectileBase> MinionProjectileClass;
+    TSoftClassPtr<class AFT_ProjectileBase> MinionProjectileClass;
     
     /** 💡 [주무기 컴포넌트] */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Minion | Visual")

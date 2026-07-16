@@ -76,7 +76,7 @@ public:
     TArray<TSubclassOf<UGameplayAbility>> MinionAbilities;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | GAS", meta = (ToolTip = "원거리 미니언일 경우 사출할 투사체 블루프린트 클래스를 지정합니다."))
-    TSubclassOf<AFT_ProjectileBase> ProjectileClass;
+    TSoftClassPtr<AFT_ProjectileBase> ProjectileClass;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Minion | AI")
     TSubclassOf<UGameplayAbility> BrainAbilityClass;

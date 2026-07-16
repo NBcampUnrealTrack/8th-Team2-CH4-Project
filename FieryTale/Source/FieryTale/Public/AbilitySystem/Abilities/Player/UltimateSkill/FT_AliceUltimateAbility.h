@@ -27,8 +27,8 @@ protected:
 	void ReleaseAlice();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
-	TObjectPtr<class UAnimMontage> SkillMontage;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Animation")
+	TSoftObjectPtr<class UAnimMontage> SkillMontage;
 
 	// --- 앨리스 궁극기 고유 스펙 ---
 	/** 자신 중심 시간 정지 영역 반지름 (기본값 600.f / 6m) */

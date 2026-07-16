@@ -175,10 +175,11 @@ void UFT_WolfRoarAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         }
     }
     
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("WolfRoarMontage"), SkillMontage, 1.0f);
+            this, FName("WolfRoarMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
             MontageTask->OnCompleted.AddDynamic(this, &UFT_WolfRoarAbility::OnMontageFinished);

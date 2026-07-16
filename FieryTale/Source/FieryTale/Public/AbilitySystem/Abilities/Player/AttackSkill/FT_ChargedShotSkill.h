@@ -58,6 +58,6 @@ protected:
 
     // --- 비주얼 클래스 ---
     /** 스킬 몽타주 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Visual")
-    TObjectPtr<UAnimMontage> FireMontage;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Animation")
+    TSoftObjectPtr<UAnimMontage> FireMontage;
 };

@@ -160,6 +160,18 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
                 }
             }
         }
+
+        // 3. 동적 연출용 GameplayCue 즉시 재생 (데이터 에셋에 등록된 경우)
+        if (HitGameplayCueTag.IsValid() && InstigatorASC)
+        {
+            FGameplayCueParameters CueParams;
+            CueParams.Location = FinalHitResult.ImpactPoint;
+            CueParams.Normal = FinalHitResult.ImpactNormal;
+            CueParams.TargetAttachComponent = FinalHitResult.GetComponent();
+            CueParams.PhysicalMaterial = FinalHitResult.PhysMaterial;
+            
+            InstigatorASC->ExecuteGameplayCue(HitGameplayCueTag, CueParams);
+        }
     }
     
     // 타깃 정산 완료 후 안전 수명 소멸 시퀀스로 전이

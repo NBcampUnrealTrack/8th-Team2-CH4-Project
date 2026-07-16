@@ -30,7 +30,7 @@ protected:
     
     /** 공격 몽타주 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Attack | Visual")
-    TObjectPtr<UAnimMontage> AttackMontage;
+    TSoftObjectPtr<UAnimMontage> AttackMontage;
 
     /** 대미지 이펙트 클래스 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Attack | GAS")
@@ -43,7 +43,7 @@ protected:
      * 투사체 클래스. 설정되지 않은 경우 근접 공격으로 처리됩니다.
      */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Attack | DesignData")
-    TSubclassOf<AFT_ProjectileBase> ProjectileClass;
+    TSoftClassPtr<AFT_ProjectileBase> ProjectileClass;
 
     /** 기본 피해량 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Attack | DesignData")

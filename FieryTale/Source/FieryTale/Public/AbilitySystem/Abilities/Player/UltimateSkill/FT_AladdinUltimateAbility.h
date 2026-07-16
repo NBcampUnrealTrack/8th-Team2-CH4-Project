@@ -38,7 +38,7 @@ protected:
 
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
-    TObjectPtr<class UAnimMontage> SkillMontage;
+    TSoftObjectPtr<class UAnimMontage> SkillMontage;
 
 protected:
     // --- 알라딘 궁극기 고유 스펙 ---

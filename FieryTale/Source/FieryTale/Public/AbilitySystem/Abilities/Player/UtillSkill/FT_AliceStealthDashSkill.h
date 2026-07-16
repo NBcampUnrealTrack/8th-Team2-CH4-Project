@@ -32,7 +32,7 @@ protected:
 
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
-    TObjectPtr<class UAnimMontage> SkillMontage;
+    TSoftObjectPtr<class UAnimMontage> SkillMontage;
 
     /** 버프 지속 타이머 핸들 */
     FTimerHandle ShrinkBuffDurationTimerHandle;

@@ -35,15 +35,16 @@ protected:
     TSubclassOf<class UGameplayEffect> DamageEffectClass;
 
     /** 투사체 클래스 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Projectile")
-    TSubclassOf<class AFT_ProjectileBase> ProjectileClass;
+    /** 발사할 투사체 클래스 (소프트 참조) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | SilverBullet Spec")
+    TSoftClassPtr<class AFT_ProjectileBase> ProjectileClass;
 
     /** 슬로우 이펙트 클래스 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Effects")
     TSubclassOf<class UGameplayEffect> SlowEffectClass;
     
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Animation")
-    TObjectPtr<UAnimMontage> SkillMontage;
+    TSoftObjectPtr<UAnimMontage> SkillMontage;
     
     /** 장전 타이머 핸들 */
     FTimerHandle ChannellingTimerHandle;

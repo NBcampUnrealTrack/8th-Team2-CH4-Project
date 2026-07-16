@@ -49,10 +49,11 @@ void UFT_AliceUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
         return;
     }
 
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("AliceUltMontage"), SkillMontage, 1.0f);
+            this, FName("AliceUltMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
             MontageTask->ReadyForActivation();

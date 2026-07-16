@@ -67,10 +67,11 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
 
     // 몽타주 재생 태스크 실행
     UFT_WeaponData* WeaponData = Character->GetWeaponData();
-    if (WeaponData && WeaponData->AttackMontage)
+    UAnimMontage* LoadedMontage = WeaponData ? WeaponData->AttackMontage.LoadSynchronous() : nullptr;
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("CounterGuardTask"), WeaponData->AttackMontage, 1.0f);
+            this, FName("CounterGuardTask"), LoadedMontage, 1.0f);
 
         if (MontageTask)
         {
@@ -84,8 +85,11 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
     // 방벽 지속 타이머 설정
     if (GetWorld())
     {
+        // 방패 에셋 비동기(또는 동기) 로드
+        UClass* LoadedShieldClass = BulwarkShieldClass.LoadSynchronous();
+
         // 1P 서버 권한 확인 후 거대 방패 액터 스폰
-        if (Character->HasAuthority() && BulwarkShieldClass)
+        if (Character->HasAuthority() && LoadedShieldClass)
         {
             FActorSpawnParameters SpawnParams;
             SpawnParams.Owner = Character;
@@ -96,7 +100,7 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
             FVector SpawnLocation = Character->GetActorLocation() + (Character->GetActorForwardVector() * 100.0f);
             FRotator SpawnRotation = Character->GetActorRotation();
 
-            SpawnedShieldActor = GetWorld()->SpawnActor<AActor>(BulwarkShieldClass, SpawnLocation, SpawnRotation, SpawnParams);
+            SpawnedShieldActor = GetWorld()->SpawnActor<AActor>(LoadedShieldClass, SpawnLocation, SpawnRotation, SpawnParams);
             
             if (SpawnedShieldActor)
             {

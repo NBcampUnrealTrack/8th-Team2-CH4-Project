@@ -49,10 +49,11 @@ void UFT_RedRollSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         return;
     }
 
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("RedRollMontage"), SkillMontage, 1.0f);
+            this, FName("RedRollMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
             MontageTask->ReadyForActivation();

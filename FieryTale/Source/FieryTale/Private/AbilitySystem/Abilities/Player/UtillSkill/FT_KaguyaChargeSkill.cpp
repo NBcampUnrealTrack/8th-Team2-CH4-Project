@@ -50,10 +50,11 @@ void UFT_KaguyaChargeSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
         return;
     }
 
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("KaguyaChargeMontage"), SkillMontage, 1.0f);
+            this, FName("KaguyaChargeMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
             MontageTask->ReadyForActivation();

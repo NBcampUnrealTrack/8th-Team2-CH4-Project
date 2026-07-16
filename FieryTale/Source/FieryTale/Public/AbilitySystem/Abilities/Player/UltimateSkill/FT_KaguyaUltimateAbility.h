@@ -25,7 +25,7 @@ protected:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
-	TObjectPtr<class UAnimMontage> SkillMontage;
+	TSoftObjectPtr<class UAnimMontage> SkillMontage;
 
 	// --- 가구야 궁극기 고유 스펙 ---
 	/** 자신 중심 광역 스캔 반경 (기본 1200cm / 12m) */

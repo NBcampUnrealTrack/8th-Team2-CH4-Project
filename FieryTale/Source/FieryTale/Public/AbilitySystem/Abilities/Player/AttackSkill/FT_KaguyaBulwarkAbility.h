@@ -56,7 +56,7 @@ protected:
 
     /** 전방에 생성될 거대 방벽 액터 클래스 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Bulwark Spec")
-    TSubclassOf<AActor> BulwarkShieldClass;
+    TSoftClassPtr<AActor> BulwarkShieldClass;
 
     /** 실제 스폰되어 유지 중인 방벽 액터 포인터 */
     UPROPERTY()

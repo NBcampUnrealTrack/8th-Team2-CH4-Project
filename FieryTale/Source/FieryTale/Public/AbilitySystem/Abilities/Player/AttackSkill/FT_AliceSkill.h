@@ -47,9 +47,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Effects")
     TSubclassOf<class UGameplayEffect> DebuffEffectClass;
     
-    /** 투사체 클래스 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Alice Spec")
-    TSubclassOf<AFT_ProjectileBase> ClockRabbitProjectileClass;
+    /** 투척할 시계토끼 투사체 클래스 */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Alice Skill GAS")
+    TSoftClassPtr<AFT_ProjectileBase> ClockRabbitProjectileClass;
 
     /** 기본 피해량 (기본값 30.0f) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Alice Spec")
@@ -60,6 +60,6 @@ protected:
     TSubclassOf<class UGameplayEffect> RabbitImpactEffectClass;
 
     /** 스킬 몽타주 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Visual")
-    TObjectPtr<UAnimMontage> AttackMontage;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Animation")
+    TSoftObjectPtr<UAnimMontage> AttackMontage;
 };

@@ -42,10 +42,16 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
     
     // 공격 몽타주가 존재할 경우 재생 태스크를 실행합니다.
     UAbilityTask_PlayMontageAndWait* MontageTask = nullptr;
-    if (AttackMontage != nullptr)
+    UAnimMontage* LoadedMontage = nullptr;
+    if (!AttackMontage.IsNull())
+    {
+        LoadedMontage = AttackMontage.LoadSynchronous();
+    }
+    
+    if (LoadedMontage != nullptr)
     {
         MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, TEXT("MinionAttackTask"), AttackMontage, 1.0f, NAME_None, false
+            this, TEXT("MinionAttackTask"), LoadedMontage, 1.0f, NAME_None, false
         );
     }
 
@@ -154,17 +160,18 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     }
     
     // 투사체 클래스 획득
-    TSubclassOf<AFT_ProjectileBase> TargetProjectileClass = nullptr;
+    TSoftClassPtr<AFT_ProjectileBase> TargetProjectileClass = nullptr;
     if (MinionChar)
     {
         TargetProjectileClass = MinionChar->GetMinionProjectileClass();
     }
     
     // 투사체를 스폰합니다.
-    if (TargetProjectileClass)
+    if (!TargetProjectileClass.IsNull())
     {
+        UClass* LoadedProjectileClass = TargetProjectileClass.LoadSynchronous();
         UWorld* World = GetWorld();
-        if (World)
+        if (World && LoadedProjectileClass)
         {
             // 스폰 위치 계산
             FVector ChestLocation = AvatarChar->GetActorLocation() + FVector(0.f, 0.f, 50.f); 
@@ -182,7 +189,7 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
 
             // 서버에서 투사체 스폰
             AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-                TargetProjectileClass, SpawnTransform, AvatarChar, AvatarChar, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+                LoadedProjectileClass, SpawnTransform, AvatarChar, AvatarChar, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             
             if (Projectile)
             {

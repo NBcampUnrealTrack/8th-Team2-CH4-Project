@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayEffectTypes.h"
+#include "GameplayTagContainer.h"
 #include "GameFramework/Actor.h"
 #include "FT_ProjectileBase.generated.h"
 
@@ -28,6 +29,10 @@ public:
     /** 적중 시 추가로 적용할 상태 이상(슬로우, 기절 등) 이펙트 스펙들입니다. */
     UPROPERTY(BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "FieryTale | GAS")
     TArray<FGameplayEffectSpecHandle> AdditionalEffectSpecHandles;
+
+    /** 적중 시 터뜨릴 연출용 큐(GameplayCue) 태그입니다. */
+    UPROPERTY(BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "FieryTale | GAS")
+    FGameplayTag HitGameplayCueTag;
 
 protected:
     virtual void BeginPlay() override;

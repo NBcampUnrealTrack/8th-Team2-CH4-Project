@@ -30,8 +30,8 @@ protected:
     void OnFlyDurationExpired();
 
 protected:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
-    TObjectPtr<class UAnimMontage> SkillMontage;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Visual")
+    TSoftObjectPtr<class UAnimMontage> SkillMontage;
 
     /** 비행 유지 타이머 핸들 */
     FTimerHandle FlyDurationTimerHandle;

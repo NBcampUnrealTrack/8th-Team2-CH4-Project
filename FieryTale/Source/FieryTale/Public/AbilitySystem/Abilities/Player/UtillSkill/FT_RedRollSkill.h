@@ -30,7 +30,7 @@ protected:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
-	TObjectPtr<class UAnimMontage> SkillMontage;
+	TSoftObjectPtr<class UAnimMontage> SkillMontage;
 
 	/** 구르기 속도 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Roll Spec")

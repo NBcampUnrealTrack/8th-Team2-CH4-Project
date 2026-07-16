@@ -63,10 +63,11 @@ void UFT_ChargedShotSkill::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 
     // 몽타주 재생 태스크 실행
     bool bTriggeredVisualTask = false;
-    if (FireMontage)
+    UAnimMontage* LoadedMontage = FireMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, TEXT("GenieCrushTask"), FireMontage, 1.0f);
+            this, TEXT("GenieCrushTask"), LoadedMontage, 1.0f);
 
         if (MontageTask)
         {

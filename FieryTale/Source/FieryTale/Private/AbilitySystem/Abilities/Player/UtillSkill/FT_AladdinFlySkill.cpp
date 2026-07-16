@@ -59,10 +59,11 @@ void UFT_AladdinFlySkill::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         return;
     }
     
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("FlyMontage"), SkillMontage, 1.0f);
+            this, FName("FlyMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
             MontageTask->ReadyForActivation();

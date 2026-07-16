@@ -47,10 +47,11 @@ void UFT_SilverBulletSkill::ActivateAbility(const FGameplayAbilitySpecHandle Han
     }
     
     // 장전 몽타주 재생 태스크 실행
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, TEXT("SilverBulletChannellingTask"), SkillMontage, 1.0f);
+            this, TEXT("SilverBulletChannellingTask"), LoadedMontage, 1.0f);
 
         if (MontageTask)
         {
@@ -85,8 +86,11 @@ void UFT_SilverBulletSkill::FireSilverBullet()
         {
             UWorld* World = GetWorld();
             
+            // 투사체 에셋을 비동기(또는 동기) 로드하여 메모리에 적재합니다.
+            UClass* LoadedProjectileClass = ProjectileClass.LoadSynchronous();
+
             // 투사체를 스폰합니다.
-            if (World && ProjectileClass && DamageEffectClass)
+            if (World && LoadedProjectileClass && DamageEffectClass)
             {
                 // 스폰 위치 및 방향 계산
                 FVector SpawnLocation = Character->GetWeaponMuzzleLocation();
@@ -122,7 +126,7 @@ void UFT_SilverBulletSkill::FireSilverBullet()
                 if (Character->HasAuthority())
                 {
                     AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-                        ProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+                        LoadedProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
         
                     if (Projectile)
                     {

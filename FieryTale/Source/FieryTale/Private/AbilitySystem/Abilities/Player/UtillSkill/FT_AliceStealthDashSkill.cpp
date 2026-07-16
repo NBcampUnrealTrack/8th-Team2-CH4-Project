@@ -45,10 +45,11 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
         return;
     }
 
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("AliceDashMontage"), SkillMontage, 1.0f);
+            this, FName("AliceDashMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
             MontageTask->ReadyForActivation();

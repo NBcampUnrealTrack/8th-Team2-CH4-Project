@@ -24,7 +24,7 @@ public:
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
-	TObjectPtr<class UAnimMontage> SkillMontage;
+	TSoftObjectPtr<class UAnimMontage> SkillMontage;
 
 	// 어빌리티 종료 시 궁극기 태그를 제거하기 위해 EndAbility를 오버라이드합니다.
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;

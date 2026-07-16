@@ -206,10 +206,11 @@ void UFT_KaguyaUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle
         }
     }
 
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("KaguyaUltMontage"), SkillMontage, 1.0f);
+            this, FName("KaguyaUltMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
             MontageTask->OnCompleted.AddDynamic(this, &UFT_KaguyaUltimateAbility::OnMontageFinished);

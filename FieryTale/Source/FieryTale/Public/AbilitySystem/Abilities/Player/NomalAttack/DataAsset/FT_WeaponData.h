@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Engine/DataAsset.h"
 #include "FT_WeaponData.generated.h"
 
@@ -73,7 +74,7 @@ public:
     // --- 투사체 설정 (Projectile 전용) ---
     /** 투사체 클래스 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Projectile Options", meta = (EditCondition = "FireType == EWeaponFireType::Projectile"))
-    TSubclassOf<class AActor> ProjectileClass;
+    TSoftClassPtr<class AActor> ProjectileClass;
 
     /** 1회 공격 시 발사할 투사체 수 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Projectile Options", meta = (EditCondition = "FireType == EWeaponFireType::Projectile", ClampMin = "1"))
@@ -90,7 +91,11 @@ public:
     // --- 시각 효과 ---
     /** 공격 애니메이션 몽타주 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Visuals")
-    TObjectPtr<class UAnimMontage> AttackMontage;
+    TSoftObjectPtr<class UAnimMontage> AttackMontage;
+
+    /** 공격 적중 시 재생할 연출용 큐(GameplayCue) 태그입니다. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Visuals")
+    FGameplayTag HitGameplayCueTag;
 
 public:
     /** 이동 속도 배율 반환 */

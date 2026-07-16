@@ -91,10 +91,11 @@ void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandl
         }
     }
 
-    if (SkillMontage)
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, FName("AladdinUltMontage"), SkillMontage, 1.0f);
+            this, FName("AladdinUltMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
             MontageTask->ReadyForActivation();

@@ -92,7 +92,13 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
     ExecuteWeaponHitDetection(WeaponData, Character);
 
     // 몽타주가 없을 경우 안전을 위해 지연 후 종료합니다.
-    if (WeaponData->AttackMontage == nullptr)
+    UAnimMontage* LoadedMontage = nullptr;
+    if (!WeaponData->AttackMontage.IsNull())
+    {
+        LoadedMontage = WeaponData->AttackMontage.LoadSynchronous();
+    }
+
+    if (LoadedMontage == nullptr)
     {
         GetWorld()->GetTimerManager().SetTimer(NoMontageSafetyTimerHandle, [this]()
         {
@@ -104,7 +110,7 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
     // 몽타주 재생 태스크 실행 및 콜백 등록
     UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-        this, FName("NormalAttackTask"), WeaponData->AttackMontage, 1.0f);
+        this, FName("NormalAttackTask"), LoadedMontage, 1.0f);
 
     if (MontageTask)
     {
@@ -234,6 +240,18 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
             SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, FinalDamage);
             FGameplayAbilityTargetDataHandle TargetDataHandle = UAbilitySystemBlueprintLibrary::AbilityTargetDataFromHitResult(HitResult);
             ApplyGameplayEffectSpecToTarget(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, SpecHandle, TargetDataHandle);
+            
+            // 💡 [히트 큐 직통 재생]
+            if (InWeaponData->HitGameplayCueTag.IsValid())
+            {
+                FGameplayCueParameters CueParams;
+                CueParams.Location = HitResult.ImpactPoint;
+                CueParams.Normal = HitResult.ImpactNormal;
+                CueParams.TargetAttachComponent = HitResult.GetComponent();
+                CueParams.PhysicalMaterial = HitResult.PhysMaterial;
+                
+                MyASC->ExecuteGameplayCue(InWeaponData->HitGameplayCueTag, CueParams);
+            }
         }
     }
 }
@@ -245,10 +263,17 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
         return;
     }
     
-    if (!InWeaponData->ProjectileClass)
+    if (InWeaponData->ProjectileClass.IsNull())
     {
         return;
     }
+    
+    UClass* LoadedProjectileClass = InWeaponData->ProjectileClass.LoadSynchronous();
+    if (!LoadedProjectileClass)
+    {
+        return;
+    }
+    
     UWorld* World = GetWorld();
 
     // 단발 투사체 스폰
@@ -280,11 +305,12 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
             }
 
             AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-                InWeaponData->ProjectileClass, SpawnTransform, InCharacter, InCharacter, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+                LoadedProjectileClass, SpawnTransform, InCharacter, InCharacter, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             
             if (Projectile)
             {
                 Projectile->DamageEffectSpecHandle = DamageSpecHandle;
+                Projectile->HitGameplayCueTag = InWeaponData->HitGameplayCueTag;
                 Projectile->FinishSpawning(SpawnTransform);
             }
         }
@@ -295,7 +321,7 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
     TSharedPtr<int32> ShotCounter = MakeShared<int32>(0);
     int32 MaxShots = InWeaponData->ProjectilesPerShot;
     float Delay = InWeaponData->BurstDelay;
-    UClass* ProjectileClass = InWeaponData->ProjectileClass;
+    UClass* ProjectileClass = LoadedProjectileClass;
 
     TWeakObjectPtr<UFT_NormalAttack> WeakThis(this);
     TWeakObjectPtr<AFTPlayerCharacterBase> WeakChar(InCharacter);
@@ -355,6 +381,10 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
             if (Projectile)
             {
                 Projectile->DamageEffectSpecHandle = DynamicSpecHandle;
+                if (CharacterPtr && CharacterPtr->GetWeaponData())
+                {
+                    Projectile->HitGameplayCueTag = CharacterPtr->GetWeaponData()->HitGameplayCueTag;
+                }
                 Projectile->FinishSpawning(SpawnTransform);
             }
         }
@@ -463,6 +493,20 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
             {
                 SpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::Damage, InWeaponData->BaseDamage);
                 ApplyGameplayEffectSpecToTarget(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, SpecHandle, TargetDataHandle);
+                
+                // 💡 [히트 큐 직통 재생]
+                if (InWeaponData->HitGameplayCueTag.IsValid())
+                {
+                    for (auto WeakHitActor : ActorArrayData->TargetActorArray)
+                    {
+                        if (AActor* HitActor = WeakHitActor.Get())
+                        {
+                            FGameplayCueParameters CueParams;
+                            CueParams.Location = HitActor->GetActorLocation();
+                            MyASC->ExecuteGameplayCue(InWeaponData->HitGameplayCueTag, CueParams);
+                        }
+                    }
+                }
             }
             else
             {

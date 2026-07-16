@@ -51,10 +51,16 @@ void UFT_AliceSkill::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     }
 
     bool bHasVisualTask = false;
-    if (AttackMontage)
+    UAnimMontage* LoadedMontage = nullptr;
+    if (!AttackMontage.IsNull())
+    {
+        LoadedMontage = AttackMontage.LoadSynchronous();
+    }
+    
+    if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-            this, TEXT("AliceSkillTask"), AttackMontage, 1.0f);
+            this, TEXT("AliceSkillTask"), LoadedMontage, 1.0f);
 
         if (MontageTask)
         {
@@ -80,8 +86,11 @@ void UFT_AliceSkill::FireClockRabbit()
     AFTPlayerCharacterBase* Character = CurrentActorInfo ? Cast<AFTPlayerCharacterBase>(CurrentActorInfo->AvatarActor.Get()) : nullptr;
     UWorld* World = GetWorld();
 
+    // 투사체 에셋을 비동기(또는 동기) 로드하여 메모리에 적재합니다.
+    UClass* LoadedProjectileClass = ClockRabbitProjectileClass.LoadSynchronous();
+
     // 투사체를 스폰합니다.
-    if (World && ClockRabbitProjectileClass && DamageEffectClass && Character)
+    if (World && LoadedProjectileClass && DamageEffectClass && Character)
     {
         // 스폰 위치 및 방향 계산
         FVector SpawnLocation = Character->GetWeaponMuzzleLocation();
@@ -123,7 +132,7 @@ void UFT_AliceSkill::FireClockRabbit()
         if (Character->HasAuthority())
         {
             AFT_ProjectileBase* Projectile = World->SpawnActorDeferred<AFT_ProjectileBase>(
-                ClockRabbitProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+                LoadedProjectileClass, SpawnTransform, Character, Character, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
             
             if (Projectile)
             {
