@@ -43,7 +43,7 @@ protected:
 
 	/** 시작에 필요한 최소 인원. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "FieryTale|Lobby")
-	int32 MinPlayersToStart = 2;
+	int32 MinPlayersToStart = 1;
 
 	/** 전원 Ready 시 자동으로 매치를 시작할지 여부. false 면 호스트 버튼으로만 시작. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "FieryTale|Lobby")
