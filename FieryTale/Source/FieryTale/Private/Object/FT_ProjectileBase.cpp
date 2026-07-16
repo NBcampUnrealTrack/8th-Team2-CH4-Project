@@ -162,7 +162,7 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
         }
 
         // 3. 동적 연출용 GameplayCue 즉시 재생 (데이터 에셋에 등록된 경우)
-        if (HitGameplayCueTag.IsValid() && InstigatorASC)
+        if (HitGameplayCueTag.IsValid())
         {
             FGameplayCueParameters CueParams;
             CueParams.Location = FinalHitResult.ImpactPoint;
@@ -170,7 +170,16 @@ void AFT_ProjectileBase::OnProjectileOverlap(UPrimitiveComponent* OverlappedComp
             CueParams.TargetAttachComponent = FinalHitResult.GetComponent();
             CueParams.PhysicalMaterial = FinalHitResult.PhysMaterial;
             
-            InstigatorASC->ExecuteGameplayCue(HitGameplayCueTag, CueParams);
+            // 타겟(적)에게 명중했다면 타겟의 ASC를 통해 Cue를 재생하여 적중 위치(적 몸)에서 터지도록 유도합니다.
+            if (TargetASC)
+            {
+                TargetASC->ExecuteGameplayCue(HitGameplayCueTag, CueParams);
+            }
+            // 벽 등 무생물에 맞았을 경우에는 시전자의 ASC를 통해 재생하되 위치(Location)를 강제로 전달합니다.
+            else if (InstigatorASC)
+            {
+                InstigatorASC->ExecuteGameplayCue(HitGameplayCueTag, CueParams);
+            }
         }
     }
     

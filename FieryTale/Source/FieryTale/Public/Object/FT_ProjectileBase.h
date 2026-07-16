@@ -31,7 +31,7 @@ public:
     TArray<FGameplayEffectSpecHandle> AdditionalEffectSpecHandles;
 
     /** 적중 시 터뜨릴 연출용 큐(GameplayCue) 태그입니다. */
-    UPROPERTY(BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "FieryTale | GAS")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true), Category = "FieryTale | GAS")
     FGameplayTag HitGameplayCueTag;
 
 protected:

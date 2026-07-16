@@ -74,19 +74,8 @@ void UFT_NormalAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle, 
 
     UFT_WeaponData* WeaponData = Character->GetWeaponData();
 
-    // 이동 속도 감소 이펙트를 적용합니다.
-    if (MovementPenaltyGameplayEffectClass)
-    {
-        FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(MovementPenaltyGameplayEffectClass, GetAbilityLevel());
-        if (PenaltySpecHandle.IsValid() && PenaltySpecHandle.Data.IsValid())
-        {
-            // 웨폰 데이터의 이동 속도 배율 값을 그대로 적용합니다. (0이면 이동 불가)
-            float SpeedMulti = WeaponData->MovementSpeedMultiplier;
-            PenaltySpecHandle.Data->SetSetByCallerMagnitude(FTTags::FTCombat::MovementPenalty, SpeedMulti);
-            
-            MovementPenaltyActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*PenaltySpecHandle.Data.Get());
-        }
-    }
+    // 부모 클래스의 공용 이동 속도 페널티 적용 (무기 데이터의 배율 오버라이드)
+    ApplyMovementPenalty(WeaponData->MovementSpeedMultiplier);
 
     // 무기 타입에 따른 공격 판정을 실행합니다.
     ExecuteWeaponHitDetection(WeaponData, Character);
@@ -250,7 +239,15 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
                 CueParams.TargetAttachComponent = HitResult.GetComponent();
                 CueParams.PhysicalMaterial = HitResult.PhysMaterial;
                 
-                MyASC->ExecuteGameplayCue(InWeaponData->HitGameplayCueTag, CueParams);
+                // 타겟(적)의 ASC를 통해 Cue를 격발하여 적 몸에서 터지도록 유도
+                if (TargetASC)
+                {
+                    TargetASC->ExecuteGameplayCue(InWeaponData->HitGameplayCueTag, CueParams);
+                }
+                else
+                {
+                    MyASC->ExecuteGameplayCue(InWeaponData->HitGameplayCueTag, CueParams);
+                }
             }
         }
     }
@@ -497,13 +494,23 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
                 // 💡 [히트 큐 직통 재생]
                 if (InWeaponData->HitGameplayCueTag.IsValid())
                 {
-                    for (auto WeakHitActor : ActorArrayData->TargetActorArray)
+                    for (const TWeakObjectPtr<AActor>& WeakHitActor : ActorArrayData->TargetActorArray)
                     {
                         if (AActor* HitActor = WeakHitActor.Get())
                         {
                             FGameplayCueParameters CueParams;
                             CueParams.Location = HitActor->GetActorLocation();
-                            MyASC->ExecuteGameplayCue(InWeaponData->HitGameplayCueTag, CueParams);
+                            CueParams.Instigator = InCharacter;
+                            
+                            UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
+                            if (TargetASC)
+                            {
+                                TargetASC->ExecuteGameplayCue(InWeaponData->HitGameplayCueTag, CueParams);
+                            }
+                            else
+                            {
+                                MyASC->ExecuteGameplayCue(InWeaponData->HitGameplayCueTag, CueParams);
+                            }
                         }
                     }
                 }
@@ -535,12 +542,6 @@ void UFT_NormalAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const
     {
         UAbilitySystemComponent* SourceASC = ActorInfo->AbilitySystemComponent.Get();
 
-        if (MovementPenaltyActiveHandle.IsValid())
-        {
-            SourceASC->RemoveActiveGameplayEffect(MovementPenaltyActiveHandle);
-            MovementPenaltyActiveHandle.Invalidate();
-        }
-
         // 탄퍼짐 속성을 원래 값으로 복구합니다.
         if (UFT_AttributeSet* AttributeSet = const_cast<UFT_AttributeSet*>(Cast<UFT_AttributeSet>(SourceASC->GetAttributeSet(UFT_AttributeSet::StaticClass()))))
         {
@@ -550,6 +551,9 @@ void UFT_NormalAttack::EndAbility(const FGameplayAbilitySpecHandle Handle, const
             SourceASC->SetNumericAttributeBase(UFT_AttributeSet::GetWeaponSpreadAttribute(), OriginalSpread);
         }
     }
+
+    // 부모 클래스의 공용 이동 속도 페널티 제거
+    RemoveMovementPenalty();
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

@@ -70,15 +70,8 @@ void UFT_AladdinFlySkill::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         }
     }
 
-    // 비행 중 속도 감소 페널티 적용
-    if (FlyMovementPenaltyGameplayEffectClass)
-    {
-        FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(FlyMovementPenaltyGameplayEffectClass, GetAbilityLevel());
-        if (PenaltySpecHandle.IsValid())
-        {
-            FlyMovementPenaltyActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*PenaltySpecHandle.Data.Get());
-        }
-    }
+    // 비행 중 속도 감소 페널티 적용 (부모 클래스 기능 사용)
+    ApplyMovementPenalty();
     
     // 이동 모드를 비행으로 변경
     MoveComp->SetMovementMode(EMovementMode::MOVE_Flying);
@@ -128,12 +121,8 @@ void UFT_AladdinFlySkill::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 
     if (SourceASC)
     {
-        // 속도 감소 이펙트 해제
-        if (FlyMovementPenaltyActiveHandle.IsValid())
-        {
-            SourceASC->RemoveActiveGameplayEffect(FlyMovementPenaltyActiveHandle);
-            FlyMovementPenaltyActiveHandle.Invalidate();
-        }
+        // 속도 감소 이펙트 해제 (부모 클래스 기능 사용)
+        RemoveMovementPenalty();
 
         // 어빌리티가 취소되었을 경우 쿨타임 초기화
         if (bWasCancelled)

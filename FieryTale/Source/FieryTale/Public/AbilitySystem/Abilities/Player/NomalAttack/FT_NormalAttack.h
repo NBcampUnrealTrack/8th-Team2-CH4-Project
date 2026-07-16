@@ -53,16 +53,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
     TSubclassOf<class UGameplayEffect> BaseDamageEffectClass;
 
-    /** 이동 속도 감소 이펙트 클래스 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Effects")
-    TSubclassOf<class UGameplayEffect> MovementPenaltyGameplayEffectClass;
-
 private:
     /** 점사 타이머 핸들 */
     FTimerHandle BurstTimerHandle;
-
-    /** 이동 속도 감소 이펙트 핸들 */
-    FActiveGameplayEffectHandle MovementPenaltyActiveHandle;
 
     /** 몽타주 안전 타이머 핸들 */
     FTimerHandle NoMontageSafetyTimerHandle;

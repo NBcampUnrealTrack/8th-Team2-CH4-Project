@@ -40,12 +40,4 @@ protected:
     /** 비행 지속 시간 (기본값 5.0초) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin Spec")
     float FlyDuration;
-
-    // GAS 이동 속도 제어를 위해 이펙트를 사용합니다.
-    /** 이동 속도 감소 이펙트 클래스 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin GAS")
-    TSubclassOf<UGameplayEffect> FlyMovementPenaltyGameplayEffectClass;
-
-    /** 이동 속도 감소 이펙트 핸들 */
-    FActiveGameplayEffectHandle FlyMovementPenaltyActiveHandle;
 };

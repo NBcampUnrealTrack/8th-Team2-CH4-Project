@@ -47,12 +47,6 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Bulwark Spec")
     float MaxDuration;
 
-    /** 이동 속도 감소 이펙트 클래스 */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Bulwark GAS")
-    TSubclassOf<UGameplayEffect> MovementPenaltyGameplayEffectClass;
-
-    /** 이동 속도 감소 이펙트 핸들 */
-    FActiveGameplayEffectHandle MovementPenaltyActiveHandle;
 
     /** 전방에 생성될 거대 방벽 액터 클래스 */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Bulwark Spec")
