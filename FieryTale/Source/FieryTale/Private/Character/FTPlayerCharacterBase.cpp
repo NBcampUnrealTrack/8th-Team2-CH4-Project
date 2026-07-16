@@ -229,6 +229,61 @@ FVector AFTPlayerCharacterBase::GetWeaponMuzzleLocation() const
 	return GetActorLocation() + FVector(0.f, 0.f, 60.f); // 무기/FirePoint 리깅이 없는 캐릭터는 기존 기본 오프셋 그대로 사용.
 }
 
+FVector AFTPlayerCharacterBase::GetCameraAimDirection(const FVector& MuzzleLocation, float MaxTraceDistance) const
+{
+	// 폴백: 시점 정보를 못 구하면 기존과 동일하게 액터 정면 방향을 사용한다.
+	const FVector FallbackDirection = GetActorForwardVector();
+
+	// 시점(카메라) 위치·방향 확보. 컨트롤러의 뷰포인트는 서버로 복제되는 컨트롤 회전을 반영하므로
+	// 서버 권위 실행 경로에서도 클라이언트의 조준을 근사한다.
+	FVector ViewLocation;
+	FRotator ViewRotation;
+	if (const AController* OwningController = GetController())
+	{
+		OwningController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+	}
+	else if (FollowCamera)
+	{
+		ViewLocation = FollowCamera->GetComponentLocation();
+		ViewRotation = FollowCamera->GetComponentRotation();
+	}
+	else
+	{
+		return FallbackDirection;
+	}
+
+	const FVector ViewDirection = ViewRotation.Vector();
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return ViewDirection;
+	}
+
+	// 카메라 정면 라인트레이스 → 처음 충돌하는 지점을 조준점으로 잡는다.
+	const FVector TraceStart = ViewLocation;
+	const FVector TraceEnd = ViewLocation + (ViewDirection * MaxTraceDistance);
+
+	FVector AimPoint = TraceEnd;
+	FHitResult HitResult;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CameraAimTrace), /*bTraceComplex=*/false, this);
+	if (World->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility, QueryParams))
+	{
+		AimPoint = HitResult.ImpactPoint;
+	}
+
+	// 머즐 → 조준점 방향 = 실제 투사체가 나가는 방향.
+	FVector AimDirection = (AimPoint - MuzzleLocation).GetSafeNormal();
+
+	// 근접 벽 밀착 등으로 조준점이 머즐보다 뒤에 있어 역방향이 되면 시점 정면 방향으로 대체한다.
+	if (AimDirection.IsNearlyZero() || FVector::DotProduct(AimDirection, ViewDirection) < 0.f)
+	{
+		AimDirection = ViewDirection;
+	}
+
+	return AimDirection;
+}
+
 AFTPlayerCharacterBase::AFTPlayerCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {

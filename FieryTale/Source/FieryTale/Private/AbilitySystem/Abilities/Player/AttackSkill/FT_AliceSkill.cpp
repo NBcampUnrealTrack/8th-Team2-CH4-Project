@@ -81,7 +81,8 @@ void UFT_AliceSkill::FireClockRabbit()
     {
         // 스폰 위치 및 방향 계산
         FVector SpawnLocation = Character->GetWeaponMuzzleLocation();
-        FVector LaunchDirection = Character->GetActorForwardVector();
+        // 액터 정면 대신 카메라 조준선의 첫 충돌 지점을 향하도록 발사 방향을 보정한다.
+        FVector LaunchDirection = Character->GetCameraAimDirection(SpawnLocation);
 
         if (CurrentActorInfo && CurrentActorInfo->AbilitySystemComponent.IsValid())
         {

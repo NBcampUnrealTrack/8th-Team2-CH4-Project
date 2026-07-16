@@ -159,6 +159,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "FieryTale | Weapon")
 	FVector GetWeaponMuzzleLocation() const;
 
+	//	카메라(컨트롤 시점)에서 정면으로 라인트레이스해 처음 충돌하는 지점을 조준점으로 잡고,
+	//	발사 시작점(MuzzleLocation)에서 그 조준점을 향하는 정규화된 발사 방향을 반환한다.
+	//	충돌이 없으면 카메라 정면 MaxTraceDistance 지점을 조준점으로 사용한다. 시점 정보를 얻지 못하면
+	//	액터 정면 벡터로 폴백한다. 컨트롤 회전은 서버로 복제되므로 서버 권위 실행(투사체 스폰)에서도 안전하다.
+	//	투사체가 조준점 뒤에서 스폰되는 근접 벽 밀착 상황에선 역방향 발사를 막고 시점 정면 방향을 사용한다.
+	UFUNCTION(BlueprintCallable, Category = "FieryTale | Combat")
+	FVector GetCameraAimDirection(const FVector& MuzzleLocation, float MaxTraceDistance = 10000.f) const;
+
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/

@@ -122,7 +122,8 @@ void UFT_NormalAttack::ExecuteWeaponHitDetection(UFT_WeaponData* InWeaponData, A
         return;
     }
     FVector StartLocation = InCharacter->GetWeaponMuzzleLocation();
-    FVector ForwardVector = InCharacter->GetActorForwardVector();
+    // 액터 정면 대신 카메라 조준선의 첫 충돌 지점을 향하도록 발사 방향을 보정한다.
+    FVector ForwardVector = InCharacter->GetCameraAimDirection(StartLocation);
 
     switch (InWeaponData->FireType)
     {
