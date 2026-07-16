@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #include "Level/FTNexus.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
 #include "UI/Health/FTHealthWidgetComponent.h"
 #include "GameplayTags/FTTags.h"
@@ -16,7 +17,13 @@ AFTNexus::AFTNexus()
 {
 	NexusMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("NexusMesh")); // 원본 본진 외형 생성
 	SetRootComponent(NexusMesh); // 최상위 루트로 고정
-	NexusMesh->SetCollisionProfileName(TEXT("BlockAllGeneric")); // 기본 물리 차단 부여
+	NexusMesh->SetCollisionProfileName(TEXT("NoCollision")); // 라인트레이스 겹침 방지를 위해 비주얼 메쉬 콜리전 전면 비활성화
+
+	CollisionCapsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CollisionCapsule")); // 라인트레이스 판정용 실린더 콜리전 객체 생성
+	CollisionCapsule->SetupAttachment(NexusMesh); // 본진 외형 하위에 부착
+	CollisionCapsule->InitCapsuleSize(300.f, 300.f); // 기본 타격 반경 및 높이 설정
+	CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); // 트레이스 및 타격 판정 전용 물리 개방
+	CollisionCapsule->SetCollisionProfileName(TEXT("BlockAllGeneric")); // 라인트레이스를 막기 위한 Block 속성 부여
 
 	DebrisMesh = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("DebrisMesh")); // 카오스 파편 객체 생성
 	DebrisMesh->SetupAttachment(NexusMesh); // 본진 외형 하위에 부착
@@ -72,6 +79,8 @@ void AFTNexus::PerformDestructionEffects()
 
 	if (UFTHealthWidgetComponent* HealthWidgetComp = FindComponentByClass<UFTHealthWidgetComponent>()) HealthWidgetComp->SetVisibility(false); // 1P/2P 화면에서 체력바 UI 즉각 소거
 
+	if (CollisionCapsule) CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 파괴 후 라인트레이스 및 타격 판정 즉각 차단
+
 	if (NexusMesh)
 	{
 		NexusMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 메쉬 겹침 에러 차단을 위해 원본 외형 콜리전 소거
@@ -94,22 +103,22 @@ void AFTNexus::SetVulnerable(bool bNewVulnerable)
 {
 	if (!AbilitySystemComponent || !HasAuthority())
 	{
-		return;
+		return; // 권한 검증
 	}
 
 	if (bNewVulnerable)
 	{
-		AbilitySystemComponent->RemoveLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll);
+		AbilitySystemComponent->RemoveLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 무적 태그 제거
 	}
 	else
 	{
-		AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll);
+		AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 무적 태그 추가
 	}
 }
 
 bool AFTNexus::IsVulnerable() const
 {
-	return AbilitySystemComponent && !AbilitySystemComponent->HasMatchingGameplayTag(FTTags::FTStates::Buff::Invincible);
+	return AbilitySystemComponent && !AbilitySystemComponent->HasMatchingGameplayTag(FTTags::FTStates::Buff::Invincible); // 무적 태그 미소지 여부 반환
 }
 
 void AFTNexus::NotifyGameMode()
@@ -121,4 +130,5 @@ void AFTNexus::NotifyGameMode()
 			GameMode->NexusDestroyed(this); // 오직 1P 서버 환경에서만 매치 종료 룰 연산을 위해 통보 발송
 		}
 	}
+	SetLifeSpan(5.0f); // 메모리 완전 소거 지정을 통한 서버 동기화 오류 및 충돌 잔존 차단
 }

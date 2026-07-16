@@ -10,6 +10,7 @@ class UGeometryCollectionComponent;
 class UDataTable;
 class USoundBase;
 class UParticleSystem;
+class UCapsuleComponent;
 
 UENUM(BlueprintType)
 enum class EFTNexusTeam : uint8
@@ -29,11 +30,10 @@ public:
 
 	EFTNexusTeam GetNexusTeam() const { return NexusTeam; } // 본진 소속 진영 반환 함수
 
-	// 넥서스의 파괴 가능 여부를 토글한다. false면 GAS Invincible 태그가 붙어 무적 상태를 유지한다.
-	void SetVulnerable(bool bNewVulnerable);
+	void SetVulnerable(bool bNewVulnerable); // 넥서스의 파괴 가능 여부를 토글하는 함수
 	
 	UFUNCTION(BlueprintPure, Category = "FieryTale | Structure")
-	bool IsVulnerable() const;
+	bool IsVulnerable() const; // 무적 상태 여부 반환 함수
 
 protected:
 	virtual void BeginPlay() override; // 넥서스 특화 데이터베이스 연동 루틴
@@ -51,6 +51,9 @@ protected:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> NexusMesh; // 블루프린트 오작동을 막기 위해 보존된 원본 넥서스 메쉬
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UCapsuleComponent> CollisionCapsule; // 라인트레이스 및 독립 타격 판정을 위한 실린더 콜리전
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UGeometryCollectionComponent> DebrisMesh; // 붕괴 연출을 위한 카오스 파편 컬렉션
