@@ -38,6 +38,12 @@ public:
 
 	void AddTeamScore(EFTTeam ScoringTeam);
 
+	//	서버가 킬 발생 시 호출한다. GameState는 항상 릴러번트하므로 접속 중인 모든 머신(호스트 포함)이
+	//	이 멀티캐스트를 수신하고, 각자 로컬 로그 서브시스템(UFTLogSubsystem)으로 킬로그를 출력한다.
+	//	완성된 표시 문자열을 그대로 넘겨 각 클라이언트는 포맷을 다시 조립하지 않는다.
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_BroadcastKillLog(const FString& KillLogMessage);
+
 	// UI에서 팀 스코어를 읽어갈 수 있도록 제공하는 함수
 	UFUNCTION(BlueprintPure, Category = "FieryTale|Score")
 	int32 GetBlueTeamKills() const { return BlueTeamKills; }

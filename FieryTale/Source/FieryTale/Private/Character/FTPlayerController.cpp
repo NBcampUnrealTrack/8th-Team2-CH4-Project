@@ -364,26 +364,39 @@ void AFTPlayerController::HandleCharacterDeath(AFTCharacterBase* DiedCharacter, 
 	{
 		// 🌟 1. 나의 데스(Death) 1 증가
 		AFTPlayerState* VictimPS = GetPlayerState<AFTPlayerState>();
+
+		// 가해자 PlayerState — 다른 플레이어에게 죽었을 때만 존재한다.
+		// (미니언/포탑/환경 피해/자멸이면 nullptr → 킬 크레딧 없이 킬로그만 '전사'로 남긴다.)
+		AFTPlayerState* KillerPS = nullptr;
+		if (KillerController && KillerController != this)
+		{
+			KillerPS = KillerController->GetPlayerState<AFTPlayerState>();
+		}
+
 		if (VictimPS)
 		{
 			VictimPS->AddDeath();
-			
+
 			// 🌟 2. 가해자 팀에게 팀 스코어(Team Kill) 추가
 			if (AFTArenaGameState* GS = GetWorld()->GetGameState<AFTArenaGameState>())
 			{
 				// 내가 블루면 레드에게 점수를, 내가 레드면 블루에게 점수를 줍니다.
 				EFTTeam KillerTeam = (VictimPS->GetTeam() == EFTTeam::Blue) ? EFTTeam::Red : EFTTeam::Blue;
 				GS->AddTeamScore(KillerTeam);
+
+				// 🌟 킬로그: 완성된 표시 문자열을 만들어 전 클라이언트(호스트 포함) 로그 서브시스템으로 브로드캐스트한다.
+				const FString VictimName = VictimPS->GetPlayerName();
+				const FString KillLogMessage = KillerPS
+					? FString::Printf(TEXT("%s 님이 %s 님을 처치했습니다."), *KillerPS->GetPlayerName(), *VictimName)
+					: FString::Printf(TEXT("%s 님이 전사했습니다."), *VictimName);
+				GS->Multicast_BroadcastKillLog(KillLogMessage);
 			}
 		}
 
 		// 🌟 3. 가해자(Killer)의 개인 킬(Kill) 1 증가
-		if (KillerController && KillerController != this)
+		if (KillerPS)
 		{
-			if (AFTPlayerState* KillerPS = KillerController->GetPlayerState<AFTPlayerState>())
-			{
-				KillerPS->AddKill();
-			}
+			KillerPS->AddKill();
 		}
 
 		// 리스폰 타이머 처리 (기존 로직 유지)

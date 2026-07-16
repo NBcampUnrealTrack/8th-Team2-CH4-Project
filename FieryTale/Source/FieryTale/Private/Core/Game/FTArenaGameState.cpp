@@ -10,6 +10,7 @@
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "Core/FTLoadingScreenSubsystem.h"
+#include "Log/FTLogSubsystem.h"
 
 AFTArenaGameState::AFTArenaGameState()
 {
@@ -42,6 +43,20 @@ void AFTArenaGameState::AddTeamScore(EFTTeam ScoringTeam)
 	{
 		if (ScoringTeam == EFTTeam::Blue) BlueTeamKills++;
 		else if (ScoringTeam == EFTTeam::Red) RedTeamKills++;
+	}
+}
+
+void AFTArenaGameState::Multicast_BroadcastKillLog_Implementation(const FString& KillLogMessage)
+{
+	//	각 머신(호스트 포함) 로컬의 로그 서브시스템으로 라우팅한다. 채팅창이 떠 있으면 System 메시지로도 표시된다.
+	//	완성된 문자열을 그대로 넘겨(printf 미사용) 플레이어 이름에 '%'가 있어도 안전하게 출력한다.
+	if (UFTLogSubsystem* LogSys = UFTLogSubsystem::Get(this))
+	{
+		LogSys->LogInfo(KillLogMessage);
+	}
+	else
+	{
+		UE_LOG(LogFieryTale, Log, TEXT("%s"), *KillLogMessage);
 	}
 }
 
