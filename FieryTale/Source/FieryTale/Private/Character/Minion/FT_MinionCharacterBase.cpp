@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/Minion/FT_MinionCharacterBase.h"
@@ -28,6 +28,12 @@ AFT_MinionCharacterBase::AFT_MinionCharacterBase()
     if (AbilitySystemComponent && MutableAttributeSet)
     {
         AbilitySystemComponent->AddSpawnedAttribute(MutableAttributeSet);
+    }
+
+    // 평타(히트스캔) 등 라인트레이스(Visibility 채널)에 맞기 위해 콜리전 설정
+    if (GetCapsuleComponent())
+    {
+        GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
     }
 
     // [양손 무기 컴포넌트 독립 타설]
