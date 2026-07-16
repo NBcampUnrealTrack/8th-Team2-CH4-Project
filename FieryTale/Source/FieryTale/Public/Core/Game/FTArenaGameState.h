@@ -37,14 +37,21 @@ public:
 	EFTArenaMatchState GetArenaMatchState() const { return CurrentMatchState; }
 
 	void AddTeamScore(EFTTeam ScoringTeam);
-	
+
 	// UI에서 팀 스코어를 읽어갈 수 있도록 제공하는 함수
 	UFUNCTION(BlueprintPure, Category = "FieryTale|Score")
 	int32 GetBlueTeamKills() const { return BlueTeamKills; }
 
 	UFUNCTION(BlueprintPure, Category = "FieryTale|Score")
 	int32 GetRedTeamKills() const { return RedTeamKills; }
-	
+
+	// GameMode::BeginPlay()에서 세션 정원(MinPlayersToStart) 확정 직후 1회 전달받는다.
+	void SetExpectedPlayerCount(int32 InExpectedPlayerCount) { ExpectedPlayerCount = InExpectedPlayerCount; }
+
+	// 각 클라이언트가 자기 로컬 캐릭터 스폰(Possess/OnRep_PlayerState)을 마친 직후 서버에 보고한다
+	// (FTPlayerController::ServerNotifyLoadingComplete에서 호출). 전원 보고가 모이면 bAllPlayersLoaded를 true로 전환한다.
+	void ServerNotifyPlayerLoadingComplete(APlayerState* PS);
+
 
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentMatchState, BlueprintReadOnly, Category = "Game State")
@@ -52,7 +59,14 @@ protected:
 
 	UFUNCTION()
 	void OnRep_CurrentMatchState();
-	
+
+	// 전원이 각자 로컬 로딩을 마쳤음을 전 클라이언트에 알리는 신호. 로딩 화면 해제 전용이며 CurrentMatchState와는 독립적이다.
+	UPROPERTY(ReplicatedUsing = OnRep_AllPlayersLoaded)
+	bool bAllPlayersLoaded = false;
+
+	UFUNCTION()
+	void OnRep_AllPlayersLoaded();
+
 	UPROPERTY(Replicated)
 	int32 BlueTeamKills = 0;
 
@@ -78,5 +92,21 @@ private:
 
 	//	InProgress에서 프리로드를 이미 시작했는지 (중복 실행 방지).
 	bool bPreloadStarted = false;
+
+	// 로딩 완료를 보고한 플레이어 집합 (서버 전용, 리플리케이트하지 않는다).
+	TSet<TWeakObjectPtr<APlayerState>> LoadingCompletePlayers;
+
+	// 매치에 참여할 총 인원수. GameMode가 세션 정원을 계산한 뒤 SetExpectedPlayerCount로 전달한다.
+	int32 ExpectedPlayerCount = 0;
+
+	// 전원 보고 완료 후 실제 bAllPlayersLoaded 신호를 내보내기까지의 유예 시간(초).
+	// 캐릭터 possess 직후에도 텍스처/셰이더 스트리밍이 마저 끝나도록 약간의 여유를 둔다.
+	static constexpr float AllPlayersLoadedBroadcastDelay = 5.0f;
+
+	// 유예 타이머 핸들.
+	FTimerHandle AllPlayersLoadedDelayTimer;
+
+	// 타이머 만료 후 실제로 bAllPlayersLoaded를 true로 전환하고 리플리케이션을 트리거한다.
+	void BroadcastAllPlayersLoaded();
 
 };

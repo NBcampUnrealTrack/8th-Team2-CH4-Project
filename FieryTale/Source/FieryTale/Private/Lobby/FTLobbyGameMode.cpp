@@ -16,6 +16,8 @@
 #include "Character/FTPlayerController.h"
 #include "Online/OnlineSessionNames.h" // NAME_GameSession 사용을 위함
 #include "Misc/PackageName.h"
+#include "Core/FTLoadingScreenSubsystem.h"
+#include "Engine/GameInstance.h"
 
 AFTLobbyGameMode::AFTLobbyGameMode()
 {
@@ -165,6 +167,18 @@ void AFTLobbyGameMode::TravelToMatch()
 		return;
 	}
 	bMatchStarting = true;
+
+	// 세션(OSS)이 없는 PIE 등에서도 아레나 쪽이 정확한 인원수를 쓸 수 있도록,
+	// 지금 로비에 실제로 모인 인원수를 GameInstance 서브시스템에 저장해둔다(셈리스 트래블 전 구간에서 유지됨).
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UFTLoadingScreenSubsystem* LoadingScreen = GI->GetSubsystem<UFTLoadingScreenSubsystem>())
+		{
+			const int32 NumPlayers = GameState ? GameState->PlayerArray.Num() : 0;
+			LoadingScreen->SetExpectedPlayerCount(NumPlayers);
+			UE_LOG(LogFTSession, Log, TEXT("[Lobby] 트래블 직전 실제 인원수 %d명을 저장했습니다."), NumPlayers);
+		}
+	}
 
 	if (UWorld* World = GetWorld())
 	{

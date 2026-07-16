@@ -27,6 +27,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Level/FTTeamPlayerStart.h"
 #include "EngineUtils.h"
+#include "Core/FTLoadingScreenSubsystem.h"
 
 AFTGameMode::AFTGameMode()
 {
@@ -60,6 +61,21 @@ void AFTGameMode::BeginPlay()
 				UE_LOG(LogFTSession, Log, TEXT("[Arena] 세션 연동 완료: 전장 시작 필수 인원 %d명"), MinPlayersToStart);
 			}
 		}
+	}
+
+	// 세션(OSS)이 없거나 정원 조회에 실패하는 환경(PIE 등)에서도 정확한 값을 쓰도록,
+	// 로비가 트래블 직전에 저장해둔 실제 인원수가 있으면 그 값을 우선한다.
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UFTLoadingScreenSubsystem* LoadingScreen = GI->GetSubsystem<UFTLoadingScreenSubsystem>())
+		{
+			const int32 LobbyPlayerCount = LoadingScreen->GetExpectedPlayerCount();
+		}
+	}
+
+	if (AFTArenaGameState* ArenaGS = GetGameState<AFTArenaGameState>())
+	{
+		ArenaGS->SetExpectedPlayerCount(MinPlayersToStart);
 	}
 }
 

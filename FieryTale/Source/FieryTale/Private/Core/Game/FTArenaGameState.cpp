@@ -9,6 +9,7 @@
 #include "Engine/DataTable.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
+#include "Core/FTLoadingScreenSubsystem.h"
 
 AFTArenaGameState::AFTArenaGameState()
 {
@@ -22,7 +23,8 @@ void AFTArenaGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AFTArenaGameState, CurrentMatchState);
 	DOREPLIFETIME(AFTArenaGameState, BlueTeamKills);
 	DOREPLIFETIME(AFTArenaGameState, RedTeamKills);
-	
+	DOREPLIFETIME(AFTArenaGameState, bAllPlayersLoaded);
+
 }
 
 void AFTArenaGameState::SetArenaMatchState(EFTArenaMatchState NewState)
@@ -52,6 +54,52 @@ void AFTArenaGameState::OnRep_CurrentMatchState()
 	if (CurrentMatchState == EFTArenaMatchState::InProgress)
 	{
 		PreloadActiveCharacterAssets();
+	}
+}
+
+void AFTArenaGameState::ServerNotifyPlayerLoadingComplete(APlayerState* PS)
+{
+	if (!HasAuthority() || !PS || bAllPlayersLoaded)
+	{
+		return;
+	}
+
+	bool bAlreadyReported = false;
+	LoadingCompletePlayers.Add(PS, &bAlreadyReported);
+	if (bAlreadyReported)
+	{
+		return;
+	}
+
+	UE_LOG(LogFTSession, Log, TEXT("[LoadingScreen] 로딩 완료 보고 수신: %s (%d/%d)"),
+		*PS->GetPlayerName(), LoadingCompletePlayers.Num(), ExpectedPlayerCount);
+
+	if (ExpectedPlayerCount > 0 && LoadingCompletePlayers.Num() >= ExpectedPlayerCount)
+	{
+		UE_LOG(LogFTSession, Log, TEXT("[LoadingScreen] 전원 보고 완료 — %.1f초 뒤 로딩 해제 신호를 보냅니다."), AllPlayersLoadedBroadcastDelay);
+		GetWorldTimerManager().SetTimer(AllPlayersLoadedDelayTimer, this, &AFTArenaGameState::BroadcastAllPlayersLoaded, AllPlayersLoadedBroadcastDelay, false);
+	}
+}
+
+void AFTArenaGameState::BroadcastAllPlayersLoaded()
+{
+	bAllPlayersLoaded = true;
+	OnRep_AllPlayersLoaded(); // 서버는 리플리케이션으로 자동 호출되지 않으므로 직접 1회 실행
+}
+
+void AFTArenaGameState::OnRep_AllPlayersLoaded()
+{
+	if (!bAllPlayersLoaded)
+	{
+		return;
+	}
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UFTLoadingScreenSubsystem* LoadingScreen = GI->GetSubsystem<UFTLoadingScreenSubsystem>())
+		{
+			LoadingScreen->NotifyAllPlayersReady();
+		}
 	}
 }
 

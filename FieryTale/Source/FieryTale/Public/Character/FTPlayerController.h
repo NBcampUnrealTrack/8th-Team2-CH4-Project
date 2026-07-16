@@ -219,7 +219,11 @@ protected:
 	
 	UFUNCTION(Server, Reliable)
 	void ServerSetCharacter(EFTCharacterType NewCharacter);
-	
+
+	// 로컬 캐릭터 스폰(Possess/OnRep_PlayerState)이 끝난 직후 호출 — 서버가 전원 완료 여부를 카운트하도록 보고한다.
+	UFUNCTION(Server, Reliable)
+	void ServerNotifyLoadingComplete();
+
 	// 결과창 위젯 (에디터에서 지정)
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<class UUserWidget> ResultWidgetClass;
