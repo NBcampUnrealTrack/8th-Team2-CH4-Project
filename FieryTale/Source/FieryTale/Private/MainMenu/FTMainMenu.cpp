@@ -8,6 +8,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Blueprint/UserWidget.h" // PlayAnimation 함수를 위해 추가
 #include "MainMenu/FTMainMenuWidget.h"
+#include "Online/FTSessionSubsystem.h"
+#include "Components/EditableTextBox.h"
+#include "Engine/GameInstance.h"
 
 void UFTMainMenu::NativeConstruct()
 {
@@ -29,6 +32,15 @@ void UFTMainMenu::NativeConstruct()
 	if (WBP_MainMenuWidget)
 	{
 		WBP_MainMenuWidget->SetVisibility(ESlateVisibility::Hidden);
+	}
+	
+	// 🌟 1. 서브시스템의 로그인 완료 이벤트에 함수 바인딩
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UFTSessionSubsystem* Subsystem = GameInstance->GetSubsystem<UFTSessionSubsystem>())
+		{
+			Subsystem->OnLoginCompleteEvent.AddDynamic(this, &UFTMainMenu::OnLoginComplete);
+		}
 	}
 }
 
@@ -56,13 +68,47 @@ void UFTMainMenu::OnPlayButtonUnhovered()
 
 void UFTMainMenu::OnPlayButtonClicked()
 {
-	// 클릭 시 실행할 로직
-	UE_LOG(LogTemp, Warning, TEXT("플레이 버튼이 클릭되었습니다!"));
-	
-	if (WBP_MainMenuWidget)
-	{
-		WBP_MainMenuWidget->SetVisibility(ESlateVisibility::Visible);
-	}
+	UE_LOG(LogTemp, Warning, TEXT("플레이 버튼이 클릭되었습니다! EOS 로그인을 시도합니다."));
 	
 	PlayButton->SetIsEnabled(false);
+
+	FString TokenString = TEXT("");
+	if (Input_LoginToken)
+	{
+		TokenString = Input_LoginToken->GetText().ToString();
+		TokenString = TokenString.Replace(TEXT(" "), TEXT(""));// 공백제거
+	}
+
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UFTSessionSubsystem* Subsystem = GameInstance->GetSubsystem<UFTSessionSubsystem>())
+		{
+			// 🌟 가져온 문자열을 파라미터로 넘겨줍니다.
+			Subsystem->LoginEOS(TokenString);
+		}
+	}
+}
+
+void UFTMainMenu::OnLoginComplete(bool bWasSuccessful)
+{
+	if (bWasSuccessful)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("로그인 성공! 방 만들기/찾기 메뉴를 엽니다."));
+        
+		// 로그인이 성공했을 때만 하위 메뉴(방 만들기/찾기 창)를 띄워줍니다.
+		if (WBP_MainMenuWidget)
+		{
+			WBP_MainMenuWidget->SetVisibility(ESlateVisibility::Visible);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("로그인 실패! 버튼을 다시 활성화합니다."));
+        
+		// 실패했다면 사용자가 다시 시도할 수 있도록 버튼을 켜줍니다.
+		if (PlayButton)
+		{
+			PlayButton->SetIsEnabled(true);
+		}
+	}
 }

@@ -57,6 +57,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFTOnJoinSessionComplete, bool, bWas
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFTOnDestroySessionComplete, bool, bWasSuccessful);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFTOnLoginComplete, bool, bWasSuccessful);
+
 /**
  * 로비/매치메이킹의 세션 계층을 담당하는 서브시스템.
  *
@@ -82,11 +84,11 @@ public:
 	/** 방을 만들고(세션 생성) 성공하면 대기방(Lobby) 맵으로 ServerTravel 한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
 	void HostSession(int32 MaxPlayers = 4, const FString& RoomName = "FieryTale Room", const FString& Password = "",
-	                 bool bUseLAN = true);
+	                 bool bUseLAN = false);
 
 	/** 방 목록을 검색한다. 완료 시 OnFindSessionsCompleteEvent 로 결과를 전달한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
-	void FindSessions(int32 MaxResults = 20, bool bUseLAN = true);
+	void FindSessions(int32 MaxResults = 20, bool bUseLAN = false);
 
 	/** 검색 결과 인덱스로 방에 입장한다. 비밀번호가 걸린 방이면 Password 가 일치해야 한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
@@ -95,6 +97,17 @@ public:
 	/** 현재 세션에서 나간다(세션 파괴). */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
 	void LeaveSession();
+	
+	
+	
+	/** EOS DevAuthTool을 이용해 로그인합니다. (PIE 인덱스에 따라 자동 분기) */
+	UFUNCTION(BlueprintCallable, Category = "FieryTale|Auth")
+	void LoginEOS(FString InToken = TEXT(""));
+
+	UPROPERTY(BlueprintAssignable, Category = "FieryTale|Auth")
+	FFTOnLoginComplete OnLoginCompleteEvent;
+	
+	
 
 	/** (선택) 세션을 InProgress 로 표시한다. 매치 시작 시 호스트가 호출. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
@@ -125,6 +138,8 @@ public:
 private:
 	// 실제 세션 생성 로직. HostSession 에서 기존 세션 정리 후 호출된다.
 	void CreateSessionInternal(int32 MaxPlayers, const FString& RoomName, const FString& Password, bool bUseLAN);
+	
+	void HandleLoginComplete(int32 LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
 
 	// IOnlineSession 콜백
 	void HandleCreateSessionComplete(FName SessionName, bool bWasSuccessful);

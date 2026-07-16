@@ -10,6 +10,7 @@ class UButton;
 class UTextBlock;
 class UWidgetAnimation;
 class UFTMainMenuWidget;
+class UEditableTextBox;
 
 /**
  * 
@@ -27,6 +28,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* PlayText;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	UEditableTextBox* Input_LoginToken;
 
 	// C++ 클래스에서 사용자가 UMG 디자이너에서 만든 애니메이션을 바인딩합니다.
 	UPROPERTY(Transient,meta = (BindWidgetAnim))
@@ -44,4 +48,7 @@ protected:
 
 	UFUNCTION()
 	void OnPlayButtonClicked();
+	
+	UFUNCTION()
+	void OnLoginComplete(bool bWasSuccessful);
 };

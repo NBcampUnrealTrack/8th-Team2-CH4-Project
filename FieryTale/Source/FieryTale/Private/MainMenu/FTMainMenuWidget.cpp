@@ -60,7 +60,7 @@ void UFTMainMenuWidget::OnHostButtonClicked()
 	if (Text_StatusMessage) Text_StatusMessage->SetText(FText::FromString(TEXT("방 생성 중...")));
 	
 	// FTSessionSubsystem의 HostSession 호출 (비밀번호 없음, LAN 사용 안함 가정)
-	SessionSubsystem->HostSession(MaxPlayers, RoomName, TEXT(""), true);
+	SessionSubsystem->HostSession(MaxPlayers, RoomName, TEXT(""), false);
 }
 
 void UFTMainMenuWidget::OnFindButtonClicked()
@@ -71,7 +71,7 @@ void UFTMainMenuWidget::OnFindButtonClicked()
 	if (Scroll_SessionList) Scroll_SessionList->ClearChildren();
 	
 	SelectedSessionIndex = INDEX_NONE;
-	SessionSubsystem->FindSessions(20, true);
+	SessionSubsystem->FindSessions(20, false);
 }
 
 void UFTMainMenuWidget::OnJoinButtonClicked()
