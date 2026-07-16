@@ -70,6 +70,7 @@ void AFTPlayerCharacterBase::BeginPlay()
 	{
 		DefaultCameraSocketOffset = CameraBoom->SocketOffset;
 		DefaultCameraArmLength = CameraBoom->TargetArmLength;
+		CameraBoom->AddLocalRotation(FRotator(-60.0f, 0.0f, 0.0f));
 	}
 }
 
