@@ -104,6 +104,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup")
 	float HomingAcceleration;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup")
+	float DestructionImpulseRadius;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup")
+	float DestructionImpulseStrength;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Setup")
 	TObjectPtr<AActor> CurrentTarget;
 

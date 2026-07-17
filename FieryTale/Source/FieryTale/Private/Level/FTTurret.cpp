@@ -49,6 +49,8 @@ AFTTurret::AFTTurret()
 	DetectionRange = 1200.0f; // 사거리 초기화
 	AttackCooldown = 1.5f; // 연사 쿨타임 초기화
 	HomingAcceleration = 50000.0f; // 기본 유도 가속도 세팅
+	DestructionImpulseRadius = 500.0f; // 자체 폭발 반경 초기화
+	DestructionImpulseStrength = 10000.0f; // 에디터 개방용 붕괴 충격량 초기화
 	CurrentTarget = nullptr; // 타겟 초기화
 	bCanAttack = true; // 사격 가용 초기화
 	TurretDummyInstigator = nullptr; // 가상 폰 초기화
@@ -119,7 +121,11 @@ void AFTTurret::PerformDestructionEffects()
 	if (DebrisMesh)
 	{
 		DebrisMesh->SetVisibility(true); // 파편 활성화
-		DebrisMesh->SetSimulatePhysics(true); // 카오스 스레드 재개방
+		DebrisMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform); // 트랜스폼 독립으로 서버 물리 동기화 방해 차단
+		DebrisMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); // 파편 물리 강제 개방
+		DebrisMesh->SetCollisionProfileName(TEXT("Destructible")); // 디스트럭터블 반응 프로필 주입
+		DebrisMesh->SetSimulatePhysics(true); // 물리 스레드 가동
+		DebrisMesh->AddRadialImpulse(GetActorLocation(), DestructionImpulseRadius, DestructionImpulseStrength, ERadialImpulseFalloff::RIF_Linear, true); // 에디터에서 제어 가능한 변수로 자체 붕괴 충격량 강제 인가
 	}
 
 	if (DestructionSound) UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation()); // 사운드 재생
@@ -232,7 +238,6 @@ void AFTTurret::FireProjectile()
 		TurretDummyInstigator = GetWorld()->SpawnActor<APawn>(APawn::StaticClass(), GetActorLocation(), GetActorRotation(), SpawnParams); // 가상 대리인 생성
 		if (TurretDummyInstigator)
 		{
-			// 계층 에러의 주범이었던 AttachToActor 로직 완전 제거 완료
 			TurretDummyInstigator->SetActorHiddenInGame(true); // 렌더링 은닉
 			TurretDummyInstigator->SetActorEnableCollision(false); // 물리 간섭 차단
 			TurretDummyInstigator->SetCanBeDamaged(false); // 무적 처리
