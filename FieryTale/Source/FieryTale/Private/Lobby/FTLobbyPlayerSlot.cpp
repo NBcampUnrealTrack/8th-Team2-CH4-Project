@@ -9,9 +9,9 @@
 #include "Components/WidgetSwitcher.h"
 #include "Engine/Texture2D.h"
 
-void UFTLobbyPlayerSlot::UpdateSlotData(const FString& InPlayerName, EFTCharacterType InCharType)
+void UFTLobbyPlayerSlot::UpdateSlotData(const FString& InPlayerName, EFTCharacterType InCharType, bool bIsReady)
 {
-	// 🌟 1. 오직 '이름이 비어있는가?'만으로 접속 여부(빈 슬롯 여부)를 판별합니다.[cite: 10]
+	// 1. 오직 '이름이 비어있는가?'만으로 접속 여부(빈 슬롯 여부)를 판별합니다.[cite: 10]
 	bool bIsEmptySlot = InPlayerName.IsEmpty();
 
 	// 2. 스위처 상태 즉시 전환 (접속했다면 아무것도 안 골랐어도 1번 인덱스로 갑니다)[cite: 10]
@@ -32,7 +32,7 @@ void UFTLobbyPlayerSlot::UpdateSlotData(const FString& InPlayerName, EFTCharacte
 			Img_HeroPortrait->SetBrushFromTexture(nullptr);
 		}
 	}
-	// 🌟 4. 유저가 접속해 있는 슬롯(1번 인덱스)일 때의 데이터 처리
+	// 4. 유저가 접속해 있는 슬롯(1번 인덱스)일 때의 데이터 처리
 	else
 	{
 		// 이름 세팅[cite: 10]
@@ -40,7 +40,21 @@ void UFTLobbyPlayerSlot::UpdateSlotData(const FString& InPlayerName, EFTCharacte
 		{
 			Text_PlayerName->SetText(FText::FromString(InPlayerName));
 		}
-
+		
+		
+		if (Text_ReadyState)
+		{
+			if (bIsReady)
+			{
+				Text_ReadyState->SetText(FText::FromString(TEXT("준비 완료")));
+				Text_ReadyState->SetColorAndOpacity(FSlateColor(FLinearColor::Green)); // 초록색 강조
+			}
+			else
+			{
+				Text_ReadyState->SetText(FText::FromString(TEXT("대기 중")));
+				Text_ReadyState->SetColorAndOpacity(FSlateColor(FLinearColor::White)); // 기본색
+			}
+		}
 		// 캐릭터 타입에 따른 초상화 세팅[cite: 10]
 		if (Img_HeroPortrait)
 		{

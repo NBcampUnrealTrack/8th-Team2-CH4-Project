@@ -144,12 +144,13 @@ void UFTLobbyWidget::RefreshTeamRoster()
 			AFTLobbyPlayerState* TargetPS = Cast<AFTLobbyPlayerState>(SortedArray[i]);
 			if (TargetPS)
 			{
-				// 델리게이트 안전하게 바인딩 (캐릭터 변경 시 새로고침 용도)[cite: 9]
 				TargetPS->OnCharacterStateChanged.RemoveDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
 				TargetPS->OnCharacterStateChanged.AddDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
-
-				// 실제 유저의 이름과 선택한 캐릭터 타입으로 슬롯을 업데이트합니다.
-				PlayerSlot->UpdateSlotData(TargetPS->GetPlayerName(), TargetPS->GetCharacterType());
+				
+				TargetPS->OnReadyStateChanged.RemoveDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
+				TargetPS->OnReadyStateChanged.AddDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
+				
+				PlayerSlot->UpdateSlotData(TargetPS->GetPlayerName(), TargetPS->GetCharacterType(), TargetPS->IsReady());
 				bSlotFilled = true;
 			}
 		}

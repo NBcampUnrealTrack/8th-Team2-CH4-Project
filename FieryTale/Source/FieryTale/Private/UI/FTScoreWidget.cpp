@@ -22,20 +22,4 @@ void UFTScoreWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 			Text_RedScore->SetText(FText::AsNumber(GS->GetRedTeamKills()));
 		}
 	}
-
-	// 2. 개인 킬/데스 업데이트 (내 PlayerState에서 가져옴)
-	if (APlayerController* PC = GetOwningPlayer())
-	{
-		if (AFTPlayerState* PS = PC->GetPlayerState<AFTPlayerState>())
-		{
-			if (Text_MyKills)
-			{
-				Text_MyKills->SetText(FText::Format(FText::FromString(TEXT("K: {0}")), FText::AsNumber(PS->GetKills())));
-			}
-			if (Text_MyDeaths)
-			{
-				Text_MyDeaths->SetText(FText::Format(FText::FromString(TEXT("D: {0}")), FText::AsNumber(PS->GetDeaths())));
-			}
-		}
-	}
 }

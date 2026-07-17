@@ -103,7 +103,7 @@ struct FFTCharacterData : public FTableRowBase
 
 	//  데이터 테이블의 이 행이 어떤 캐릭터 타입을 의미하는지 식별
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Character")
-	EFTCharacterType CharacterType;
+	EFTCharacterType CharacterType = EFTCharacterType::None;
 
 	// 초상화 아이콘
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Character")
