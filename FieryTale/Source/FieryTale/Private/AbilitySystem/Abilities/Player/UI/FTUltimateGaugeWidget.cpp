@@ -241,7 +241,7 @@ void UFTUltimateGaugeWidget::RefreshGaugeDisplay()
 		GaugeText->SetVisibility(bIsGaugeFull ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 		if (!bIsGaugeFull)
 		{
-			GaugeText->SetText(FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(ClampedPercent * 100.f))));
+			GaugeText->SetText(FText::FromString(FString::Printf(TEXT("%d"), FMath::RoundToInt(ClampedPercent * 100.f))));
 		}
 	}
 
