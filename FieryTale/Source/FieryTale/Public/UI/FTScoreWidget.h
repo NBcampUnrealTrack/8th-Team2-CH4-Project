@@ -24,11 +24,4 @@ protected:
 
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* Text_RedScore;
-
-	// --- 개인 스코어 (우측 상단 또는 하단 배치 추천) ---
-	UPROPERTY(meta = (BindWidget))
-	UTextBlock* Text_MyKills;
-
-	UPROPERTY(meta = (BindWidget))
-	UTextBlock* Text_MyDeaths;
 };
