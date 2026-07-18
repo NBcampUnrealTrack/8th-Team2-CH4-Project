@@ -15,110 +15,114 @@
 
 AFTNexus::AFTNexus()
 {
-	NexusMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("NexusMesh")); // 원본 본진 외형 생성
-	SetRootComponent(NexusMesh); // 최상위 루트로 고정
-	NexusMesh->SetCollisionProfileName(TEXT("NoCollision")); // 라인트레이스 겹침 방지를 위해 비주얼 메쉬 콜리전 전면 비활성화
+	NexusMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("NexusMesh")); // 비주얼 메쉬 컴포넌트 생성
+	SetRootComponent(NexusMesh); // 비주얼 메쉬를 루트 컴포넌트로 설정
+	NexusMesh->SetCollisionProfileName(TEXT("NoCollision")); // 충돌 간섭을 방지하기 위해 메쉬 자체 콜리전 제거
 
-	CollisionCapsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CollisionCapsule")); // 라인트레이스 판정용 실린더 콜리전 객체 생성
-	CollisionCapsule->SetupAttachment(NexusMesh); // 본진 외형 하위에 부착
-	CollisionCapsule->InitCapsuleSize(300.f, 300.f); // 기본 타격 반경 및 높이 설정
-	CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); // 트레이스 및 타격 판정 전용 물리 개방
-	CollisionCapsule->SetCollisionProfileName(TEXT("BlockAllGeneric")); // 라인트레이스를 막기 위한 Block 속성 부여
+	CollisionCapsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CollisionCapsule")); // 물리 충돌 및 라인트레이스용 캡슐 생성
+	CollisionCapsule->SetupAttachment(NexusMesh); // 캡슐을 루트 하위에 컴포넌트로 부착
+	CollisionCapsule->InitCapsuleSize(300.f, 300.f); // 캡슐 크기를 기획에 맞게 반경과 높이 셋업
+	CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); // 캡슐의 물리 연산 및 레이캐스트 감지 허용
+	CollisionCapsule->SetCollisionProfileName(TEXT("BlockAllGeneric")); // 제네릭 차단 프로필 부여로 정확한 충돌 레이 판정 구현
 
-	DebrisMesh = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("DebrisMesh")); // 카오스 파편 객체 생성
-	DebrisMesh->SetupAttachment(NexusMesh); // 본진 외형 하위에 부착
+	DebrisMesh = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("DebrisMesh")); // 카오스 파편 컴포넌트 생성
+	DebrisMesh->SetupAttachment(NexusMesh); // 파편 컴포넌트 부착
 
-	NexusTeam = EFTNexusTeam::NoneTeam; // 초기 에러 방지용 진영 할당
+	NexusTeam = EFTNexusTeam::NoneTeam; // 진영 정보 안전 기본값 설정
 }
 
 void AFTNexus::BeginPlay()
 {
-	float TargetMaxHealth = 5000.0f; // 본진 전용 백업 초기 체력 세팅
+	float TargetMaxHealth = 5000.0f; // 최대 체력 기본 폴백 값 할당
 	
 	if (NexusDataTable && !DataRowName.IsNone())
 	{
 		if (FFTStructureData* RowData = NexusDataTable->FindRow<FFTStructureData>(DataRowName, TEXT("")))
 		{
-			TargetMaxHealth = RowData->MaxHealth; // 블루프린트에 등록된 시트 데이터로 체력 수치 완전 덮어쓰기
+			TargetMaxHealth = RowData->MaxHealth; // 데이터 테이블 기획 수치 반영
 		}
 	}
+
+	Super::BeginPlay(); // 부모 초기화 루틴을 선행 호출하여 GAS Actor Info 바인딩 무결성 확보
 
 	if (AttributeSet && AbilitySystemComponent)
 	{
-		AttributeSet->InitMaxHealth(TargetMaxHealth); // 확보된 시트 체력을 GAS 최대치에 세팅
-		AttributeSet->InitHealth(TargetMaxHealth); // 확보된 시트 체력을 GAS 현재치에 세팅
-		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AFTTowerBase::OnHealthChanged); // 공통 권한 개방을 통한 리스너 정상 부착
+		AttributeSet->InitMaxHealth(TargetMaxHealth); // 체력 속성 최대치 동기화 초기화
+		AttributeSet->InitHealth(TargetMaxHealth); // 체력 속성 현재치 동기화 초기화
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AFTTowerBase::OnHealthChanged); // 체력 상태값 모니터링 변경 감지 이벤트 바인딩
 
 		if (HasAuthority())
 		{
-			AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 같은 팀 타워가 하나라도 파괴되기 전까지 넥서스 무적 유지
+			AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 서버 권한 무적 태그 기본 인가
 		}
 	}
 
-	Super::BeginPlay(); // 기초 베이스 연동
-
 	if (UFTHealthWidgetComponent* HealthWidgetComp = FindComponentByClass<UFTHealthWidgetComponent>())
 	{
-		HealthWidgetComp->UpdateASCBinding(); // 넥서스 고유 UI 동기화 강제 지시
+		HealthWidgetComp->UpdateASCBinding(); // 체력 컴포넌트 전용 위젯 바인딩 갱신 지시
 	}
 }
 
 FGameplayTag AFTNexus::GetTeamTag() const
 {
-	return (NexusTeam == EFTNexusTeam::BlueTeam) ? FTTags::FTFaction::Team_Blue : FTTags::FTFaction::Team_Red; // 설정된 진영 태그 필터링 반환
+	return (NexusTeam == EFTNexusTeam::BlueTeam) ? FTTags::FTFaction::Team_Blue : FTTags::FTFaction::Team_Red; // 설정 진영을 체크하여 대응하는 전용 태그 반환
 }
 
 FGameplayTag AFTNexus::GetStructureTag() const
 {
-	return FTTags::FTObjectType::Structure_Nexus; // 본진 객체 식별용 고유 태그 반환
+	return FTTags::FTObjectType::Structure_Nexus; // 본진 객체 구분을 위한 넥서스 태그 반환
 }
 
 void AFTNexus::PerformDestructionEffects()
 {
-	if (AbilitySystemComponent) AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTCombat::Structure_Muted); // 무력화 태그 삽입
+	if (AbilitySystemComponent) AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTCombat::Structure_Muted); // 어빌리티 비활성화를 위한 가동 중지 상태 태그 추가
 
-	if (UFTHealthWidgetComponent* HealthWidgetComp = FindComponentByClass<UFTHealthWidgetComponent>()) HealthWidgetComp->SetVisibility(false); // 1P/2P 화면에서 체력바 UI 즉각 소거
+	if (CollisionCapsule) CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 서버-클라이언트 공통 피격용 캡슐 물리 정지
+	if (NexusMesh) NexusMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 서버-클라이언트 공통 물리 장벽 해제
 
-	if (CollisionCapsule) CollisionCapsule->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 파괴 후 라인트레이스 및 타격 판정 즉각 차단
-
-	if (NexusMesh)
+	// 데디케이티드 서버 네트워크 병목 방지를 위한 클라이언트 로컬 전용 렌더 및 시뮬레이션 제어 (포탑과 동일하게 붕괴 현상 수복)
+	if (GetNetMode() != NM_DedicatedServer)
 	{
-		NexusMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 메쉬 겹침 에러 차단을 위해 원본 외형 콜리전 소거
-		NexusMesh->SetVisibility(false); // 기존 신전 메쉬 렌더링 전면 은닉
+		if (UFTHealthWidgetComponent* HealthWidgetComp = FindComponentByClass<UFTHealthWidgetComponent>()) HealthWidgetComp->SetVisibility(false); // 가시성 소거 처리로 화면 UI 정지
+		if (NexusMesh) NexusMesh->SetVisibility(false); // 기존 스태틱 메쉬 렌더링 오프
+
+		if (DebrisMesh)
+		{
+			DebrisMesh->SetVisibility(true); // 카오스 파편 보이도록 토글
+			DebrisMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform); // 트랜스폼 독립으로 물리 덮어쓰기 현상 차단
+			DebrisMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); // 파편 물리 강제 개방
+			DebrisMesh->SetCollisionProfileName(TEXT("Destructible")); // 디스트럭터블 반응 프로필 주입
+			DebrisMesh->SetSimulatePhysics(true); // 클라이언트 로컬 물리 스레드를 깨워 카오스 붕괴 연출 시뮬레이션 개시
+			DebrisMesh->AddRadialImpulse(GetActorLocation(), 1000.0f, 20000.0f, ERadialImpulseFalloff::RIF_Linear, true); // 넥서스 파괴 전용 강제 충격량 주입
+		}
+
+		if (DestructionSound) UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation()); // 파괴 폭발 사운드 로컬 재생
+		if (DestructionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation()); // 가루 이펙트 로컬 스폰
+
+		OnNexusDestroyed(); // 블루프린트 최종 이벤트 재생 로컬 트리거
 	}
-
-	if (DebrisMesh)
-	{
-		DebrisMesh->SetVisibility(true); // 숨겨둔 카오스 조각 파편 렌더링 활성화
-		DebrisMesh->SetSimulatePhysics(true); // 복구 완료: 캐시 매니저가 조각들을 통제할 수 있도록 카오스 물리 스레드 재개방
-	}
-
-	if (DestructionSound) UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation()); // 위치 기반 파괴 사운드 재생
-	if (DestructionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation()); // 방향 기반 폭발 이펙트 재생
-
-	OnNexusDestroyed(); // 블루프린트단에 캐시 애니메이션 트리거 신호 발송
 }
 
 void AFTNexus::SetVulnerable(bool bNewVulnerable)
 {
 	if (!AbilitySystemComponent || !HasAuthority())
 	{
-		return; // 권한 검증
+		return; // 네트워크 정합성을 확보하기 위해 권한 검사 및 예외 탈출
 	}
 
 	if (bNewVulnerable)
 	{
-		AbilitySystemComponent->RemoveLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 무적 태그 제거
+		AbilitySystemComponent->RemoveLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 가해 허가 시 무적 판정 해제
 	}
 	else
 	{
-		AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 무적 태그 추가
+		AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Buff::Invincible, 1, EGameplayTagReplicationState::TagAndCountToAll); // 가해 비허가 시 무적 태그 덮어쓰기
 	}
 }
 
 bool AFTNexus::IsVulnerable() const
 {
-	return AbilitySystemComponent && !AbilitySystemComponent->HasMatchingGameplayTag(FTTags::FTStates::Buff::Invincible); // 무적 태그 미소지 여부 반환
+	return AbilitySystemComponent && !AbilitySystemComponent->HasMatchingGameplayTag(FTTags::FTStates::Buff::Invincible); // 무적 상태 태그 소유 상태가 아니면 true 반환
 }
 
 void AFTNexus::NotifyGameMode()
@@ -127,8 +131,8 @@ void AFTNexus::NotifyGameMode()
 	{
 		if (AFTGameMode* GameMode = World->GetAuthGameMode<AFTGameMode>())
 		{
-			GameMode->NexusDestroyed(this); // 오직 1P 서버 환경에서만 매치 종료 룰 연산을 위해 통보 발송
+			GameMode->NexusDestroyed(this); // 서버 게임모드에 넥서스 파괴 통보
 		}
 	}
-	SetLifeSpan(5.0f); // 메모리 완전 소거 지정을 통한 서버 동기화 오류 및 충돌 잔존 차단
+	SetLifeSpan(5.0f); // 충돌 찌꺼기가 남아있는 고스트 액터 버그 방지를 위한 생명 주기 자동 강제 제한
 }

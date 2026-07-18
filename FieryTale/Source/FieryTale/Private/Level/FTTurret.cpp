@@ -17,10 +17,13 @@
 #include "UI/Health/FTHealthWidgetComponent.h"
 #include "Core/Game/FTGameMode.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
 AFTTurret::AFTTurret()
 {
+	bReplicates = true; // 포탑 액터 자체 네트워크 동기화 활성화
+
 	TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh")); // 포탑 외형 생성
 	SetRootComponent(TurretMesh); // 루트 지정
 	TurretMesh->SetCollisionProfileName(TEXT("BlockAllGeneric")); // 물리 차단 지정
@@ -48,12 +51,23 @@ AFTTurret::AFTTurret()
 
 	DetectionRange = 1200.0f; // 사거리 초기화
 	AttackCooldown = 1.5f; // 연사 쿨타임 초기화
-	HomingAcceleration = 50000.0f; // 기본 유도 가속도 세팅
-	DestructionImpulseRadius = 500.0f; // 자체 폭발 반경 초기화
-	DestructionImpulseStrength = 10000.0f; // 에디터 개방용 붕괴 충격량 초기화
+	HomingAcceleration = 50000.0f; // 유도 가속도 세팅
+	DestructionImpulseRadius = 500.0f; // 폭발 반경 초기화
+	DestructionImpulseStrength = 10000.0f; // 붕괴 충격량 초기화
 	CurrentTarget = nullptr; // 타겟 초기화
 	bCanAttack = true; // 사격 가용 초기화
 	TurretDummyInstigator = nullptr; // 가상 폰 초기화
+}
+
+void AFTTurret::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps); // 상위 복제 프로퍼티 수집 호출
+	// 확정된 타겟 클라이언트 동기화
+	DOREPLIFETIME(AFTTurret, CurrentTarget);
+	// 포탑 진영 동기화
+	DOREPLIFETIME(AFTTurret, TurretTeam);
+	// 포탑 위치 동기화
+	DOREPLIFETIME(AFTTurret, TurretPosition);
 }
 
 void AFTTurret::BeginPlay()
@@ -107,31 +121,31 @@ void AFTTurret::PerformDestructionEffects()
 	GetWorld()->GetTimerManager().ClearTimer(TargetTrackingTimerHandle); // 감시 소거
 	GetWorld()->GetTimerManager().ClearTimer(AttackTimerHandle); // 연사 소거
 
-	if (LaserMesh) LaserMesh->SetVisibility(false); // 조준선 삭제
-	if (UWidgetComponent* HealthWidgetComp = FindComponentByClass<UWidgetComponent>()) HealthWidgetComp->SetVisibility(false); // 체력바 삭제
+	if (CollisionBox) CollisionBox->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 피격 박스 판정 정지
+	if (TurretMesh) TurretMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 물리 장벽 해제
 
-	if (TurretMesh)
+	// 데디케이티드 서버의 CPU 낭비를 막고 화면이 있는 리슨 서버 및 클라이언트에서만 시각적 붕괴 연출 수행
+	if (GetNetMode() != NM_DedicatedServer)
 	{
-		TurretMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 외형 충돌 소거
-		TurretMesh->SetVisibility(false); // 기둥 은닉
+		if (LaserMesh) LaserMesh->SetVisibility(false); // 조준선 삭제
+		if (UWidgetComponent* HealthWidgetComp = FindComponentByClass<UWidgetComponent>()) HealthWidgetComp->SetVisibility(false); // 체력바 삭제
+		if (TurretMesh) TurretMesh->SetVisibility(false); // 원본 메쉬 은닉
+
+		if (DebrisMesh)
+		{
+			DebrisMesh->SetVisibility(true); // 파편 활성화
+			DebrisMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform); // 트랜스폼 독립으로 서버 물리 덮어쓰기 현상 차단
+			DebrisMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); // 로컬 파편 물리 강제 개방
+			DebrisMesh->SetCollisionProfileName(TEXT("Destructible")); // 디스트럭터블 반응 프로필 주입
+			DebrisMesh->SetSimulatePhysics(true); // 클라이언트 로컬 물리 스레드 가동
+			DebrisMesh->AddRadialImpulse(GetActorLocation(), DestructionImpulseRadius, DestructionImpulseStrength, ERadialImpulseFalloff::RIF_Linear, true); // 파편 분해 충격량 인가
+		}
+
+		if (DestructionSound) UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation()); // 사운드 재생
+		if (DestructionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation()); // 이펙트 재생
+
+		OnTurretDestroyed(); // 블루프린트 연출 트리거
 	}
-
-	if (CollisionBox) CollisionBox->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 피격 박스 정지
-
-	if (DebrisMesh)
-	{
-		DebrisMesh->SetVisibility(true); // 파편 활성화
-		DebrisMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform); // 트랜스폼 독립으로 서버 물리 동기화 방해 차단
-		DebrisMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); // 파편 물리 강제 개방
-		DebrisMesh->SetCollisionProfileName(TEXT("Destructible")); // 디스트럭터블 반응 프로필 주입
-		DebrisMesh->SetSimulatePhysics(true); // 물리 스레드 가동
-		DebrisMesh->AddRadialImpulse(GetActorLocation(), DestructionImpulseRadius, DestructionImpulseStrength, ERadialImpulseFalloff::RIF_Linear, true); // 에디터에서 제어 가능한 변수로 자체 붕괴 충격량 강제 인가
-	}
-
-	if (DestructionSound) UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation()); // 사운드 재생
-	if (DestructionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation()); // 이펙트 재생
-
-	OnTurretDestroyed(); // 블루프린트 연출 트리거
 }
 
 void AFTTurret::NotifyGameMode()
@@ -151,56 +165,64 @@ void AFTTurret::TrackNearestEnemy()
 {
 	if (bIsDying) return; // 락다운
 
-	if (CurrentTarget && (GetDistanceTo(CurrentTarget) > DetectionRange))
+	if (HasAuthority())
 	{
-		CurrentTarget = nullptr; // 사거리 이탈 포인터 해제
-	}
-
-	if (CurrentTarget)
-	{
-		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(CurrentTarget); // 타겟 시스템 캐싱
-		if (TargetASC && TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
+		if (CurrentTarget && (GetDistanceTo(CurrentTarget) > DetectionRange))
 		{
-			CurrentTarget = nullptr; // 사망한 타겟 소거
+			CurrentTarget = nullptr; // 사거리 이탈 포인터 해제
 		}
-	}
 
-	if (!CurrentTarget)
-	{
-		TArray<AActor*> FoundActors;
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFTCharacterBase::StaticClass(), FoundActors); // 전역 색인
-		
-		AActor* NearestEnemy = nullptr; // 거리 갱신 변수
-		float ClosestDistance = DetectionRange; // 거리 한계선 세팅
-
-		for (AActor* Actor : FoundActors)
+		if (CurrentTarget)
 		{
-			AFTCharacterBase* EnemyChar = Cast<AFTCharacterBase>(Actor); // 적정 캐릭터 판독
-			if (!EnemyChar) continue; // 이탈
-
-			UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(EnemyChar); // 어빌리티 추출
-			if (!TargetASC || TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue; // 사망자 배제
-
-			bool bIsEnemy = false; // 진영 비트
-			if (TurretTeam == EFTTurretTeam::BlueTeam && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsEnemy = true; // 블루팀 타워 타겟 판별
-			if (TurretTeam == EFTTurretTeam::RedTeam && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsEnemy = true; // 레드팀 타워 타겟 판별
-
-			if (bIsEnemy)
+			UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(CurrentTarget); // 타겟 시스템 캐싱
+			if (TargetASC && TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
 			{
-				float Distance = GetDistanceTo(EnemyChar); // 타겟 거리 산출
-				if (Distance < ClosestDistance)
-				{
-					ClosestDistance = Distance; // 거리 갱신
-					NearestEnemy = EnemyChar; // 새 표적 인가
-				}
+				CurrentTarget = nullptr; // 사망한 타겟 소거
 			}
 		}
-		CurrentTarget = NearestEnemy; // 최종 표적 확정
+
+		if (!CurrentTarget)
+		{
+			TArray<AActor*> FoundActors;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFTCharacterBase::StaticClass(), FoundActors); // 전역 색인
+			
+			AActor* NearestEnemy = nullptr; // 거리 갱신 변수
+			float ClosestDistance = DetectionRange; // 거리 한계선 세팅
+
+			for (AActor* Actor : FoundActors)
+			{
+				AFTCharacterBase* EnemyChar = Cast<AFTCharacterBase>(Actor); // 적정 캐릭터 판독
+				if (!EnemyChar) continue; // 이탈
+
+				UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(EnemyChar); // 어빌리티 추출
+				if (!TargetASC || TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue; // 사망자 배제
+
+				bool bIsEnemy = false; // 진영 비트
+				if (TurretTeam == EFTTurretTeam::BlueTeam && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsEnemy = true; // 블루팀 타워 타겟 판별
+				if (TurretTeam == EFTTurretTeam::RedTeam && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsEnemy = true; // 레드팀 타워 타겟 판별
+
+				if (bIsEnemy)
+				{
+					float Distance = GetDistanceTo(EnemyChar); // 타겟 거리 산출
+					if (Distance < ClosestDistance)
+					{
+						ClosestDistance = Distance; // 거리 갱신
+						NearestEnemy = EnemyChar; // 새 표적 인가
+					}
+				}
+			}
+			CurrentTarget = NearestEnemy; // 최종 표적 서버 확정 및 클라이언트 자동 동기화
+		}
+
+		if (CurrentTarget && bCanAttack)
+		{
+			FireProjectile(); // 서버 권한 사격 개시
+		}
 	}
 
 	if (CurrentTarget && LaserMesh)
 	{
-		LaserMesh->SetVisibility(true); // 조준 활성화
+		LaserMesh->SetVisibility(true); // 동기화된 타겟을 기반으로 조준 활성화
 
 		FVector StartLocation = GetActorLocation() + FVector(0.0f, 0.0f, 200.0f); // 빔 원점 연산
 		FVector EndLocation = CurrentTarget->GetActorLocation(); // 빔 끝점 연산
@@ -212,11 +234,6 @@ void AFTTurret::TrackNearestEnemy()
 		LaserMesh->SetWorldLocation(MidLocation); // 중앙값 동기화
 		LaserMesh->SetWorldRotation(LaserRot); // 회전 정렬
 		LaserMesh->SetWorldScale3D(FVector(Distance / 100.0f, 0.05f, 0.05f)); // 배율 증축
-
-		if (bCanAttack && HasAuthority())
-		{
-			FireProjectile(); // 총알 생성 진입
-		}
 	}
 	else if (LaserMesh)
 	{
@@ -234,10 +251,12 @@ void AFTTurret::FireProjectile()
 	{
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		SpawnParams.Owner = this;
+		SpawnParams.Owner = this; // 오너 지정
 		TurretDummyInstigator = GetWorld()->SpawnActor<APawn>(APawn::StaticClass(), GetActorLocation(), GetActorRotation(), SpawnParams); // 가상 대리인 생성
+		
 		if (TurretDummyInstigator)
 		{
+			TurretDummyInstigator->SetReplicates(false); // 서버 최적화를 위해 불필요한 더미 폰의 네트워크 복제 완전 차단
 			TurretDummyInstigator->SetActorHiddenInGame(true); // 렌더링 은닉
 			TurretDummyInstigator->SetActorEnableCollision(false); // 물리 간섭 차단
 			TurretDummyInstigator->SetCanBeDamaged(false); // 무적 처리
@@ -261,7 +280,7 @@ void AFTTurret::FireProjectile()
 	{
 		if (UProjectileMovementComponent* MovementComp = Projectile->FindComponentByClass<UProjectileMovementComponent>())
 		{
-			MovementComp->bIsHomingProjectile = true; // 유도 센서 개방
+			MovementComp->bIsHomingProjectile = true; // 서버 유도 센서 개방
 			MovementComp->HomingAccelerationMagnitude = HomingAcceleration; // 유도 가속도 주입
 			if (CurrentTarget && CurrentTarget->GetRootComponent())
 			{
@@ -279,10 +298,14 @@ void AFTTurret::FireProjectile()
 
 		UGameplayStatics::FinishSpawningActor(Projectile, SpawnTransform); // 실세계 스폰 개시
 
-		if (HasAuthority())
-		{
-			Multicast_SyncProjectileHoming(Projectile, CurrentTarget); // 유도 렌더링 동기화 호출
-		}
+		// 투사체가 클라이언트 네트워크에 도착하기도 전에 RPC가 터지는 레이스 컨디션을 막기 위해 지연 동기화 적용
+		FTimerHandle RpcDelayHandle;
+		GetWorld()->GetTimerManager().SetTimer(RpcDelayHandle, FTimerDelegate::CreateLambda([this, Projectile, CurrentTarget = this->CurrentTarget]() {
+			if (IsValid(this) && IsValid(Projectile) && IsValid(CurrentTarget))
+			{
+				Multicast_SyncProjectileHoming(Projectile, CurrentTarget); // 지연 후 유도 렌더링 동기화 호출
+			}
+		}), 0.1f, false);
 	}
 
 	GetWorld()->GetTimerManager().SetTimer(AttackTimerHandle, FTimerDelegate::CreateLambda([this]() {

@@ -36,6 +36,8 @@ class FIERYTALE_API AFTTurret : public AFTTowerBase
 public:
 	AFTTurret();
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	EFTTurretTeam GetTurretTeam() const { return TurretTeam; }
 	EFTTurretPosition GetTurretPosition() const { return TurretPosition; }
 
@@ -83,10 +85,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
 	TSubclassOf<UGameplayEffect> AttackDamageEffectClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setup")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "Setup")
 	EFTTurretTeam TurretTeam;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Turret Property")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Turret Property")
 	EFTTurretPosition TurretPosition;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
@@ -110,7 +112,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup")
 	float DestructionImpulseStrength;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Setup")
+	UPROPERTY(BlueprintReadOnly, Replicated, Category = "Setup")
 	TObjectPtr<AActor> CurrentTarget;
 
 	UPROPERTY()
