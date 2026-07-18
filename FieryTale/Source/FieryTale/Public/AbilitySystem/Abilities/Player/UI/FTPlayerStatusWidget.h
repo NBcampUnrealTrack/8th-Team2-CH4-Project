@@ -4,12 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Character/FTCharacterTypes.h"
 #include "FTPlayerStatusWidget.generated.h"
 
 class UProgressBar;
 class UTextBlock;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
+class UImage;
+class UTexture2D;
 
 /**
  *	(임시 플레이 테스트용) 플레이어 체력바 + 체력 수치 표시 위젯 베이스.
@@ -30,11 +33,20 @@ protected:
 
 	//	체력 비율(0~1) 표시
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UProgressBar> HealthBar;
+	TObjectPtr<UImage> HealthBar;
 
 	//	"120 / 150" 형태의 수치 표시 (없어도 컴파일되도록 Optional)
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> HealthText;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|UI")
+	TObjectPtr<UMaterialInterface> HealthBarMaterial;
+	
+	// 초상화
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> PortraitImage;
+	UPROPERTY(EditDefaultsOnly, Category = "FieryTale|UI")
+	TMap<EFTCharacterType, TSoftObjectPtr<UTexture2D>> PortraitMap;
 
 private:
 	//	소유 Pawn에서 ASC를 찾아 바인딩. 실패하면(복제 지연 등) 재시도 타이머를 건다.
@@ -49,9 +61,14 @@ private:
 	void HandleMaxHealthChanged(const FOnAttributeChangeData& Data);
 
 	void RefreshHealthDisplay();
+	
+	void UpdatePortrait();
 
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> BoundASC;
+	
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> HealthMID;
 
 	float CachedHealth = 0.f;
 	float CachedMaxHealth = 0.f;
