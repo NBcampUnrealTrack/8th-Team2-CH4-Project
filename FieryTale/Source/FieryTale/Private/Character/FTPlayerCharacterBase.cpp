@@ -630,6 +630,9 @@ void AFTPlayerCharacterBase::Revive()
 	GetCharacterMovement()->GravityScale = 1.0f;
 	GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
 
+	// Die()에서 꺼둔 컨트롤러 Yaw 추종을 되살려서, 리스폰 후 다시 카메라(컨트롤러)를 바라보도록 복구한다.
+	bUseControllerRotationYaw = true;
+
 	InitializeCharacterAttribute();
 }
 

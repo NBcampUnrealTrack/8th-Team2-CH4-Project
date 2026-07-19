@@ -497,6 +497,11 @@ void AFTPlayerController::OnDeadTagChanged(const FGameplayTag Tag, int32 NewCoun
 
 	if (NewCount > 0)
 	{
+		if (APawn* ControlledPawn = GetPawn())
+		{
+			ControlledPawn->bUseControllerRotationYaw = false;
+		}
+
 		if (DeathOverlayClass)
 		{
 			DeathOverlayWidgetInstance = CreateWidget<UFTDeathWidget>(this, DeathOverlayClass);
@@ -508,6 +513,11 @@ void AFTPlayerController::OnDeadTagChanged(const FGameplayTag Tag, int32 NewCoun
 	}
 	else
 	{
+		if (APawn* ControlledPawn = GetPawn())
+		{
+			ControlledPawn->bUseControllerRotationYaw = true;
+		}
+
 		if (DeathOverlayWidgetInstance)
 		{
 			DeathOverlayWidgetInstance->RemoveFromParent();

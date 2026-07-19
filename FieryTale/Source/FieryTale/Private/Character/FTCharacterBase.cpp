@@ -33,6 +33,10 @@ void AFTCharacterBase::Die(AController* KillerController)
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 
+	// bUseControllerRotationYaw가 true인 채로 남아있으면 사망 몽타주 재생 중에도
+	// 카메라(컨트롤러) Yaw를 따라 캡슐이 계속 회전해 몽타주가 도는 것처럼 보인다.
+	bUseControllerRotationYaw = false;
+
 	OnCharacterDied.Broadcast(this, KillerController);
 
 	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
