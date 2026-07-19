@@ -12,6 +12,8 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/PlayerController.h"
 #include "Character/FTPlayerController.h"
+#include "Lobby/FTLobbyPlayerState.h"
+#include "InputCoreTypes.h"
 
 void UFTChatWidget::NativeConstruct()
 {
@@ -23,12 +25,6 @@ void UFTChatWidget::NativeConstruct()
 		if (ChatSubsystem)
 		{
 			ChatSubsystem->OnMessageReceived.AddDynamic(this, &UFTChatWidget::HandleMessageReceived);
-
-			// 위젯이 늦게 생성됐어도(레벨 트래블 등) 기존 기록을 즉시 복원한다.
-			for (const FFTChatMessage& Message : ChatSubsystem->GetHistory())
-			{
-				AddMessageRow(Message);
-			}
 		}
 	}
 
@@ -40,6 +36,23 @@ void UFTChatWidget::NativeConstruct()
 	{
 		Input_Message->OnTextCommitted.AddDynamic(this, &UFTChatWidget::OnTextCommitted);
 	}
+
+	//	표시 필터 버튼 바인딩(BP에 배치돼 있을 때만).
+	if (Btn_ViewAll)
+	{
+		Btn_ViewAll->OnClicked.AddDynamic(this, &UFTChatWidget::OnViewAllClicked);
+	}
+	if (Btn_ViewTeam)
+	{
+		Btn_ViewTeam->OnClicked.AddDynamic(this, &UFTChatWidget::OnViewTeamClicked);
+	}
+	if (Btn_ViewSystem)
+	{
+		Btn_ViewSystem->OnClicked.AddDynamic(this, &UFTChatWidget::OnViewSystemClicked);
+	}
+
+	//	위젯이 늦게 생성됐어도(레벨 트래블 등) 현재 필터에 맞춰 기존 기록을 즉시 복원한다.
+	RebuildMessageList();
 
 	//	컨트롤러가 엔터(ChatAction)로 이 입력창에 포커스를 줄 수 있도록 자신을 등록한다.
 	//	HUD 안에 중첩돼 있어도 이 자가 등록으로 컨트롤러가 참조를 얻는다.
@@ -59,9 +72,30 @@ void UFTChatWidget::NativeDestruct()
 	Super::NativeDestruct();
 }
 
+FReply UFTChatWidget::NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	//	입력창에 포커스가 있는 동안 Tab → 전송 채널(전체 ↔ 팀) 토글.
+	//	프리뷰 단계에서 처리하므로 EditableTextBox 의 기본 Tab 포커스 이동이 발생하기 전에 가로챈다.
+	if (InKeyEvent.GetKey() == EKeys::Tab && Input_Message && Input_Message->HasKeyboardFocus())
+	{
+		ToggleSendChannel();
+		return FReply::Handled();
+	}
+
+	return Super::NativeOnPreviewKeyDown(InGeometry, InKeyEvent);
+}
+
 void UFTChatWidget::SelectChannel(EFTChatChannel Channel)
 {
 	SendChannel = Channel;
+	//	현재 전송 채널 표시를 BP에서 갱신할 수 있도록 알린다.
+	OnSendChannelChanged(SendChannel);
+}
+
+void UFTChatWidget::ToggleSendChannel()
+{
+	//	전송 채널은 전체 ↔ 팀 만 순환한다. System 은 플레이어가 보내는 채널이 아니므로 제외한다.
+	SelectChannel(SendChannel == EFTChatChannel::Team ? EFTChatChannel::All : EFTChatChannel::Team);
 }
 
 void UFTChatWidget::OnSendClicked()
@@ -128,16 +162,125 @@ void UFTChatWidget::FocusMessageInput()
 
 void UFTChatWidget::RestoreGameInput()
 {
-	if (APlayerController* PC = GetOwningPlayer())
+	APlayerController* PC = GetOwningPlayer();
+	if (!PC)
 	{
-		PC->SetInputMode(FInputModeGameOnly());
-		PC->SetShowMouseCursor(false);
+		return;
 	}
+
+	//	로비(대기방)에서는 화면 전체가 UI 모드이고 마우스로 슬롯/버튼을 조작해야 하므로,
+	//	채팅 전송 후 게임 입력(GameOnly + 커서 숨김)으로 되돌리면 마우스가 사라진다.
+	//	로비/아레나 구분은 코드 다른 곳(FTPlayerController::OnRep_PlayerState)과 동일하게
+	//	PlayerState 타입으로 판별한다(로비=AFTLobbyPlayerState, 아레나=AFTPlayerState).
+	if (PC->GetPlayerState<AFTLobbyPlayerState>() != nullptr)
+	{
+		//	입력창 포커스 잠금만 풀고 UI 모드·커서는 그대로 유지한다.
+		FInputModeUIOnly UIMode;
+		PC->SetInputMode(UIMode);
+		PC->SetShowMouseCursor(true);
+		return;
+	}
+
+	//	아레나(인게임)에서는 기존대로 게임 조작으로 복귀한다.
+	PC->SetInputMode(FInputModeGameOnly());
+	PC->SetShowMouseCursor(false);
 }
 
 void UFTChatWidget::HandleMessageReceived(const FFTChatMessage& Message)
 {
-	AddMessageRow(Message);
+	//	현재 표시 필터에 해당하는 채널의 메시지만 즉시 추가한다.
+	if (PassesCurrentFilter(Message.Channel))
+	{
+		AddMessageRow(Message);
+	}
+}
+
+void UFTChatWidget::OnViewAllClicked()
+{
+	SetFilterMode(EFTChatFilterMode::All);
+}
+
+void UFTChatWidget::OnViewTeamClicked()
+{
+	//	"팀 메세지" 탭 = 팀 채팅 + 시스템 알림.
+	SetFilterMode(EFTChatFilterMode::TeamAndSystem);
+}
+
+void UFTChatWidget::OnViewSystemClicked()
+{
+	SetFilterMode(EFTChatFilterMode::SystemOnly);
+}
+
+void UFTChatWidget::SetFilterMode(EFTChatFilterMode NewMode)
+{
+	if (CurrentFilter == NewMode)
+	{
+		return;
+	}
+	CurrentFilter = NewMode;
+	RebuildMessageList();
+}
+
+bool UFTChatWidget::PassesCurrentFilter(EFTChatChannel Channel) const
+{
+	switch (CurrentFilter)
+	{
+	case EFTChatFilterMode::SystemOnly:
+		return Channel == EFTChatChannel::System;
+	case EFTChatFilterMode::TeamAndSystem:
+		return Channel == EFTChatChannel::Team || Channel == EFTChatChannel::System;
+	case EFTChatFilterMode::All:
+	default:
+		return true;
+	}
+}
+
+void UFTChatWidget::RebuildMessageList()
+{
+	if (!Scroll_Messages || !ChatSubsystem)
+	{
+		return;
+	}
+
+	//	기존 행을 모두 비우고 현재 필터에 맞는 채널 기록에서 다시 채운다.
+	//	채널별 버킷에서 직접 가져오므로, 통합 뷰의 총량 상한 때문에 오래된 팀/시스템 기록이
+	//	잘려나가는 일 없이 각 채널의 보관분을 온전히 복원한다.
+	Scroll_Messages->ClearChildren();
+
+	switch (CurrentFilter)
+	{
+	case EFTChatFilterMode::SystemOnly:
+		for (const FFTChatMessage& Message : ChatSubsystem->GetChannelHistory(EFTChatChannel::System))
+		{
+			AddMessageRow(Message);
+		}
+		break;
+
+	case EFTChatFilterMode::TeamAndSystem:
+	{
+		//	팀·시스템 두 버킷을 시각순으로 병합해 표시한다.
+		TArray<FFTChatMessage> Merged = ChatSubsystem->GetChannelHistory(EFTChatChannel::Team);
+		Merged.Append(ChatSubsystem->GetChannelHistory(EFTChatChannel::System));
+		Merged.StableSort([](const FFTChatMessage& A, const FFTChatMessage& B)
+		{
+			return A.Timestamp < B.Timestamp;
+		});
+		for (const FFTChatMessage& Message : Merged)
+		{
+			AddMessageRow(Message);
+		}
+		break;
+	}
+
+	case EFTChatFilterMode::All:
+	default:
+		//	GetHistory()가 세 채널을 시각순으로 병합해 돌려준다.
+		for (const FFTChatMessage& Message : ChatSubsystem->GetHistory())
+		{
+			AddMessageRow(Message);
+		}
+		break;
+	}
 }
 
 void UFTChatWidget::AddMessageRow(const FFTChatMessage& Message)

@@ -100,20 +100,65 @@ void UFTChatSubsystem::PushSystemMessage(const FString& Text)
 
 void UFTChatSubsystem::HandleMessageReceived(const FFTChatMessage& Message)
 {
-	History.Add(Message);
+	//	메시지를 채널별 버킷에 분리 보관한다.
+	TArray<FFTChatMessage>& Bucket = GetMutableChannelHistory(Message.Channel);
+	Bucket.Add(Message);
 
-	// 오래된 기록부터 잘라 상한을 유지한다.
-	if (MaxHistory > 0 && History.Num() > MaxHistory)
+	// 오래된 기록부터 잘라 해당 채널의 상한을 유지한다.
+	if (MaxHistory > 0 && Bucket.Num() > MaxHistory)
 	{
-		History.RemoveAt(0, History.Num() - MaxHistory);
+		Bucket.RemoveAt(0, Bucket.Num() - MaxHistory);
 	}
 
 	OnMessageReceived.Broadcast(Message);
 }
 
+TArray<FFTChatMessage> UFTChatSubsystem::GetHistory() const
+{
+	//	세 채널 버킷을 시각순으로 병합한 통합 뷰(최근 MaxHistory개로 제한).
+	//	모든 채널을 한 창에 표시하는 통합 채팅 위젯이 과거 기록을 복원할 때 쓴다.
+	TArray<FFTChatMessage> Merged;
+	Merged.Reserve(AllHistory.Num() + TeamHistory.Num() + SystemHistory.Num());
+	Merged.Append(AllHistory);
+	Merged.Append(TeamHistory);
+	Merged.Append(SystemHistory);
+
+	//	타임스탬프가 같은 메시지들은 버킷 내 원래 순서를 보존하도록 안정 정렬한다.
+	Merged.StableSort([](const FFTChatMessage& A, const FFTChatMessage& B)
+	{
+		return A.Timestamp < B.Timestamp;
+	});
+
+	if (MaxHistory > 0 && Merged.Num() > MaxHistory)
+	{
+		Merged.RemoveAt(0, Merged.Num() - MaxHistory);
+	}
+
+	return Merged;
+}
+
+const TArray<FFTChatMessage>& UFTChatSubsystem::GetChannelHistory(EFTChatChannel Channel) const
+{
+	switch (Channel)
+	{
+	case EFTChatChannel::Team:   return TeamHistory;
+	case EFTChatChannel::System: return SystemHistory;
+	case EFTChatChannel::All:
+	default:                     return AllHistory;
+	}
+}
+
+TArray<FFTChatMessage>& UFTChatSubsystem::GetMutableChannelHistory(EFTChatChannel Channel)
+{
+	//	상수 버전과 동일 매핑을 재사용한다(Effective C++ 관용구: 비상수 → 상수 위임).
+	return const_cast<TArray<FFTChatMessage>&>(GetChannelHistory(Channel));
+}
+
 void UFTChatSubsystem::ClearHistory()
 {
-	History.Reset();
+	AllHistory.Reset();
+	TeamHistory.Reset();
+	SystemHistory.Reset();
 }
 
 void UFTChatSubsystem::RegisterLocalComponent(UFTChatComponent* Component)

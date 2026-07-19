@@ -38,9 +38,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Chat")
 	void SendMessage(const FString& Text, EFTChatChannel Channel = EFTChatChannel::All);
 
-	/** 지금까지 누적된 채팅 기록(레벨 트래블에도 유지). */
+	/** 지금까지 누적된 전체 채팅 기록(All/Team/System 통합, 시각순, 최근 MaxHistory개). 레벨 트래블에도 유지. */
 	UFUNCTION(BlueprintPure, Category = "FieryTale|Chat")
-	const TArray<FFTChatMessage>& GetHistory() const { return History; }
+	TArray<FFTChatMessage> GetHistory() const;
+
+	/** 특정 채널(All/Team/System)의 기록만 반환한다. 채널별로 독립 보관되며 각자 MaxHistory 상한을 가진다.
+	 *  채널 탭(전체/팀/시스템)별 위젯이 자기 채널 기록만 복원/표시할 때 사용한다. */
+	UFUNCTION(BlueprintPure, Category = "FieryTale|Chat")
+	const TArray<FFTChatMessage>& GetChannelHistory(EFTChatChannel Channel) const;
 
 	/** 기록을 비운다. (예: 새 매치 시작 시 호출) */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Chat")
@@ -75,10 +80,22 @@ private:
 	/** 로컬 송신 경로로 쓸 채팅 컴포넌트(자기 PlayerController의 것). */
 	TWeakObjectPtr<UFTChatComponent> LocalChatComponent;
 
+	//	채널별 분리 보관. 각 버킷은 아래 MaxHistory로 독립 상한을 둔다.
+	//	→ 한 채널(예: All 채팅) 폭주가 다른 채널(Team/System 알림) 기록을 밀어내지 않는다.
 	UPROPERTY()
-	TArray<FFTChatMessage> History;
+	TArray<FFTChatMessage> AllHistory;
 
-	/** 기록 보관 최대 개수. 초과분은 앞에서부터 버린다. */
+	UPROPERTY()
+	TArray<FFTChatMessage> TeamHistory;
+
+	UPROPERTY()
+	TArray<FFTChatMessage> SystemHistory;
+
+	/** Channel에 해당하는 버킷의 가변 참조. HandleMessageReceived의 분리 보관에 쓰인다.
+	 *  상수 버전 GetChannelHistory와 동일 매핑을 재사용한다(중복 스위치 방지). */
+	TArray<FFTChatMessage>& GetMutableChannelHistory(EFTChatChannel Channel);
+
+	/** 기록 보관 최대 개수(채널 버킷 각각에 적용). 초과분은 앞에서부터 버린다. */
 	UPROPERTY(EditAnywhere, Category = "FieryTale|Chat")
 	int32 MaxHistory = 100;
 
