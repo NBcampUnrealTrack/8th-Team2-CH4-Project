@@ -8,10 +8,12 @@
 #include "FT_MinionCharacterBase.generated.h"
 
 class UAbilitySystemComponent;
-class UFT_MinionData;
+class AFT_MinionAIController;
+class AFT_MinionSpawner;
 class UGameplayAbility;
 class AFT_WayPoint;
 class UGameplayEffect;
+class UFT_MinionData;
 
 /**
  * FieryTale 전장의 블루 vs 레드 진영 미니언들을 총괄하는 GAS 내장형 C++ 마스터 캐릭터 클래스입니다.
@@ -56,6 +58,12 @@ public:
      */
     void LaunchMinionInfrastructure();
     
+    /** 풀링 시스템: 소속 스포너 할당 */
+    void SetOwningSpawner(AFT_MinionSpawner* InSpawner) { OwningSpawner = InSpawner; }
+
+    /** 스폰 대기열 진입용 풀링 초기화 */
+    void ReinitializeForPool(const FTransform& NewTransform, UFT_MinionData* NewData, const FGameplayTag& NewTeamTag);
+
     FORCEINLINE TSoftClassPtr<class AFT_ProjectileBase> GetMinionProjectileClass() const { return MinionProjectileClass; }
 
     /** 💡 [2단계: 데이터 에셋 Getter 뚫기 완착] 
@@ -79,6 +87,14 @@ public:
     virtual void Die(AController* KillerController) override;
 
 protected:
+    /** 애니메이션 등 시체가 유지된 후 오브젝트 풀로 반환되는 함수 */
+    UFUNCTION()
+    void DeactivateForPool();
+
+    /** 풀링 상태 리플리케이션 콜백 */
+    UFUNCTION()
+    void OnRep_IsActiveInPool();
+
     virtual void BeginPlay() override;
 
     /** 서버 단 AI 컨트롤러 포제스 시점에 GAS 하드웨어 연결을 마감하는 포인터 낚시 바늘 */
@@ -150,4 +166,17 @@ private:
     
     UPROPERTY()
     TSubclassOf<class UAnimInstance> FallbackAnimClass;
+    // =========================================================================
+    // [풀링(Pooling) 인프라]
+    // =========================================================================
+    /** 이 미니언을 생성 및 통제하는 소속 스포너 포인터 */
+    UPROPERTY()
+    AFT_MinionSpawner* OwningSpawner;
+
+    /** 풀링 시체 반환용 타이머 핸들 */
+    FTimerHandle PoolReturnTimerHandle;
+
+    /** 이 미니언이 현재 맵에 활성화된 상태인지 (풀에 들어가있으면 false) */
+    UPROPERTY(ReplicatedUsing = OnRep_IsActiveInPool)
+    bool bIsActiveInPool = true;
 };

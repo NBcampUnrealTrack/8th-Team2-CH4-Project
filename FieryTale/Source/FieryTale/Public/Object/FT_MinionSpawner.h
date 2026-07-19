@@ -11,6 +11,15 @@ class AFT_MinionCharacterBase;
 class AFT_WayPoint;
 class UFT_MinionData;
 
+USTRUCT()
+struct FMinionPoolArray
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    TArray<AFT_MinionCharacterBase*> Pool;
+};
+
 /**
  * 총괄님의 기획 명세: 단 1개의 마스터 미니언 캐릭터 클래스만 들고,
  * 데이터 에셋(MinionData)만 교체하여 탑/미드/바텀 레일로 무한 사출하는 순정 웨이브 스포너입니다.
@@ -22,6 +31,9 @@ class FIERYTALE_API AFT_MinionSpawner : public AActor
     
 public:    
     AFT_MinionSpawner();
+
+    /** 풀링: 미니언이 죽은 후 시체 기간이 끝나면 자신을 반환하는 인터페이스 */
+    void ReturnMinionToPool(AFT_MinionCharacterBase* Minion);
 
 protected:
     virtual void BeginPlay() override;
@@ -73,6 +85,13 @@ protected:
     /** 에디터에서 기획팀이 던져줄 원거리 미니언 속성 자산 데이터 (DA_Minion_Ranged) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale | Spawner | WaveData")
     TObjectPtr<UFT_MinionData> RangedMinionData;
+
+    // =========================================================================
+    // [미니언 오브젝트 풀]
+    // =========================================================================
+    /** 재사용 대기 중인(비활성화된) 미니언 시체 보관함. 데이터 에셋(종류)별로 분리해서 관리합니다. */
+    UPROPERTY()
+    TMap<UFT_MinionData*, FMinionPoolArray> MinionPools;
 
 private:
     /** 30초 주기로 웨이브 생산 종을 울리는 통제 함수 */

@@ -27,6 +27,9 @@ void AFT_MinionSpawner::BeginPlay()
 {
     Super::BeginPlay();
     
+    // MinionPool 초기화
+    MinionPools.Empty();
+    
     if (HasAuthority() && GetWorld())
     {
         GetWorld()->GetTimerManager().SetTimer(
@@ -176,38 +179,33 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
     FVector FinalSpawnLocation = SpawnerLocation + AggregatedOffset;
     FTransform SpawnTransform(SpawnRotation, FinalSpawnLocation);
     
-    AFT_MinionCharacterBase* SpawnedMinion = GetWorld()->SpawnActorDeferred<AFT_MinionCharacterBase>(
-        MasterMinionClass, 
-        SpawnTransform, 
-        this,                                                           
-        nullptr,                                                        
-        ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn 
-    );
-    
-    if (SpawnedMinion)
+    // 💡 [오브젝트 풀링 체크]: 큐에서 꺼낸 TargetData 전용 풀을 확인
+    AFT_MinionCharacterBase* PooledMinion = nullptr;
+    if (MinionPools.Contains(TargetData) && MinionPools[TargetData].Pool.Num() > 0)
     {
-        // 1단계: 마스터 진영 태그 및 조립용 데이터 에셋 하달
-        SpawnedMinion->SetMinionDataAndTeam(TargetData, SpawnerTeamTag);
-        
-        // 2단계: AOS 전선 진격을 위한 최초 공성 거점(웨이포인트) 주소지 확정 낙인
-        SpawnedMinion->SetCurrentTargetWayPoint(InitialWayPoint);
-        
-        // 3단계: [Stuck 및 Replication Pop 원천 박멸] FinishSpawning 이전에 정확한 바닥 위치 연산 집행
+        PooledMinion = MinionPools[TargetData].Pool.Pop();
+    }
+
+    if (PooledMinion)
+    {
+        // =====================================================================
+        // [재활용 분기]: 풀에서 꺼낸 미니언 재활성화
+        // =====================================================================
         FTransform FinalSpawnTransform = SpawnTransform;
         
-        if (GetWorld() && SpawnedMinion->GetCapsuleComponent())
+        if (GetWorld() && PooledMinion->GetCapsuleComponent())
         {
             FVector StartLoc = SpawnTransform.GetLocation();
             FVector EndLoc = StartLoc - FVector(0.0f, 0.0f, 1000.0f);
             
             FCollisionQueryParams QueryParams;
             QueryParams.AddIgnoredActor(this);
-            QueryParams.AddIgnoredActor(SpawnedMinion);
+            QueryParams.AddIgnoredActor(PooledMinion);
             
             FHitResult FloorHit;
             if (GetWorld()->LineTraceSingleByChannel(FloorHit, StartLoc, EndLoc, ECC_Visibility, QueryParams))
             {
-                float CapsuleHalfHeight = SpawnedMinion->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+                float CapsuleHalfHeight = PooledMinion->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
                 FVector CorrectionLocation = FloorHit.ImpactPoint + FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
                 
                 if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
@@ -218,28 +216,94 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
                         CorrectionLocation = ProjectedNavLoc.Location + FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
                     }
                 }
-                
                 FinalSpawnTransform.SetLocation(CorrectionLocation);
             }
         }
-        
-        // 4단계: 진짜 바닥 좌표가 주입된 트랜스폼으로 월드 최종 완착 선언
-        SpawnedMinion->FinishSpawning(FinalSpawnTransform);
 
-        // 5단계: 바닥 완착 확인 후 무브먼트 모드 세팅 및 정산
-        if (UCharacterMovementComponent* MoveComp = SpawnedMinion->GetCharacterMovement())
+        PooledMinion->ReinitializeForPool(FinalSpawnTransform, TargetData, SpawnerTeamTag);
+        PooledMinion->SetCurrentTargetWayPoint(InitialWayPoint);
+    }
+    else
+    {
+        // =====================================================================
+        // [신규 생성 분기]: 풀이 비어있으면 새로 스폰
+        // =====================================================================
+        AFT_MinionCharacterBase* SpawnedMinion = GetWorld()->SpawnActorDeferred<AFT_MinionCharacterBase>(
+            MasterMinionClass, 
+            SpawnTransform, 
+            this,                                                           
+            nullptr,                                                        
+            ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn 
+        );
+        
+        if (SpawnedMinion)
         {
-            MoveComp->SetMovementMode(EMovementMode::MOVE_Walking);
-            if (SpawnedMinion->GetCapsuleComponent())
+            SpawnedMinion->SetOwningSpawner(this);
+            SpawnedMinion->SetMinionDataAndTeam(TargetData, SpawnerTeamTag);
+            SpawnedMinion->SetCurrentTargetWayPoint(InitialWayPoint);
+            
+            FTransform FinalSpawnTransform = SpawnTransform;
+            if (GetWorld() && SpawnedMinion->GetCapsuleComponent())
             {
-                MoveComp->FindFloor(SpawnedMinion->GetCapsuleComponent()->GetComponentLocation(), MoveComp->CurrentFloor, false);
+                FVector StartLoc = SpawnTransform.GetLocation();
+                FVector EndLoc = StartLoc - FVector(0.0f, 0.0f, 1000.0f);
+                
+                FCollisionQueryParams QueryParams;
+                QueryParams.AddIgnoredActor(this);
+                QueryParams.AddIgnoredActor(SpawnedMinion);
+                
+                FHitResult FloorHit;
+                if (GetWorld()->LineTraceSingleByChannel(FloorHit, StartLoc, EndLoc, ECC_Visibility, QueryParams))
+                {
+                    float CapsuleHalfHeight = SpawnedMinion->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+                    FVector CorrectionLocation = FloorHit.ImpactPoint + FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
+                    
+                    if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
+                    {
+                        FNavLocation ProjectedNavLoc;
+                        if (NavSys->ProjectPointToNavigation(CorrectionLocation, ProjectedNavLoc, FVector(100.f, 100.f, 100.f)))
+                        {
+                            CorrectionLocation = ProjectedNavLoc.Location + FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
+                        }
+                    }
+                    FinalSpawnTransform.SetLocation(CorrectionLocation);
+                }
+            }
+            
+            SpawnedMinion->FinishSpawning(FinalSpawnTransform);
+
+            if (UCharacterMovementComponent* MoveComp = SpawnedMinion->GetCharacterMovement())
+            {
+                MoveComp->SetMovementMode(EMovementMode::MOVE_Walking);
+                if (SpawnedMinion->GetCapsuleComponent())
+                {
+                    MoveComp->FindFloor(SpawnedMinion->GetCapsuleComponent()->GetComponentLocation(), MoveComp->CurrentFloor, false);
+                }
+            }
+
+            if (HasAuthority())
+            {
+                SpawnedMinion->SpawnDefaultController();
             }
         }
+    }
+}
 
-        // 6단계: [AI 컨트롤러 주권 생성 및 강제 포제스 완착]
-        if (HasAuthority())
+void AFT_MinionSpawner::ReturnMinionToPool(AFT_MinionCharacterBase* Minion)
+{
+    if (!Minion) return;
+
+    UFT_MinionData* MinionData = Minion->GetMinionData();
+    if (MinionData)
+    {
+        if (!MinionPools.Contains(MinionData))
         {
-            SpawnedMinion->SpawnDefaultController();
+            MinionPools.Add(MinionData, FMinionPoolArray());
+        }
+
+        if (!MinionPools[MinionData].Pool.Contains(Minion))
+        {
+            MinionPools[MinionData].Pool.Add(Minion);
         }
     }
 }

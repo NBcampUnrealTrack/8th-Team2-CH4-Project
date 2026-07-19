@@ -12,6 +12,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTags/FTTags.h"
+#include "Object/FT_MinionSpawner.h"
+#include "TimerManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
@@ -100,6 +102,7 @@ void AFT_MinionCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 
     DOREPLIFETIME(AFT_MinionCharacterBase, MinionData);
     DOREPLIFETIME(AFT_MinionCharacterBase, MinionTeamTag);
+    DOREPLIFETIME(AFT_MinionCharacterBase, bIsActiveInPool);
 }
 
 void AFT_MinionCharacterBase::BeginPlay()
@@ -415,6 +418,97 @@ void AFT_MinionCharacterBase::Die(AController* KillerController)
 
     if (HasAuthority())
     {
-        SetLifeSpan(5.0f);
+        // 5초 뒤 오브젝트 풀로 반환
+        if (GetWorld())
+        {
+            GetWorld()->GetTimerManager().SetTimer(PoolReturnTimerHandle, this, &AFT_MinionCharacterBase::DeactivateForPool, 5.0f, false);
+        }
+    }
+}
+
+void AFT_MinionCharacterBase::DeactivateForPool()
+{
+    if (!HasAuthority()) return;
+
+    bIsActiveInPool = false;
+    OnRep_IsActiveInPool();
+
+    if (OwningSpawner)
+    {
+        OwningSpawner->ReturnMinionToPool(this);
+    }
+}
+
+void AFT_MinionCharacterBase::OnRep_IsActiveInPool()
+{
+    SetActorHiddenInGame(!bIsActiveInPool);
+    SetActorEnableCollision(bIsActiveInPool);
+    SetActorTickEnabled(bIsActiveInPool);
+
+    if (bIsActiveInPool)
+    {
+        if (GetCapsuleComponent())
+        {
+            GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+            GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+        }
+        if (GetMesh())
+        {
+            GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        }
+    }
+    else
+    {
+        if (GetCharacterMovement())
+        {
+            GetCharacterMovement()->StopMovementImmediately();
+            GetCharacterMovement()->DisableMovement();
+        }
+        if (GetCapsuleComponent())
+        {
+            GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        }
+        if (GetMesh())
+        {
+            GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        }
+    }
+}
+
+void AFT_MinionCharacterBase::ReinitializeForPool(const FTransform& NewTransform, UFT_MinionData* NewData, const FGameplayTag& NewTeamTag)
+{
+    // 위치 초기화
+    SetActorTransform(NewTransform, false, nullptr, ETeleportType::ResetPhysics);
+
+    // 데이터 교체
+    SetMinionDataAndTeam(NewData, NewTeamTag);
+
+    if (AbilitySystemComponent)
+    {
+        AbilitySystemComponent->RemoveLooseGameplayTag(FTTags::FTStates::Core::Dead, 1);
+        
+        // 모든 Gameplay Effect 제거
+        FGameplayEffectQuery Query;
+        AbilitySystemComponent->RemoveActiveEffects(Query);
+    }
+
+    if (AbilitySystemComponent && NewData)
+    {
+        AbilitySystemComponent->SetNumericAttributeBase(UFT_AttributeSet::GetHealthAttribute(), NewData->DefaultMaxHealth);
+    }
+
+    // 부활(활성화)
+    bIsActiveInPool = true;
+    OnRep_IsActiveInPool();
+    
+    // 시체 회전 복구
+    if (GetMesh())
+    {
+        GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+    }
+
+    if (GetCharacterMovement())
+    {
+        GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
     }
 }

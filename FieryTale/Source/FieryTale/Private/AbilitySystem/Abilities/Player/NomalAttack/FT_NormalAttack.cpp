@@ -173,14 +173,6 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
 
     bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility, QueryParams);
 
-#if !UE_BUILD_SHIPPING
-    DrawDebugLine(GetWorld(), Start, bHit ? HitResult.ImpactPoint : End, FColor::Red, false, 2.0f, 0, 5.0f);
-    if (bHit)
-    {
-        DrawDebugSphere(GetWorld(), HitResult.ImpactPoint, 30.f, 12, FColor::Yellow, false, 3.0f, 0, 2.0f);
-    }
-#endif
-
     if (bHit && HitResult.GetActor())
     {
         AActor* HitActor = HitResult.GetActor();
@@ -290,11 +282,6 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
                 }
             }
 
-#if !UE_BUILD_SHIPPING
-            FVector ArrowEnd = Start + (FinalForward * 150.f);
-            DrawDebugDirectionalArrow(World, Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
-#endif
-
             FTransform SpawnTransform(FinalForward.Rotation(), Start);
             FGameplayEffectSpecHandle DamageSpecHandle = MakeOutgoingGameplayEffectSpec(BaseDamageEffectClass, GetAbilityLevel());
             if (DamageSpecHandle.IsValid())
@@ -357,11 +344,6 @@ void UFT_NormalAttack::SpawnProjectileLogic(UFT_WeaponData* InWeaponData, AFTPla
                     FinalForward = FMath::VRandCone(Forward, FMath::DegreesToRadians(AttributeSet->GetWeaponSpread()));
                 }
             }
-
-#if !UE_BUILD_SHIPPING
-            FVector ArrowEnd = Start + (FinalForward * 150.f);
-            DrawDebugDirectionalArrow(World, Start, ArrowEnd, 30.f, FColor::Green, false, 1.5f, 0, 4.0f);
-#endif
 
             FTransform SpawnTransform(FinalForward.Rotation(), Start);
             
