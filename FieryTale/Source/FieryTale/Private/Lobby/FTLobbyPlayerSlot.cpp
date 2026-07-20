@@ -9,7 +9,7 @@
 #include "Components/WidgetSwitcher.h"
 #include "Engine/Texture2D.h"
 
-void UFTLobbyPlayerSlot::UpdateSlotData(const FString& InPlayerName, EFTCharacterType InCharType, bool bIsReady)
+void UFTLobbyPlayerSlot::UpdateSlotData(const FString& InPlayerName, EFTCharacterType InCharType, bool bIsReady, int32 PlayerIndex)
 {
 	// 1. 오직 '이름이 비어있는가?'만으로 접속 여부(빈 슬롯 여부)를 판별합니다.[cite: 10]
 	bool bIsEmptySlot = InPlayerName.IsEmpty();
@@ -30,6 +30,10 @@ void UFTLobbyPlayerSlot::UpdateSlotData(const FString& InPlayerName, EFTCharacte
 		if (Img_HeroPortrait)
 		{
 			Img_HeroPortrait->SetBrushFromTexture(nullptr);
+		}
+		if (Img_TeamColor)
+		{
+			Img_TeamColor->SetColorAndOpacity(FLinearColor(0.2f, 0.2f, 0.2f, 0.0f)); // 어두운 반투명 회색
 		}
 	}
 	// 4. 유저가 접속해 있는 슬롯(1번 인덱스)일 때의 데이터 처리
@@ -55,6 +59,24 @@ void UFTLobbyPlayerSlot::UpdateSlotData(const FString& InPlayerName, EFTCharacte
 				Text_ReadyState->SetColorAndOpacity(FSlateColor(FLinearColor::White)); // 기본색
 			}
 		}
+		
+		if (Img_TeamColor)
+		{
+			FLinearColor TintColor = FLinearColor::White;
+			
+			if (PlayerIndex % 2 == 0) //PlayerIndex는 0번 부터 시작
+			{
+				TintColor = FLinearColor(0.1f, 0.3f, 1.0f, 1.0f); // 1,3P: 파랑
+			}
+			else
+			{
+				TintColor = FLinearColor(1.0f, 0.1f, 0.1f, 1.0f); // 2,4P: 빨강
+			}
+			
+			// Image 컴포넌트의 틴트 색상은 SetColorAndOpacity로 제어합니다.
+			Img_TeamColor->SetColorAndOpacity(TintColor);
+		}
+		
 		// 캐릭터 타입에 따른 초상화 세팅[cite: 10]
 		if (Img_HeroPortrait)
 		{

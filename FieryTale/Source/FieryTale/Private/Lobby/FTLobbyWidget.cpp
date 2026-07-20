@@ -3,6 +3,7 @@
 
 #include "Lobby/FTLobbyWidget.h"
 
+#include "TimerManager.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/HorizontalBox.h"
@@ -150,7 +151,7 @@ void UFTLobbyWidget::RefreshTeamRoster()
 				TargetPS->OnReadyStateChanged.RemoveDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
 				TargetPS->OnReadyStateChanged.AddDynamic(this, &UFTLobbyWidget::RefreshTeamRoster);
 				
-				PlayerSlot->UpdateSlotData(TargetPS->GetPlayerName(), TargetPS->GetCharacterType(), TargetPS->IsReady());
+				PlayerSlot->UpdateSlotData(TargetPS->GetPlayerName(), TargetPS->GetCharacterType(), TargetPS->IsReady(),TargetPS->PlayerIndex);
 				bSlotFilled = true;
 			}
 		}

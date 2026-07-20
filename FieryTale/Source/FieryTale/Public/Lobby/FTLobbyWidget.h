@@ -39,7 +39,7 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	UButton* Btn_ReturnToMain;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(meta = (BindWidgetOptional))
 	UTextBlock* Text_ReadyStatus;
 	
 	// 캐릭터 정보가 담긴 데이터 테이블 (에디터에서 할당)

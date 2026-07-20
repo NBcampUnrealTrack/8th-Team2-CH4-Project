@@ -32,6 +32,9 @@ protected:
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> Text_ReadyState;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Img_TeamColor;
 
 public:
 	// 에디터에서 캐릭터 타입별 2D 텍스처(초상화)를 지정할 맵
@@ -39,5 +42,5 @@ public:
 	TMap<EFTCharacterType, TSoftObjectPtr<UTexture2D>> PortraitMap;
 
 	// 이 슬롯의 데이터(이름, 선택한 캐릭터)를 최신화하는 함수
-	void UpdateSlotData(const FString& InPlayerName, EFTCharacterType InCharType,bool bIsReady = false);
+	void UpdateSlotData(const FString& InPlayerName, EFTCharacterType InCharType,bool bIsReady = false, int32 PlayerIndex = 0);
 };
