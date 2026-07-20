@@ -113,6 +113,9 @@ namespace GameplayCue
 
 	//	[예시 1] 앨리스 스킬 시전 연출 큐. FT_AliceSkill::ActivateAbility에서 ExecuteGameplayCue로 격발한다.
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_SkillCast, "GameplayCue.Alice.SkillCast", "앨리스 스킬 시전 순간의 머즐/차지 연출 격발용 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_SkillCast_AttackSkill, "GameplayCue.Alice.SkillCast.AttackSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_SkillCast_UtilSkill, "GameplayCue.Alice.SkillCast.UtilSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_SkillCast_UltimateSkill, "GameplayCue.Alice.SkillCast.UltimateSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
 
 	// 공용 디버프 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Stunned, "GameplayCue.Debuff.Stunned", "기절: 모든 행동이 불가능해지는 상태이상 디버프 태그");
