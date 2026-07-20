@@ -8,6 +8,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayTags/FTTags.h"
+#include "Character/FTPlayerState.h"
 
 AFTBush::AFTBush()
 {
@@ -144,24 +145,19 @@ void AFTBush::SetPawnVisibilityLocal(APawn* Pawn, bool bVisible)
 
 void AFTBush::OnRep_Occupants(const TArray<APawn*>& OldOccupants)
 {
+	//	[레이스 A 수정] 이 부시에서 나간 pawn의 외형을 복원한다.
+	//	과거에는 Invisibility 태그가 남아있는지로 게이트했으나, 태그 제거는 폰 ASC의 '별도 채널'로 복제되어
+	//	이 Occupants RepNotify보다 늦게 도착할 수 있다. 그러면 아직 태그가 남은 것으로 보여 복원이 스킵되고,
+	//	이후 재평가 트리거가 없어 pawn이 영구히 안 보이게 된다(클라 전용 증상의 주원인).
+	//	부시가 Invisibility 태그의 유일한 사용처이므로, 나간 pawn은 태그와 무관하게 복원한다.
 	for (APawn* OldPawn : OldOccupants)
 	{
 		if (OldPawn && !Occupants.Contains(OldPawn))
 		{
-			if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OldPawn))
-			{
-				if (!ASC->HasMatchingGameplayTag(FTTags::FTStates::Buff::Invisibility))
-				{
-					SetPawnVisibilityLocal(OldPawn, true); // 외형 노출 복원
-				}
-			}
-			else
-			{
-				SetPawnVisibilityLocal(OldPawn, true); // 외형 노출 복원
-			}
+			SetPawnVisibilityLocal(OldPawn, true); // 외형 노출 복원
 		}
 	}
-	UpdateBushEffects(); // 연출 동기화 호출
+	UpdateBushEffects(); // 현재 occupant 기준으로 재적용
 }
 
 void AFTBush::OnRep_RevealedOccupants()
@@ -181,6 +177,23 @@ void AFTBush::UpdateBushEffects()
 	
 	bool bIsLocalBlue = LocalASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue); // 블루팀 판독
 	bool bIsLocalRed = LocalASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red); // 레드팀 판독
+
+	//	[레이스 B 수정] 로컬 팀 태그가 아직 복제 전이면(둘 다 false) 아래 숨김 판정이 아군까지 전부 숨겨버린다.
+	//	접속 직후 팀 태그가 늦게 오면 아군이 영구히 안 보이는 원인이 된다. 팀이 확정되기 전엔 숨김을 보류하고
+	//	(기본=보임), 팀 확정 시(OnTeamTagReady) 재평가하도록 1회 구독한다.
+	if (!bIsLocalBlue && !bIsLocalRed)
+	{
+		if (!bSubscribedToTeamReady)
+		{
+			if (AFTPlayerState* LocalPS = LocalPC->GetPlayerState<AFTPlayerState>())
+			{
+				LocalPS->OnTeamTagReady.AddUObject(this, &AFTBush::UpdateBushEffects);
+				bSubscribedToTeamReady = true;
+			}
+		}
+		return;
+	}
+
 	bool bLocalTeamHasVision = false; // 가시 플래그 초기화
 	
 	if (Occupants.Contains(LocalPlayer))

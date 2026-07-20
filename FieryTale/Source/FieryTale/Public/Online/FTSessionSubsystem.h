@@ -90,7 +90,7 @@ public:
 	/** 방 목록을 검색한다. 완료 시 OnFindSessionsCompleteEvent 로 결과를 전달한다.
 	 *  bFindDedicated=true 면 데디케이티드 서버 세션(EOS Sessions)을, false 면 리슨 호스트 방(EOS Lobbies)을 검색한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
-	void FindSessions(int32 MaxResults = 20, bool bUseLAN = false, bool bFindDedicated = true);
+	void FindSessions(int32 MaxResults = 20, bool bUseLAN = false, bool bFindDedicated = false);
 
 	/** 검색 결과 인덱스로 방에 입장한다. 비밀번호가 걸린 방이면 Password 가 일치해야 한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
