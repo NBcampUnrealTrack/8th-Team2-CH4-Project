@@ -37,6 +37,7 @@ AFT_MinionCharacterBase::AFT_MinionCharacterBase()
     if (GetCapsuleComponent())
     {
         GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
+        GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_GameTraceChannel1, ECollisionResponse::ECR_Block);
     }
 
     // [양손 무기 컴포넌트 독립 타설]
@@ -127,6 +128,7 @@ void AFT_MinionCharacterBase::BeginPlay()
     if (GetCapsuleComponent())
     {
         GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
+        GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_GameTraceChannel1, ECollisionResponse::ECR_Block);
     }
 }
 
@@ -471,7 +473,8 @@ void AFT_MinionCharacterBase::OnRep_IsActiveInPool()
             // 죽을 때 NoCollision으로 바뀐 프로필을 완벽히 Pawn 기본값으로 복구합니다 (클라이언트 포함)
             GetCapsuleComponent()->SetCollisionProfileName(TEXT("Pawn"));
             GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-            GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+            GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
+            GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_GameTraceChannel1, ECollisionResponse::ECR_Block);
         }
         if (GetMesh())
         {
