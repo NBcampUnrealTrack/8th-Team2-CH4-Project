@@ -70,6 +70,12 @@ void UFTLoadingScreenSubsystem::HandlePostLoadMapWithWorld(UWorld* LoadedWorld)
 
 void UFTLoadingScreenSubsystem::ShowLoadingScreen()
 {
+	//	데디케이티드 서버는 뷰포트가 없다. 로딩 화면 위젯을 만들지 않는다.
+	//	(로딩 완료 코디네이션 로직 자체는 그대로 두고, 위젯 생성/부착만 건너뛴다.)
+	if (IsRunningDedicatedServer())
+	{
+		return;
+	}
 
 	if (LoadingWidgetClass && !LoadingWidgetInstance)
 	{

@@ -300,7 +300,25 @@ void AFTGameMode::EndSessionAndReturn()
 	// 1. 다음 맵 이동 및 정상화를 위해 시간을 1.0으로 복구
 	UGameplayStatics::SetGlobalTimeDilation(GetWorld(), 1.0f);
 
-	// 2. 온라인 세션 파괴 및 메인 레벨로 복귀 (기존 로직 유지)
+	// 2-A. 데디케이티드 서버: 돌아갈 메인 메뉴가 없다. ReturnToMainMenuHost를 쓰면 서버가 아레나에 눌러앉아
+	//      다음 접속자가 끝난 아레나로 들어온다. 세션은 파괴하지 않고(서버 프로세스가 계속 소유)
+	//      대기방으로 ServerTravel 해서 서버를 다음 매치용으로 리셋한다. 연결된 클라는 함께 대기방으로 이동한다.
+	if (IsRunningDedicatedServer())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			const FString LobbyUrl = TEXT("/Game/Maps/L_Lobby");
+			UE_LOG(LogFTSession, Log, TEXT("[DediServer] 매치 종료 → 대기방으로 ServerTravel: %s"), *LobbyUrl);
+			World->ServerTravel(LobbyUrl);
+		}
+		else
+		{
+			UE_LOG(LogFTSession, Error, TEXT("[DediServer] 매치 종료 처리 실패 — World 없음"));
+		}
+		return;
+	}
+
+	// 2-B. 리슨 호스트(기존 경로): 온라인 세션 파괴 후 메인 메뉴로 복귀.
 	if (UGameInstance* GameInstance = GetGameInstance())
 	{
 		if (UFTSessionSubsystem* Session = GameInstance->GetSubsystem<UFTSessionSubsystem>())
