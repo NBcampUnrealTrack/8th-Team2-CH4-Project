@@ -121,6 +121,13 @@ void AFT_MinionCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimePropert
 void AFT_MinionCharacterBase::BeginPlay()
 {
     Super::BeginPlay();
+
+    // 블루프린트(CDO)에서 Pawn 프로필 기본값으로 덮어씌워져 Visibility가 무시되는 현상 방지
+    // 새로 스폰된 미니언도 레드후드(플레이어)의 라인트레이스(ECC_Visibility)에 무조건 맞도록 강제합니다.
+    if (GetCapsuleComponent())
+    {
+        GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
+    }
 }
 
 void AFT_MinionCharacterBase::PossessedBy(AController* NewController)
