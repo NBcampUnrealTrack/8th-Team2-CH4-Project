@@ -21,7 +21,7 @@ AFT_MinionAIController::AFT_MinionAIController()
     if (SightConfig && MinionPerceptionComponent)
     {
         SightConfig->SightRadius = 400.f;
-        SightConfig->LoseSightRadius = 500.f;
+        SightConfig->LoseSightRadius = 200.f;
         SightConfig->PeripheralVisionAngleDegrees = 90.f;
         SightConfig->SetMaxAge(3.f);
         
