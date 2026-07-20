@@ -168,7 +168,13 @@ void UFTSessionSubsystem::HandleCreateSessionComplete(FName SessionName, bool bW
 
 	OnCreateSessionCompleteEvent.Broadcast(bWasSuccessful);
 
-	if (bWasSuccessful && bTravelToLobbyOnHost)
+	//	데디케이티드 서버는 이미 부팅 시 대기방(L_Lobby)에 있으므로 ?listen 트래블을 하지 않는다.
+	//	(리슨 호스트만 방 생성 후 대기방으로 ServerTravel 한다.)
+	if (bWasSuccessful && IsRunningDedicatedServer())
+	{
+		UE_LOG(LogFTSession, Log, TEXT("[DediServer] 데디 세션 생성 성공 — 대기방에서 접속 대기 (?listen 트래블 생략)"));
+	}
+	else if (bWasSuccessful && bTravelToLobbyOnHost)
 	{
 		if (UWorld* World = GetWorld())
 		{
@@ -186,7 +192,64 @@ void UFTSessionSubsystem::HandleCreateSessionComplete(FName SessionName, bool bW
 	}
 }
 
-void UFTSessionSubsystem::FindSessions(int32 MaxResults, bool bUseLAN)
+void UFTSessionSubsystem::CreateDedicatedSession(int32 MaxPlayers, const FString& RoomName)
+{
+	//	데디케이티드 서버 경로: 로컬 플레이어(UserId)가 없다. 서버 크리덴셜로 세션을 만든다.
+	IOnlineSubsystem* Subsystem = Online::GetSubsystem(GetWorld());
+	if (Subsystem)
+	{
+		SessionInterface = Subsystem->GetSessionInterface();
+	}
+
+	UE_LOG(LogFTSession, Log, TEXT("[DediServer] 데디 세션 생성 시작: MaxPlayers=%d, RoomName=%s"), MaxPlayers, *RoomName);
+
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogFTSession, Error, TEXT("[DediServer] SessionInterface 무효 (OSS 미초기화) — 데디 세션 생성 실패"));
+		OnCreateSessionCompleteEvent.Broadcast(false);
+		return;
+	}
+
+	//	이전 실행에서 남은 세션이 있으면 파괴 후 '데디' 경로로 재생성 예약(리슨 재생성 경로로 새지 않도록 별도 플래그 사용).
+	if (SessionInterface->GetNamedSession(NAME_GameSession) != nullptr)
+	{
+		UE_LOG(LogFTSession, Warning, TEXT("[DediServer] 기존 GameSession 잔류 → 파괴 후 데디 세션 재생성 예약"));
+		bCreateDedicatedSessionOnDestroyComplete = true;
+		PendingMaxPlayers = MaxPlayers;
+		PendingRoomName   = RoomName;
+		LeaveSession();
+		return;
+	}
+
+	FOnlineSessionSettings Settings;
+	Settings.bIsLANMatch            = false;
+	Settings.bIsDedicated           = true;    // ← 데디케이티드 세션
+	Settings.bUsesPresence          = false;   // 데디는 presence 없음
+	Settings.bUseLobbiesIfAvailable = false;   // Lobbies가 아니라 Sessions 사용
+	Settings.bAllowJoinViaPresence  = false;
+	Settings.bAllowJoinInProgress   = true;
+	Settings.bShouldAdvertise       = true;
+	Settings.bAllowInvites          = false;
+	Settings.NumPublicConnections   = FMath::Max(1, MaxPlayers);
+	Settings.NumPrivateConnections  = 0;
+
+	Settings.Set(Key_MatchType, FieryTaleMatchType, EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(Key_RoomName,  RoomName,           EOnlineDataAdvertisementType::ViaOnlineService);
+	Settings.Set(Key_Password,  FString(),          EOnlineDataAdvertisementType::ViaOnlineService);
+
+	CreateSessionCompleteDelegateHandle = SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegate);
+
+	//	로컬 유저 대신 HostingPlayerNum=0(서버 아이덴티티)으로 생성한다.
+	UE_LOG(LogFTSession, Log, TEXT("[DediServer] EOS CreateSession(dedicated) 호출 — 콜백 대기"));
+	if (!SessionInterface->CreateSession(0, NAME_GameSession, Settings))
+	{
+		UE_LOG(LogFTSession, Error, TEXT("[DediServer] CreateSession 이 즉시 false 반환 — 콜백 없이 종료"));
+		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
+		OnCreateSessionCompleteEvent.Broadcast(false);
+	}
+}
+
+void UFTSessionSubsystem::FindSessions(int32 MaxResults, bool bUseLAN, bool bFindDedicated)
 {
 	// 🌟 로컬 창구 통일 및 동적 갱신
 	IOnlineSubsystem* Subsystem = Online::GetSubsystem(GetWorld());
@@ -203,10 +266,22 @@ void UFTSessionSubsystem::FindSessions(int32 MaxResults, bool bUseLAN)
 
 	SessionSearch = MakeShareable(new FOnlineSessionSearch());
 	SessionSearch->MaxSearchResults = FMath::Max(1, MaxResults);
-	SessionSearch->bIsLanQuery = false; 
+	SessionSearch->bIsLanQuery = false;
 
-	SessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
+	if (bFindDedicated)
+	{
+		//	데디케이티드 서버가 만든 세션은 EOS Sessions(Lobbies 아님)이다.
+		//	SEARCH_LOBBIES를 설정하지 않고 데디 세션만 검색한다.
+		SessionSearch->QuerySettings.Set(SEARCH_DEDICATED_ONLY, true, EOnlineComparisonOp::Equals);
+	}
+	else
+	{
+		//	리슨 호스트(플레이어가 만든 방)는 EOS Lobbies를 쓴다(PIE/로컬 테스트 경로).
+		SessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
+	}
 	SessionSearch->QuerySettings.Set(Key_MatchType, FieryTaleMatchType, EOnlineComparisonOp::Equals);
+
+	UE_LOG(LogFTSession, Log, TEXT("[Find] 1) 검색 모드=%s"), bFindDedicated ? TEXT("Dedicated(Sessions)") : TEXT("Listen(Lobbies)"));
 
 	FindSessionsCompleteDelegateHandle = SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
 
@@ -247,14 +322,20 @@ void UFTSessionSubsystem::HandleFindSessionsComplete(bool bWasSuccessful)
 			Info.RoomName = RoomName.IsEmpty() ? Result.Session.OwningUserName : RoomName;
 
 			Info.MaxPlayers = Result.Session.SessionSettings.NumPublicConnections;
-			Info.CurrentPlayers = Info.MaxPlayers - Result.Session.NumOpenPublicConnections;
-			
-			if (Info.CurrentPlayers <= 0)
+			const int32 RawCurrent = Info.MaxPlayers - Result.Session.NumOpenPublicConnections;
+
+			if (Result.Session.SessionSettings.bIsDedicated)
 			{
-				Info.CurrentPlayers = 1;
+				//	데디 서버는 서버 자신이 플레이어가 아니므로 0명이 정상. 리슨용 +1 보정을 적용하지 않는다.
+				Info.CurrentPlayers = FMath::Clamp(RawCurrent, 0, Info.MaxPlayers);
+			}
+			else
+			{
+				//	리슨(Null/Lobby) 경로: 호스트가 최소 1명으로 잡히도록 기존 보정 유지
+				//	(OSS Null 검색에서 CurrentPlayers가 0 이하로 나오는 버그 대응).
+				Info.CurrentPlayers = FMath::Clamp(RawCurrent <= 0 ? 1 : RawCurrent, 1, Info.MaxPlayers);
 			}
 
-			Info.CurrentPlayers = FMath::Clamp(Info.CurrentPlayers, 1, Info.MaxPlayers);
 			Info.PingMs = Result.PingInMs;
 
 			FString Password;
@@ -414,7 +495,13 @@ void UFTSessionSubsystem::HandleDestroySessionComplete(FName SessionName, bool b
 
 	OnDestroySessionCompleteEvent.Broadcast(bWasSuccessful);
 
-	if (bWasSuccessful && bCreateSessionOnDestroyComplete)
+	if (bWasSuccessful && bCreateDedicatedSessionOnDestroyComplete)
+	{
+		UE_LOG(LogFTSession, Log, TEXT("[DediServer] 잔류 세션 파괴 완료 → 데디 세션 재생성"));
+		bCreateDedicatedSessionOnDestroyComplete = false;
+		CreateDedicatedSession(PendingMaxPlayers, PendingRoomName);
+	}
+	else if (bWasSuccessful && bCreateSessionOnDestroyComplete)
 	{
 		UE_LOG(LogFTSession, Log, TEXT("[Leave] 4) 파괴 완료 → 보류된 방 생성 진행"));
 		bCreateSessionOnDestroyComplete = false;

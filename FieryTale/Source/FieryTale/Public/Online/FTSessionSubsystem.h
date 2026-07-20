@@ -86,9 +86,10 @@ public:
 	void HostSession(int32 MaxPlayers = 4, const FString& RoomName = "FieryTale Room", const FString& Password = "",
 	                 bool bUseLAN = false);
 
-	/** 방 목록을 검색한다. 완료 시 OnFindSessionsCompleteEvent 로 결과를 전달한다. */
+	/** 방 목록을 검색한다. 완료 시 OnFindSessionsCompleteEvent 로 결과를 전달한다.
+	 *  bFindDedicated=true 면 데디케이티드 서버 세션(EOS Sessions)을, false 면 리슨 호스트 방(EOS Lobbies)을 검색한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
-	void FindSessions(int32 MaxResults = 20, bool bUseLAN = false);
+	void FindSessions(int32 MaxResults = 20, bool bUseLAN = false, bool bFindDedicated = true);
 
 	/** 검색 결과 인덱스로 방에 입장한다. 비밀번호가 걸린 방이면 Password 가 일치해야 한다. */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
@@ -97,6 +98,12 @@ public:
 	/** 현재 세션에서 나간다(세션 파괴). */
 	UFUNCTION(BlueprintCallable, Category = "FieryTale|Session")
 	void LeaveSession();
+
+	/** 데디케이티드 서버 전용 방 생성. 로컬 유저(플레이어)가 없으므로 서버 크리덴셜로 세션을 만든다.
+	 *  UFTGameInstance가 서버 부팅 후(첫 월드 로드 시) 호출한다.
+	 *  리슨 경로(CreateSessionInternal)와 달리 UserId를 요구하지 않고, bIsDedicated=true로
+	 *  Lobbies가 아닌 Sessions를 광고한다. ?listen 트래블도 하지 않는다(이미 대기방에 있음). */
+	void CreateDedicatedSession(int32 MaxPlayers, const FString& RoomName);
 	
 	
 	
@@ -166,6 +173,9 @@ private:
 
 	FOnStartSessionCompleteDelegate StartSessionCompleteDelegate;
 	FDelegateHandle StartSessionCompleteDelegateHandle;
+
+	// 데디 서버: 잔류 세션 파괴 후 '데디' 세션으로 재생성해야 할 때 사용(리슨 재생성 경로와 구분).
+	bool bCreateDedicatedSessionOnDestroyComplete = false;
 
 	// 기존 세션을 파괴한 뒤 새로 생성해야 할 때 사용하는 보류 값
 	bool bCreateSessionOnDestroyComplete = false;
