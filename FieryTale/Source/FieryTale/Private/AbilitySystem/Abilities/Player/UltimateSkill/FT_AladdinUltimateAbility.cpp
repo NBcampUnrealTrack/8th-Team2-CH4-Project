@@ -98,6 +98,9 @@ void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandl
             this, FName("AladdinUltMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
+            MontageTask->OnCompleted.AddDynamic(this, &UFT_AladdinUltimateAbility::OnMontageFinished);
+            MontageTask->OnInterrupted.AddDynamic(this, &UFT_AladdinUltimateAbility::OnMontageFinished);
+            MontageTask->OnCancelled.AddDynamic(this, &UFT_AladdinUltimateAbility::OnMontageFinished);
             MontageTask->ReadyForActivation();
         }
     }
@@ -107,26 +110,24 @@ void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandl
 
     if (CurrentWishCount >= 3)
     {
-        // 최대 콤보 도달 시 어빌리티를 종료합니다.
+        // 최대 콤보 도달 시 어빌리티 상태만 초기화하고, 어빌리티 종료는 몽타주가 끝날 때 수행합니다.
         SourceASC->RemoveLooseGameplayTag(FTTags::FTStates::Buff::AladdinComboActive);
         CurrentWishCount = 0;
-        
-        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
     }
     else
     {
-        // 다음 콤보 입력을 대기하기 위한 타이머를 설정합니다.
+        // 콤보 제한 시간을 설정합니다.
         if (GetWorld())
         {
             GetWorld()->GetTimerManager().SetTimer(
-                ComboTimeoutTimerHandle,
-                this,
-                &UFT_AladdinUltimateAbility::ResetComboState,
-                3.0f,
+                ComboTimeoutTimerHandle, 
+                this, 
+                &UFT_AladdinUltimateAbility::ResetComboState, 
+                3.0f, 
                 false
             );
         }
-        
+
         // 키 입력 대기 태스크를 시작합니다.
         UAbilityTask_WaitInputPress* InputTask = UAbilityTask_WaitInputPress::WaitInputPress(this, true);
         if (InputTask)
@@ -139,6 +140,12 @@ void UFT_AladdinUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandl
             EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         }
     }
+}
+
+void UFT_AladdinUltimateAbility::OnMontageFinished()
+{
+    // 애니메이션이 끝나면 어빌리티를 종료합니다.
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UFT_AladdinUltimateAbility::OnComboInputPressed(float TimeWaited)

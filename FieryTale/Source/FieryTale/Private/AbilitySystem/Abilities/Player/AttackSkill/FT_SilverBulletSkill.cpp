@@ -182,15 +182,6 @@ void UFT_SilverBulletSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, 
     if (SourceASC)
     {
         SourceASC->RemoveLooseGameplayTag(FTTags::FTCombat::Skill_Channelling);
-
-        if (bWasCancelled)
-        {
-            FGameplayTagContainer TargetCooldownTags;
-            TargetCooldownTags.AddTag(CooldownTag);
-            
-            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
-            SourceASC->RemoveActiveEffects(CooldownQuery);
-        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

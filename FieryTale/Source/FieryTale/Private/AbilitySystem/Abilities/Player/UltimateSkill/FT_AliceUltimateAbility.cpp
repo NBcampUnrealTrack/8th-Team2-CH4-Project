@@ -56,6 +56,9 @@ void UFT_AliceUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
             this, FName("AliceUltMontage"), LoadedMontage, 1.0f);
         if (MontageTask)
         {
+            MontageTask->OnCompleted.AddDynamic(this, &UFT_AliceUltimateAbility::ReleaseAlice);
+            MontageTask->OnInterrupted.AddDynamic(this, &UFT_AliceUltimateAbility::ReleaseAlice);
+            MontageTask->OnCancelled.AddDynamic(this, &UFT_AliceUltimateAbility::ReleaseAlice);
             MontageTask->ReadyForActivation();
         }
     }
@@ -131,18 +134,8 @@ void UFT_AliceUltimateAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
         }
     }
 
-    // 타이머를 설정하여 어빌리티 수명을 동기화합니다.
-    if (GetWorld())
-    {
-        GetWorld()->GetTimerManager().SetTimer(
-            AliceReleaseTimerHandle, 
-            this, 
-            &UFT_AliceUltimateAbility::ReleaseAlice, 
-            1.0f, 
-            false
-        );
-    }
-    else
+    // 💡 [버그 수정]: 애니메이션이 끝날 때까지 대기하도록 델리게이트를 바인딩했으므로, 강제 종료 타이머를 제거합니다.
+    if (!LoadedMontage)
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
     }
@@ -166,17 +159,6 @@ void UFT_AliceUltimateAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
     {
         // 어빌리티 종료 시 궁극기 태그를 제거합니다.
         SourceASC->RemoveLooseGameplayTag(FTTags::FTAbilities::UltimateSkill);
-
-        // 어빌리티가 취소되었을 경우 쿨타임을 초기화합니다.
-        if (bWasCancelled)
-        {
-            FGameplayTagContainer TargetCooldownTags;
-            TargetCooldownTags.AddTag(CooldownTag);
-            
-            // 해당 쿨타임 태그를 가진 활성 이펙트를 제거합니다.
-            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
-            SourceASC->RemoveActiveEffects(CooldownQuery);
-        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

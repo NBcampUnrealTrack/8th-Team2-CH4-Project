@@ -42,6 +42,9 @@ protected:
     /** 방벽 지속 타이머 핸들 */
     FTimerHandle BulwarkDurationTimerHandle;
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
+    TSoftObjectPtr<class UAnimMontage> SkillMontage;
+
     // --- 고유 스펙 ---
     /** 최대 지속 시간 (기본값 4.0초) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Kaguya Bulwark Spec")

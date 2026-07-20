@@ -66,8 +66,7 @@ void UFT_KaguyaBulwarkAbility::ActivateAbility(const FGameplayAbilitySpecHandle 
     }
 
     // 몽타주 재생 태스크 실행
-    UFT_WeaponData* WeaponData = Character->GetWeaponData();
-    UAnimMontage* LoadedMontage = WeaponData ? WeaponData->AttackMontage.LoadSynchronous() : nullptr;
+    UAnimMontage* LoadedMontage = SkillMontage.LoadSynchronous();
     if (LoadedMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
@@ -185,17 +184,6 @@ void UFT_KaguyaBulwarkAbility::EndAbility(const FGameplayAbilitySpecHandle Handl
         {
             SourceASC->RemoveActiveGameplayEffect(MovementPenaltyActiveHandle);
             MovementPenaltyActiveHandle.Invalidate();
-        }
-
-        // 어빌리티가 취소되었을 경우 쿨타임 초기화
-        if (bWasCancelled)
-        {
-            FGameplayTagContainer TargetCooldownTags;
-            TargetCooldownTags.AddTag(CooldownTag);
-            
-            // 해당 쿨타임 태그를 가진 이펙트를 제거합니다.
-            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
-            SourceASC->RemoveActiveEffects(CooldownQuery);
         }
     }
     

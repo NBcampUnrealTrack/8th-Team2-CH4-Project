@@ -36,6 +36,10 @@ protected:
     UFUNCTION()
     void OnComboInputPressed(float TimeWaited);
 
+    /** 몽타주 재생 종료 시 콜백입니다. */
+    UFUNCTION()
+    void OnMontageFinished();
+
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Animation")
     TSoftObjectPtr<class UAnimMontage> SkillMontage;

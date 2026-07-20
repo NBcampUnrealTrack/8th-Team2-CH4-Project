@@ -133,15 +133,6 @@ void UFT_AliceStealthDashSkill::EndAbility(const FGameplayAbilitySpecHandle Hand
             SourceASC->RemoveActiveGameplayEffect(DashSpeedActiveHandle);
             DashSpeedActiveHandle.Invalidate();
         }
-
-        if (bWasCancelled)
-        {
-            FGameplayTagContainer TargetCooldownTags;
-            TargetCooldownTags.AddTag(CooldownTag);
-
-            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
-            SourceASC->RemoveActiveEffects(CooldownQuery);
-        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

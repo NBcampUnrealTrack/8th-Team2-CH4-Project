@@ -127,19 +127,6 @@ void UFT_RedRollSkill::EndAbility(const FGameplayAbilitySpecHandle Handle, const
     }
 
     UAbilitySystemComponent* SourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
-    if (SourceASC)
-    {
-        // 어빌리티가 취소되었을 경우 쿨타임 초기화
-        if (bWasCancelled)
-        {
-            FGameplayTagContainer TargetCooldownTags;
-            TargetCooldownTags.AddTag(CooldownTag);
-            
-            // 해당 쿨타임 태그를 가진 이펙트를 제거합니다.
-            FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
-            SourceASC->RemoveActiveEffects(CooldownQuery);
-        }
-    }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

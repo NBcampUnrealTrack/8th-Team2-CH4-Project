@@ -415,12 +415,7 @@ void UFT_NormalAttack::PerformMeleeLogic(UFT_WeaponData* InWeaponData, AFTPlayer
 
     TArray<FOverlapResult> OverlapResults;
     bool bHit = GetWorld()->OverlapMultiByChannel(OverlapResults, BoxCenter, BoxRotation, ECollisionChannel::ECC_WorldDynamic, FCollisionShape::MakeBox(BoxHalfExtent), QueryParams);
-
-#if !UE_BUILD_SHIPPING
-    FColor DebugBoxColor = bHit ? FColor::Magenta : FColor::Cyan;
-    DrawDebugBox(GetWorld(), BoxCenter, BoxHalfExtent, BoxRotation, DebugBoxColor, false, 1.5f, 0, 2.5f);
-#endif
-
+    
     if (bHit)
     {
         UAbilitySystemComponent* MyASC = GetAbilitySystemComponentFromActorInfo();
