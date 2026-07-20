@@ -167,6 +167,7 @@ void UFTHealthWidget::TryResolveTeamColor()
 
 	HealthBar->SetColorAndOpacity(bIsAlly ? FLinearColor(0.2f, 1.0f, 0.1f, 1.0f) : FLinearColor(1.0f, 0.05f, 0.0f, 1.0f)); // 아군 녹색 / 적군 적색 적용
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible); // 판정 완료 후 노출
+	RefreshHealthDisplay();
 }
 
 void UFTHealthWidget::RefreshHealthDisplay()
