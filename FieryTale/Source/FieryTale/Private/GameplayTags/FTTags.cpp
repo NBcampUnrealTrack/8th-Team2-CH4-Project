@@ -117,6 +117,13 @@ namespace GameplayCue
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_SkillCast_UtilSkill, "GameplayCue.Alice.SkillCast.UtilSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_SkillCast_UltimateSkill, "GameplayCue.Alice.SkillCast.UltimateSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
 
+	// 레드후드
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(RedHud_SkillCast, "GameplayCue.RedHood.SkillCast", "빨강망토 스킬 시전 순간의 머즐/차지 연출 격발용 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(RedHud_SkillCast_AttackSkill, "GameplayCue.RedHood.SkillCast.AttackSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(RedHud_SkillCast_UtilSkill, "GameplayCue.RedHood.SkillCast.UtilSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(RedHud_SkillCast_UltimateSkill, "GameplayCue.RedHood.SkillCast.UltimateSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	
+	
 	// 공용 디버프 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Stunned, "GameplayCue.Debuff.Stunned", "기절: 모든 행동이 불가능해지는 상태이상 디버프 태그");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Rooted, "GameplayCue.Debuff.Rooted", "속박: 이동이 불가능해지는 상태이상 디버프 태그");
@@ -124,6 +131,7 @@ namespace GameplayCue
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Slow, "GameplayCue.Debuff.Slow", "둔화: 이동 속도가 감소하는 상태이상 디버프 태그");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Knockback, "GameplayCue.Debuff.Knockback", "넉백: 중심부에서 바깥쪽으로 밀려나는 상태이상 디버프 태그");
 
+	// 타격관련
 	// 앨리스 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Alice_AttackHit, "GameplayCue.Alice.AttackHit", "앨리스 기본 공격(로얄 카드) 적중 시 발생하는 이벤트 태그");
 
