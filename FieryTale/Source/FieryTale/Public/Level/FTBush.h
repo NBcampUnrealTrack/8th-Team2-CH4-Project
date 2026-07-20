@@ -62,4 +62,7 @@ private:
     FName OpacityParameterName;
 
     TMap<APawn*, FTimerHandle> RevealTimers;
+
+    //	[레이스 B] 로컬 팀 미확정 시 OnTeamTagReady에 재평가를 1회만 구독하기 위한 플래그(클라 전용).
+    bool bSubscribedToTeamReady = false;
 };
