@@ -154,16 +154,6 @@ void UFT_AliceSkill::OnSkillMontageFinished()
 
 void UFT_AliceSkill::HandleSkillInterrupted()
 {
-    if (CurrentActorInfo && CurrentActorInfo->AbilitySystemComponent.IsValid())
-    {
-        UAbilitySystemComponent* MyASC = CurrentActorInfo->AbilitySystemComponent.Get();
-        
-        FGameplayTagContainer TargetCooldownTags;
-        TargetCooldownTags.AddTag(CooldownTag);
-        
-        FGameplayEffectQuery CooldownQuery = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(TargetCooldownTags);
-        MyASC->RemoveActiveEffects(CooldownQuery);
-    }
-
+    // 💡 [버그 수정]: 스킬이 중단되더라도 시전된 상태이므로 쿨타임을 깎아주지 않도록 수정했습니다.
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }

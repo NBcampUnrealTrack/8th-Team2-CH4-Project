@@ -63,6 +63,12 @@ void UFT_GameplayAbility::ApplyMovementPenalty(float SpeedMultiplier)
 {
 	if (MovementPenaltyGameplayEffectClass && CurrentActorInfo && CurrentActorInfo->AbilitySystemComponent.IsValid())
 	{
+		// 💡 [버그 수정]: 이미 적용 중인 페널티가 있다면 중첩/덮어쓰기로 인한 고장(영구 감속)을 방지하기 위해 먼저 제거합니다.
+		if (MovementPenaltyActiveHandle.IsValid())
+		{
+			RemoveMovementPenalty();
+		}
+
 		UAbilitySystemComponent* SourceASC = CurrentActorInfo->AbilitySystemComponent.Get();
 		FGameplayEffectSpecHandle PenaltySpecHandle = MakeOutgoingGameplayEffectSpec(MovementPenaltyGameplayEffectClass, GetAbilityLevel());
 		if (PenaltySpecHandle.IsValid() && PenaltySpecHandle.Data.IsValid())
