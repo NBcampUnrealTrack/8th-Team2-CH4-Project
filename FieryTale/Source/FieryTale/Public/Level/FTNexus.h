@@ -1,4 +1,3 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -9,67 +8,63 @@ class UStaticMeshComponent;
 class UGeometryCollectionComponent;
 class UDataTable;
 class USoundBase;
-class UParticleSystem;
+class UNiagaraSystem;
 class UCapsuleComponent;
 
 UENUM(BlueprintType)
 enum class EFTNexusTeam : uint8
 {
-	NoneTeam, // 매크로 충돌 방지를 위한 안전 기본값
-	BlueTeam, // 블루팀 식별자
-	RedTeam // 레드팀 식별자
+    NoneTeam,
+    BlueTeam,
+    RedTeam
 };
 
 UCLASS()
 class FIERYTALE_API AFTNexus : public AFTTowerBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	AFTNexus(); // 넥서스 생성자
+    AFTNexus();
+    EFTNexusTeam GetNexusTeam() const { return NexusTeam; }
+    void SetVulnerable(bool bNewVulnerable);
 
-	EFTNexusTeam GetNexusTeam() const { return NexusTeam; } // 본진 소속 진영 반환 함수
-
-	void SetVulnerable(bool bNewVulnerable); // 넥서스의 파괴 가능 여부를 토글하는 함수
-	
-	UFUNCTION(BlueprintPure, Category = "FieryTale | Structure")
-	bool IsVulnerable() const; // 무적 상태 여부 반환 함수
+    UFUNCTION(BlueprintPure, Category = "FieryTale | Structure")
+    bool IsVulnerable() const;
 
 protected:
-	virtual void BeginPlay() override; // 넥서스 특화 데이터베이스 연동 루틴
+    virtual void BeginPlay() override;
+    virtual FGameplayTag GetTeamTag() const override;
+    virtual FGameplayTag GetStructureTag() const override;
+    virtual float GetDefaultMaxHealth() const override { return 5000.f; }
+    virtual void PerformDestructionEffects() override;
+    virtual void NotifyGameMode() override;
 
-	virtual FGameplayTag GetTeamTag() const override; // 진영 태그 오버라이드
-	virtual FGameplayTag GetStructureTag() const override; // 타입 태그 오버라이드
-	virtual float GetDefaultMaxHealth() const override { return 5000.f; } // 본진 전용 5000 체력 반환 오버라이드
-
-	virtual void PerformDestructionEffects() override; // 1P/2P 메쉬 스왑 및 카오스 재생용 렌더링 오버라이드
-	virtual void NotifyGameMode() override; // 1P 게임 오버 통보용 오버라이드
-
-	UFUNCTION(BlueprintImplementableEvent, Category = "Chaos")
-	void OnNexusDestroyed(); // 블루프린트 카오스 캐시 재생을 위해 엔진으로 넘겨주는 가상 이벤트
+    UFUNCTION(BlueprintImplementableEvent, Category = "Chaos")
+    void OnNexusDestroyed();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> NexusMesh; // 블루프린트 오작동을 막기 위해 보존된 원본 넥서스 메쉬
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    TObjectPtr<UStaticMeshComponent> NexusMesh;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UCapsuleComponent> CollisionCapsule; // 라인트레이스 및 독립 타격 판정을 위한 실린더 콜리전
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    TObjectPtr<UCapsuleComponent> CollisionCapsule;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UGeometryCollectionComponent> DebrisMesh; // 붕괴 연출을 위한 카오스 파편 컬렉션
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    TObjectPtr<UGeometryCollectionComponent> DebrisMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
-	TObjectPtr<UDataTable> NexusDataTable; // 데이터 시트 참조 슬롯
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
+    TObjectPtr<UDataTable> NexusDataTable;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
-	FName DataRowName; // 데이터 시트 열 식별자
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Data")
+    FName DataRowName;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Nexus Property")
-	EFTNexusTeam NexusTeam; // 편집 가능한 진영 변수
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Nexus Property")
+    EFTNexusTeam NexusTeam;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
-	TObjectPtr<USoundBase> DestructionSound; // 파괴 시 출력할 폭발음
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+    TObjectPtr<USoundBase> DestructionSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
-	TObjectPtr<UParticleSystem> DestructionEffect; // 파괴 시 출력할 흙먼지 이펙트
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+    TObjectPtr<UNiagaraSystem> DestructionEffect;
 };

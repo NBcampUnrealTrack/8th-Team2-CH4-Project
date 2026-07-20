@@ -19,309 +19,347 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 
+// 포탑 생성 및 초기화
 AFTTurret::AFTTurret()
 {
-	bReplicates = true; // 포탑 액터 자체 네트워크 동기화 활성화
+    bReplicates = true;
 
-	TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh")); // 포탑 외형 생성
-	SetRootComponent(TurretMesh); // 루트 지정
-	TurretMesh->SetCollisionProfileName(TEXT("BlockAllGeneric")); // 물리 차단 지정
+    TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh"));
+    SetRootComponent(TurretMesh);
+    TurretMesh->SetCollisionProfileName(TEXT("BlockAllGeneric"));
 
-	CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox")); // 판정 박스 생성
-	CollisionBox->SetupAttachment(TurretMesh); // 타워 외형 부착
-	CollisionBox->SetBoxExtent(FVector(100.f, 100.f, 200.f)); // 부피 셋업
-	CollisionBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly); // 오버랩 활성화
-	CollisionBox->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic); // 판정 채널 셋업
-	CollisionBox->SetCollisionResponseToAllChannels(ECR_Overlap); // 겹침 감지 셋업
-	CollisionBox->SetGenerateOverlapEvents(true); // 이벤트 개방
+    CollisionBox = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBox"));
+    CollisionBox->SetupAttachment(TurretMesh);
+    CollisionBox->SetBoxExtent(FVector(100.f, 100.f, 200.f));
+    CollisionBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    CollisionBox->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+    CollisionBox->SetCollisionResponseToAllChannels(ECR_Overlap);
+    CollisionBox->SetGenerateOverlapEvents(true);
 
-	LaserMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LaserMesh")); // 빔 연출 생성
-	LaserMesh->SetupAttachment(TurretMesh); // 부착
-	LaserMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 물리 차단
-	LaserMesh->SetUsingAbsoluteLocation(true); // 좌표계 독립
-	LaserMesh->SetUsingAbsoluteRotation(true); // 회전계 독립
-	LaserMesh->SetUsingAbsoluteScale(true); // 비율계 독립
+    LaserMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LaserMesh"));
+    LaserMesh->SetupAttachment(TurretMesh);
+    LaserMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LaserMesh->SetUsingAbsoluteLocation(true);
+    LaserMesh->SetUsingAbsoluteRotation(true);
+    LaserMesh->SetUsingAbsoluteScale(true);
 
-	DebrisMesh = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("DebrisMesh")); // 파편 객체 생성
-	DebrisMesh->SetupAttachment(TurretMesh); // 부착
+    DebrisMesh = CreateDefaultSubobject<UGeometryCollectionComponent>(TEXT("DebrisMesh"));
+    DebrisMesh->SetupAttachment(TurretMesh);
 
-	TurretTeam = EFTTurretTeam::BlueTeam; // 진영 기본값
-	TurretPosition = EFTTurretPosition::NonePosition; // 라인 기본값
-
-	DetectionRange = 1200.0f; // 사거리 초기화
-	AttackCooldown = 1.5f; // 연사 쿨타임 초기화
-	HomingAcceleration = 50000.0f; // 유도 가속도 세팅
-	DestructionImpulseRadius = 500.0f; // 폭발 반경 초기화
-	DestructionImpulseStrength = 10000.0f; // 붕괴 충격량 초기화
-	CurrentTarget = nullptr; // 타겟 초기화
-	bCanAttack = true; // 사격 가용 초기화
-	TurretDummyInstigator = nullptr; // 가상 폰 초기화
+    TurretTeam = EFTTurretTeam::BlueTeam;
+    TurretPosition = EFTTurretPosition::NonePosition;
+    DetectionRange = 1200.0f;
+    AttackCooldown = 1.5f;
+    HomingAcceleration = 50000.0f;
+    DestructionImpulseRadius = 500.0f;
+    DestructionImpulseStrength = 10000.0f;
+    CurrentTarget = nullptr;
+    bCanAttack = true;
+    TurretDummyInstigator = nullptr;
 }
 
+// 변수 네트워크 리플리케이션 설정
 void AFTTurret::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps); // 상위 복제 프로퍼티 수집 호출
-	// 확정된 타겟 클라이언트 동기화
-	DOREPLIFETIME(AFTTurret, CurrentTarget);
-	// 포탑 진영 동기화
-	DOREPLIFETIME(AFTTurret, TurretTeam);
-	// 포탑 위치 동기화
-	DOREPLIFETIME(AFTTurret, TurretPosition);
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(AFTTurret, CurrentTarget);
+    DOREPLIFETIME(AFTTurret, TurretTeam);
+    DOREPLIFETIME(AFTTurret, TurretPosition);
 }
 
+// 포탑 게임 시작 로직 실행
 void AFTTurret::BeginPlay()
 {
-	float TargetMaxHealth = 1000.0f; // 초기 체력 설정
-	
-	if (TurretDataTable && !DataRowName.IsNone())
-	{
-		if (FFTStructureData* RowData = TurretDataTable->FindRow<FFTStructureData>(DataRowName, TEXT("")))
-		{
-			TargetMaxHealth = RowData->MaxHealth; // 시트 체력 덮어쓰기
-		}
-	}
+    float TargetMaxHealth = 1000.0f;
 
-	if (AttributeSet && AbilitySystemComponent)
-	{
-		AttributeSet->InitMaxHealth(TargetMaxHealth); // 최대 체력 세팅
-		AttributeSet->InitHealth(TargetMaxHealth); // 현재 체력 세팅
-		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AFTTowerBase::OnHealthChanged); // 체력 리스너 부착
-	}
+    if (TurretDataTable && !DataRowName.IsNone())
+    {
+        if (FFTStructureData* RowData = TurretDataTable->FindRow<FFTStructureData>(DataRowName, TEXT("")))
+        {
+            TargetMaxHealth = RowData->MaxHealth;
+        }
+    }
 
-	Super::BeginPlay(); // 기초 연동
+    if (AttributeSet && AbilitySystemComponent)
+    {
+        AttributeSet->InitMaxHealth(TargetMaxHealth);
+        AttributeSet->InitHealth(TargetMaxHealth);
+        AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(AttributeSet->GetHealthAttribute()).AddUObject(this, &AFTTowerBase::OnHealthChanged);
+    }
 
-	if (UWidgetComponent* HealthWidgetComp = FindComponentByClass<UWidgetComponent>())
-	{
-		if (UFTHealthWidgetComponent* FTHealthComp = Cast<UFTHealthWidgetComponent>(HealthWidgetComp))
-		{
-			FTHealthComp->UpdateASCBinding(); // UI 수동 바인딩
-		}
-	}
+    Super::BeginPlay();
 
-	if (LaserMesh) LaserMesh->SetVisibility(false); // 조준선 은닉
+    if (UWidgetComponent* HealthWidgetComp = FindComponentByClass<UWidgetComponent>())
+    {
+        if (UFTHealthWidgetComponent* FTHealthComp = Cast<UFTHealthWidgetComponent>(HealthWidgetComp))
+        {
+            FTHealthComp->UpdateASCBinding();
+        }
+    }
 
-	GetWorld()->GetTimerManager().SetTimer(TargetTrackingTimerHandle, this, &AFTTurret::TrackNearestEnemy, 0.03f, true); // 탐지 루프 가동
+    if (LaserMesh)
+    {
+        LaserMesh->SetVisibility(false);
+    }
+
+    GetWorld()->GetTimerManager().SetTimer(TargetTrackingTimerHandle, this, &AFTTurret::TrackNearestEnemy, 0.03f, true);
 }
 
+// 팀 태그 반환
 FGameplayTag AFTTurret::GetTeamTag() const
 {
-	return (TurretTeam == EFTTurretTeam::BlueTeam) ? FTTags::FTFaction::Team_Blue : FTTags::FTFaction::Team_Red; // 진영 태그 반환
+    return (TurretTeam == EFTTurretTeam::BlueTeam) ? FTTags::FTFaction::Team_Blue : FTTags::FTFaction::Team_Red;
 }
 
+// 구조물 태그 반환
 FGameplayTag AFTTurret::GetStructureTag() const
 {
-	return FTTags::FTObjectType::Structure_Turret; // 포탑 태그 반환
+    return FTTags::FTObjectType::Structure_Turret;
 }
 
+// 파괴 시각 및 물리 효과 처리
 void AFTTurret::PerformDestructionEffects()
 {
-	if (AbilitySystemComponent) AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTCombat::Structure_Muted); // 무력화 태그 삽입
+    if (AbilitySystemComponent)
+    {
+        AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTCombat::Structure_Muted);
+    }
 
-	GetWorld()->GetTimerManager().ClearTimer(TargetTrackingTimerHandle); // 감시 소거
-	GetWorld()->GetTimerManager().ClearTimer(AttackTimerHandle); // 연사 소거
+    GetWorld()->GetTimerManager().ClearTimer(TargetTrackingTimerHandle);
+    GetWorld()->GetTimerManager().ClearTimer(AttackTimerHandle);
 
-	if (CollisionBox) CollisionBox->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 피격 박스 판정 정지
-	if (TurretMesh) TurretMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 물리 장벽 해제
+    if (CollisionBox)
+    {
+        CollisionBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
 
-	// 데디케이티드 서버의 CPU 낭비를 막고 화면이 있는 리슨 서버 및 클라이언트에서만 시각적 붕괴 연출 수행
-	if (GetNetMode() != NM_DedicatedServer)
-	{
-		if (LaserMesh) LaserMesh->SetVisibility(false); // 조준선 삭제
-		if (UWidgetComponent* HealthWidgetComp = FindComponentByClass<UWidgetComponent>()) HealthWidgetComp->SetVisibility(false); // 체력바 삭제
-		if (TurretMesh) TurretMesh->SetVisibility(false); // 원본 메쉬 은닉
+    if (TurretMesh)
+    {
+        TurretMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
 
-		if (DebrisMesh)
-		{
-			DebrisMesh->SetVisibility(true); // 파편 활성화
-			DebrisMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform); // 트랜스폼 독립으로 서버 물리 덮어쓰기 현상 차단
-			DebrisMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); // 로컬 파편 물리 강제 개방
-			DebrisMesh->SetCollisionProfileName(TEXT("Destructible")); // 디스트럭터블 반응 프로필 주입
-			DebrisMesh->SetSimulatePhysics(true); // 클라이언트 로컬 물리 스레드 가동
-			DebrisMesh->AddRadialImpulse(GetActorLocation(), DestructionImpulseRadius, DestructionImpulseStrength, ERadialImpulseFalloff::RIF_Linear, true); // 파편 분해 충격량 인가
-		}
+    if (GetNetMode() != NM_DedicatedServer)
+    {
+        if (LaserMesh)
+        {
+            LaserMesh->SetVisibility(false);
+        }
 
-		if (DestructionSound) UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation()); // 사운드 재생
-		if (DestructionEffect) UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation()); // 이펙트 재생
+        if (UWidgetComponent* HealthWidgetComp = FindComponentByClass<UWidgetComponent>())
+        {
+            HealthWidgetComp->SetVisibility(false);
+        }
 
-		OnTurretDestroyed(); // 블루프린트 연출 트리거
-	}
+        if (TurretMesh)
+        {
+            TurretMesh->SetVisibility(false);
+        }
+
+        if (DebrisMesh)
+        {
+            DebrisMesh->SetVisibility(true);
+            DebrisMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+            DebrisMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+            DebrisMesh->SetCollisionProfileName(TEXT("Destructible"));
+            DebrisMesh->SetSimulatePhysics(true);
+            DebrisMesh->AddRadialImpulse(GetActorLocation(), DestructionImpulseRadius, DestructionImpulseStrength, ERadialImpulseFalloff::RIF_Linear, true);
+        }
+
+        if (DestructionSound)
+        {
+            UGameplayStatics::PlaySoundAtLocation(this, DestructionSound, GetActorLocation());
+        }
+
+        if (DestructionEffect)
+        {
+            UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), DestructionEffect, GetActorLocation(), GetActorRotation());
+        }
+    }
+
+    OnTurretDestroyed();
 }
 
+// 게임 모드에 파괴 알림
 void AFTTurret::NotifyGameMode()
 {
-	if (UWorld* World = GetWorld())
-	{
-		if (AFTGameMode* GameMode = World->GetAuthGameMode<AFTGameMode>())
-		{
-			GameMode->TurretDestroyed(this); // 게임 룰 통보
-		}
-	}
-	SetLifeSpan(5.0f); // 타워 소거
-	if (TurretDummyInstigator) TurretDummyInstigator->SetLifeSpan(10.0f); // 가상 폰 동반 소거
+    if (UWorld* World = GetWorld())
+    {
+        if (AFTGameMode* GameMode = World->GetAuthGameMode<AFTGameMode>())
+        {
+            GameMode->TurretDestroyed(this);
+        }
+    }
+    SetLifeSpan(5.0f);
+    if (TurretDummyInstigator)
+    {
+        TurretDummyInstigator->SetLifeSpan(10.0f);
+    }
 }
 
+// 범위 내 적 감지 및 타겟 설정
 void AFTTurret::TrackNearestEnemy()
 {
-	if (bIsDying) return; // 락다운
+    if (bIsDying) return;
 
-	if (HasAuthority())
-	{
-		if (CurrentTarget && (GetDistanceTo(CurrentTarget) > DetectionRange))
-		{
-			CurrentTarget = nullptr; // 사거리 이탈 포인터 해제
-		}
+    if (HasAuthority())
+    {
+        if (CurrentTarget && (GetDistanceTo(CurrentTarget) > DetectionRange))
+        {
+            CurrentTarget = nullptr;
+        }
 
-		if (CurrentTarget)
-		{
-			UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(CurrentTarget); // 타겟 시스템 캐싱
-			if (TargetASC && TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
-			{
-				CurrentTarget = nullptr; // 사망한 타겟 소거
-			}
-		}
+        if (CurrentTarget)
+        {
+            UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(CurrentTarget);
+            if (TargetASC && TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead))
+            {
+                CurrentTarget = nullptr;
+            }
+        }
 
-		if (!CurrentTarget)
-		{
-			TArray<AActor*> FoundActors;
-			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFTCharacterBase::StaticClass(), FoundActors); // 전역 색인
-			
-			AActor* NearestEnemy = nullptr; // 거리 갱신 변수
-			float ClosestDistance = DetectionRange; // 거리 한계선 세팅
+        if (!CurrentTarget)
+        {
+            TArray<AActor*> FoundActors;
+            UGameplayStatics::GetAllActorsOfClass(GetWorld(), AFTCharacterBase::StaticClass(), FoundActors);
 
-			for (AActor* Actor : FoundActors)
-			{
-				AFTCharacterBase* EnemyChar = Cast<AFTCharacterBase>(Actor); // 적정 캐릭터 판독
-				if (!EnemyChar) continue; // 이탈
+            AActor* NearestEnemy = nullptr;
+            float ClosestDistance = DetectionRange;
 
-				UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(EnemyChar); // 어빌리티 추출
-				if (!TargetASC || TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue; // 사망자 배제
+            for (AActor* Actor : FoundActors)
+            {
+                AFTCharacterBase* EnemyChar = Cast<AFTCharacterBase>(Actor);
+                if (!EnemyChar) continue;
 
-				bool bIsEnemy = false; // 진영 비트
-				if (TurretTeam == EFTTurretTeam::BlueTeam && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsEnemy = true; // 블루팀 타워 타겟 판별
-				if (TurretTeam == EFTTurretTeam::RedTeam && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsEnemy = true; // 레드팀 타워 타겟 판별
+                UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(EnemyChar);
+                if (!TargetASC || TargetASC->HasMatchingGameplayTag(FTTags::FTStates::Core::Dead)) continue;
 
-				if (bIsEnemy)
-				{
-					float Distance = GetDistanceTo(EnemyChar); // 타겟 거리 산출
-					if (Distance < ClosestDistance)
-					{
-						ClosestDistance = Distance; // 거리 갱신
-						NearestEnemy = EnemyChar; // 새 표적 인가
-					}
-				}
-			}
-			CurrentTarget = NearestEnemy; // 최종 표적 서버 확정 및 클라이언트 자동 동기화
-		}
+                bool bIsEnemy = false;
+                if (TurretTeam == EFTTurretTeam::BlueTeam && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Red)) bIsEnemy = true;
+                if (TurretTeam == EFTTurretTeam::RedTeam && TargetASC->HasMatchingGameplayTag(FTTags::FTFaction::Team_Blue)) bIsEnemy = true;
 
-		if (CurrentTarget && bCanAttack)
-		{
-			FireProjectile(); // 서버 권한 사격 개시
-		}
-	}
+                if (bIsEnemy)
+                {
+                    float Distance = GetDistanceTo(EnemyChar);
+                    if (Distance < ClosestDistance)
+                    {
+                        ClosestDistance = Distance;
+                        NearestEnemy = EnemyChar;
+                    }
+                }
+            }
+            CurrentTarget = NearestEnemy;
+        }
 
-	if (CurrentTarget && LaserMesh)
-	{
-		LaserMesh->SetVisibility(true); // 동기화된 타겟을 기반으로 조준 활성화
+        if (CurrentTarget && bCanAttack)
+        {
+            FireProjectile();
+        }
+    }
 
-		FVector StartLocation = GetActorLocation() + FVector(0.0f, 0.0f, 200.0f); // 빔 원점 연산
-		FVector EndLocation = CurrentTarget->GetActorLocation(); // 빔 끝점 연산
-		
-		FVector MidLocation = (StartLocation + EndLocation) * 0.5f; // 중심 연산
-		float Distance = FVector::Distance(StartLocation, EndLocation); // 길이 추출
-		FRotator LaserRot = UKismetMathLibrary::FindLookAtRotation(StartLocation, EndLocation); // 각도 추출
-		
-		LaserMesh->SetWorldLocation(MidLocation); // 중앙값 동기화
-		LaserMesh->SetWorldRotation(LaserRot); // 회전 정렬
-		LaserMesh->SetWorldScale3D(FVector(Distance / 100.0f, 0.05f, 0.05f)); // 배율 증축
-	}
-	else if (LaserMesh)
-	{
-		LaserMesh->SetVisibility(false); // 조준 정지
-	}
+    if (CurrentTarget && LaserMesh)
+    {
+        LaserMesh->SetVisibility(true);
+        FVector StartLocation = GetActorLocation() + FVector(0.0f, 0.0f, 200.0f);
+        FVector EndLocation = CurrentTarget->GetActorLocation();
+        FVector MidLocation = (StartLocation + EndLocation) * 0.5f;
+        float Distance = FVector::Distance(StartLocation, EndLocation);
+        FRotator LaserRot = UKismetMathLibrary::FindLookAtRotation(StartLocation, EndLocation);
+
+        LaserMesh->SetWorldLocation(MidLocation);
+        LaserMesh->SetWorldRotation(LaserRot);
+        LaserMesh->SetWorldScale3D(FVector(Distance / 100.0f, 0.05f, 0.05f));
+    }
+    else if (LaserMesh)
+    {
+        LaserMesh->SetVisibility(false);
+    }
 }
 
+// 투사체 발사 처리
 void AFTTurret::FireProjectile()
 {
-	if (!HasAuthority() || !CurrentTarget || !ProjectileClass) return; // 필수 검증
+    if (!HasAuthority() || !CurrentTarget || !ProjectileClass) return;
 
-	bCanAttack = false; // 연사 락다운 적용
+    bCanAttack = false;
 
-	if (!TurretDummyInstigator)
-	{
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		SpawnParams.Owner = this; // 오너 지정
-		TurretDummyInstigator = GetWorld()->SpawnActor<APawn>(APawn::StaticClass(), GetActorLocation(), GetActorRotation(), SpawnParams); // 가상 대리인 생성
-		
-		if (TurretDummyInstigator)
-		{
-			TurretDummyInstigator->SetReplicates(false); // 서버 최적화를 위해 불필요한 더미 폰의 네트워크 복제 완전 차단
-			TurretDummyInstigator->SetActorHiddenInGame(true); // 렌더링 은닉
-			TurretDummyInstigator->SetActorEnableCollision(false); // 물리 간섭 차단
-			TurretDummyInstigator->SetCanBeDamaged(false); // 무적 처리
-			
-			UFT_AbilitySystemComponent* DummyASC = NewObject<UFT_AbilitySystemComponent>(TurretDummyInstigator, TEXT("DummyASC")); // 가짜 ASC 부착
-			if (DummyASC)
-			{
-				DummyASC->RegisterComponent(); // 가짜 시스템 기동
-				DummyASC->AddLooseGameplayTag(GetTeamTag()); // 진영 위장
-			}
-		}
-	}
+    if (!TurretDummyInstigator)
+    {
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        SpawnParams.Owner = this;
+        TurretDummyInstigator = GetWorld()->SpawnActor<APawn>(APawn::StaticClass(), GetActorLocation(), GetActorRotation(), SpawnParams);
 
-	FVector SpawnLocation = GetActorLocation() + FVector(0.0f, 0.0f, 200.0f); // 투사체 원점
-	FRotator SpawnRotation = UKismetMathLibrary::FindLookAtRotation(SpawnLocation, CurrentTarget->GetActorLocation()); // 투사체 각도
-	FTransform SpawnTransform(SpawnRotation, SpawnLocation); // 트랜스폼 결합
+        if (TurretDummyInstigator)
+        {
+            TurretDummyInstigator->SetReplicates(false);
+            TurretDummyInstigator->SetActorHiddenInGame(true);
+            TurretDummyInstigator->SetActorEnableCollision(false);
+            TurretDummyInstigator->SetCanBeDamaged(false);
 
-	AFT_ProjectileBase* Projectile = GetWorld()->SpawnActorDeferred<AFT_ProjectileBase>(ProjectileClass, SpawnTransform, this, TurretDummyInstigator, ESpawnActorCollisionHandlingMethod::AlwaysSpawn); // 가상 대리인을 발사자로 지정하여 생성
+            UFT_AbilitySystemComponent* DummyASC = NewObject<UFT_AbilitySystemComponent>(TurretDummyInstigator, TEXT("DummyASC"));
+            if (DummyASC)
+            {
+                DummyASC->RegisterComponent();
+                DummyASC->AddLooseGameplayTag(GetTeamTag());
+            }
+        }
+    }
 
-	if (Projectile)
-	{
-		if (UProjectileMovementComponent* MovementComp = Projectile->FindComponentByClass<UProjectileMovementComponent>())
-		{
-			MovementComp->bIsHomingProjectile = true; // 서버 유도 센서 개방
-			MovementComp->HomingAccelerationMagnitude = HomingAcceleration; // 유도 가속도 주입
-			if (CurrentTarget && CurrentTarget->GetRootComponent())
-			{
-				MovementComp->HomingTargetComponent = CurrentTarget->GetRootComponent(); // 표적 강제 락온
-			}
-		}
+    FVector SpawnLocation = GetActorLocation() + FVector(0.0f, 0.0f, 200.0f);
+    FRotator SpawnRotation = UKismetMathLibrary::FindLookAtRotation(SpawnLocation, CurrentTarget->GetActorLocation());
+    FTransform SpawnTransform(SpawnRotation, SpawnLocation);
 
-		if (AttackDamageEffectClass && AbilitySystemComponent)
-		{
-			FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext(); // 컨텍스트 획득
-			EffectContext.AddInstigator(TurretDummyInstigator, this); // 대미지 소유권 위임
-			FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(AttackDamageEffectClass, 1.0f, EffectContext); // 대미지 스펙 생성
-			Projectile->DamageEffectSpecHandle = SpecHandle; // 투사체 스펙 주입
-		}
+    AFT_ProjectileBase* Projectile = GetWorld()->SpawnActorDeferred<AFT_ProjectileBase>(ProjectileClass, SpawnTransform, this, TurretDummyInstigator, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 
-		UGameplayStatics::FinishSpawningActor(Projectile, SpawnTransform); // 실세계 스폰 개시
+    if (Projectile)
+    {
+        if (UProjectileMovementComponent* MovementComp = Projectile->FindComponentByClass<UProjectileMovementComponent>())
+        {
+            MovementComp->bIsHomingProjectile = true;
+            MovementComp->HomingAccelerationMagnitude = HomingAcceleration;
+            if (CurrentTarget && CurrentTarget->GetRootComponent())
+            {
+                MovementComp->HomingTargetComponent = CurrentTarget->GetRootComponent();
+            }
+        }
 
-		// 투사체가 클라이언트 네트워크에 도착하기도 전에 RPC가 터지는 레이스 컨디션을 막기 위해 지연 동기화 적용
-		FTimerHandle RpcDelayHandle;
-		GetWorld()->GetTimerManager().SetTimer(RpcDelayHandle, FTimerDelegate::CreateLambda([this, Projectile, CurrentTarget = this->CurrentTarget]() {
-			if (IsValid(this) && IsValid(Projectile) && IsValid(CurrentTarget))
-			{
-				Multicast_SyncProjectileHoming(Projectile, CurrentTarget); // 지연 후 유도 렌더링 동기화 호출
-			}
-		}), 0.1f, false);
-	}
+        if (AttackDamageEffectClass && AbilitySystemComponent)
+        {
+            FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
+            EffectContext.AddInstigator(TurretDummyInstigator, this);
+            FGameplayEffectSpecHandle SpecHandle = AbilitySystemComponent->MakeOutgoingSpec(AttackDamageEffectClass, 1.0f, EffectContext);
+            Projectile->DamageEffectSpecHandle = SpecHandle;
+        }
 
-	GetWorld()->GetTimerManager().SetTimer(AttackTimerHandle, FTimerDelegate::CreateLambda([this]() {
-		bCanAttack = true; // 사격 락다운 해제
-	}), AttackCooldown, false);
+        UGameplayStatics::FinishSpawningActor(Projectile, SpawnTransform);
+
+        FTimerHandle RpcDelayHandle;
+        GetWorld()->GetTimerManager().SetTimer(RpcDelayHandle, FTimerDelegate::CreateLambda([this, Projectile, CurrentTarget = this->CurrentTarget]() {
+            if (IsValid(this) && IsValid(Projectile) && IsValid(CurrentTarget))
+            {
+                Multicast_SyncProjectileHoming(Projectile, CurrentTarget);
+            }
+        }), 0.1f, false);
+    }
+
+    GetWorld()->GetTimerManager().SetTimer(AttackTimerHandle, FTimerDelegate::CreateLambda([this]() {
+        bCanAttack = true;
+    }), AttackCooldown, false);
 }
 
+// 투사체 호밍 동기화 멀티캐스트
 void AFTTurret::Multicast_SyncProjectileHoming_Implementation(AFT_ProjectileBase* Projectile, AActor* Target)
 {
-	if (Projectile && Target)
-	{
-		if (UProjectileMovementComponent* MovementComp = Projectile->FindComponentByClass<UProjectileMovementComponent>())
-		{
-			MovementComp->bIsHomingProjectile = true; // 클라이언트 화면 유도 센서 개방
-			MovementComp->HomingAccelerationMagnitude = HomingAcceleration; // 클라이언트 화면 유도 가속도 주입
-			MovementComp->HomingTargetComponent = Target->GetRootComponent(); // 클라이언트 화면 강제 락온
-		}
-	}
+    if (Projectile && Target)
+    {
+        if (UProjectileMovementComponent* MovementComp = Projectile->FindComponentByClass<UProjectileMovementComponent>())
+        {
+            MovementComp->bIsHomingProjectile = true;
+            MovementComp->HomingAccelerationMagnitude = HomingAcceleration;
+            MovementComp->HomingTargetComponent = Target->GetRootComponent();
+        }
+    }
 }
