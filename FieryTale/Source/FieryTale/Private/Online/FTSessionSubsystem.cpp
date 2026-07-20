@@ -551,7 +551,7 @@ void UFTSessionSubsystem::HandleStartSessionComplete(FName SessionName, bool bWa
 
 void UFTSessionSubsystem::LoginEOS(FString InToken)
 {
-	// 🌟 수정 3: IOnlineSubsystem::Get()을 로컬 창구인 Online::GetSubsystem(GetWorld())로 교체!
+	// PIE 및 클라이언트 환경에 맞춘 로컬 서브시스템 가져오기
 	IOnlineSubsystem* Subsystem = Online::GetSubsystem(GetWorld());
 	if (!Subsystem)
 	{
@@ -559,49 +559,28 @@ void UFTSessionSubsystem::LoginEOS(FString InToken)
 		return;
 	}
 
-	// 🌟 로컬 창구의 SessionInterface를 최신 상태로 갱신합니다.
 	SessionInterface = Subsystem->GetSessionInterface();
-
 	IOnlineIdentityPtr Identity = Subsystem->GetIdentityInterface();
+	
 	if (!Identity.IsValid())
 	{
 		OnLoginCompleteEvent.Broadcast(false);
 		return;
 	}
 	
+	// 백그라운드의 에픽 런처 등에 의해 이미 로그인되어 있는지 확인
 	if (Identity->GetLoginStatus(0) == ELoginStatus::LoggedIn)
 	{
-		// 에픽 게임즈 런처가 켜져있거나 한 경우, 기존 자동 로그인을 강제로 해제합니다!
-		if (!InToken.IsEmpty())
-		{
-			UE_LOG(LogFTSession, Warning, TEXT("[Login] 새로운 토큰(%s)이 입력되어 기존 로그인을 강제 해제합니다."), *InToken);
-			Identity->Logout(0);
-			// 로그아웃 후, 함수 아래쪽에 있는 Login 로직을 그대로 타게 둡니다.
-		}
-		else
-		{
-			// 토큰 입력 없이 그냥 눌렀을 때만 기존 로그인을 유지합니다.
-			UE_LOG(LogFTSession, Warning, TEXT("[Login] 이미 로그인되어 있습니다! 바로 성공(True) 처리하고 넘어갑니다."));
-			OnLoginCompleteEvent.Broadcast(true);
-			return;
-		}
+		UE_LOG(LogFTSession, Warning, TEXT("[Login] 이미 로그인되어 있습니다! 바로 성공 처리합니다."));
+		OnLoginCompleteEvent.Broadcast(true);
+		return;
 	}
 
-	FString AuthType = TEXT("developer");
-	FString AuthId = TEXT("localhost:8080"); 
-	FString AuthToken = TEXT("Guest"); 
-
-	if (!InToken.IsEmpty())
-	{
-		AuthToken = InToken;
-		UE_LOG(LogFTSession, Warning, TEXT("[Login] 위젯에서 입력받은 토큰을 사용합니다: %s"), *AuthToken);
-	}
-	else
-	{
-		// 입력받은 값이 없을 때 커맨드라인 세팅을 확인합니다.
-		FParse::Value(FCommandLine::Get(), TEXT("AUTH_LOGIN="), AuthId);
-		FParse::Value(FCommandLine::Get(), TEXT("AUTH_PASSWORD="), AuthToken);
-	}
+	// 🌟 실전용 에픽 계정 로그인 (Account Portal) 방식으로 변경
+	// DevAuthTool(localhost:8080) 관련 코드는 모두 제거되었습니다.
+	FString AuthType = TEXT("accountportal"); 
+	FString AuthId = TEXT(""); // 비워둠
+	FString AuthToken = TEXT(""); // 비워둠
 
 	FOnlineAccountCredentials Credentials;
 	Credentials.Type = AuthType;
@@ -610,7 +589,7 @@ void UFTSessionSubsystem::LoginEOS(FString InToken)
 
 	Identity->AddOnLoginCompleteDelegate_Handle(0, FOnLoginCompleteDelegate::CreateUObject(this, &UFTSessionSubsystem::HandleLoginComplete));
 	
-	UE_LOG(LogFTSession, Log, TEXT("[Login] EOS 로그인 시도 중... ID: %s, Token: %s"), *AuthId, *AuthToken);
+	UE_LOG(LogFTSession, Log, TEXT("[Login] Account Portal (웹 브라우저) 방식으로 EOS 로그인을 시도합니다..."));
 	Identity->Login(0, Credentials);
 }
 

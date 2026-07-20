@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"
+#include "UObject/SoftObjectPtr.h"
 #include "FTSessionSubsystem.generated.h"
 
 class UWorld;
