@@ -835,7 +835,8 @@ void AFTPlayerCharacterBase::InitializeCharacterAttribute() const
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMoveSpeedAttribute(),        Data->DefaultMoveSpeed);
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetAttackPowerAttribute(),      Data->DefaultAttackPower);
 	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetMaxUltimateGaugeAttribute(), Data->DefaultMaxUltimateGauge);
-	ASC->SetNumericAttributeBase(UFT_AttributeSet::GetUltimateGaugeAttribute(),    0.0f);
+	// 궁극기 게이지는 죽었을 때(Revive 시) 초기화되지 않도록 유지합니다. 처음 스폰 시 기본값은 0.0f입니다.
+	// ASC->SetNumericAttributeBase(UFT_AttributeSet::GetUltimateGaugeAttribute(),    0.0f);
 
 	// Die()에서 부여한 Dead 태그를 해제한다 (부여 시와 동일한 복제 상태로 대칭 호출).
 	ASC->RemoveLooseGameplayTag(FTTags::FTStates::Core::Dead, 1, EGameplayTagReplicationState::TagAndCountToAll);
