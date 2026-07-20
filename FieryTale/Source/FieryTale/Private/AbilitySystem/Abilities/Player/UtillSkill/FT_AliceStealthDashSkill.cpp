@@ -76,6 +76,7 @@ void UFT_AliceStealthDashSkill::ActivateAbility(const FGameplayAbilitySpecHandle
     // 캐릭터 및 카메라 크기 축소 보정
     Character->SetCharacterScale(TargetMeshScale);
     Character->SetCameraDistanceScale(TargetMeshScale);
+    Character->PlayUtilSkillFovPunch();
 
     // =========================================================================
     // 💡 [컴파일 에러 파쇄선 및 순정 GAS 태그 자동화 안착]

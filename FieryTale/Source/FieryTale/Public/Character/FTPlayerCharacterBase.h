@@ -182,6 +182,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Camera")
 	void PlayCameraFovPunch(float TargetFov, float PunchDuration, float HoldDuration, float ReturnDuration, UCurveFloat* PunchCurve = nullptr);
 
+	//	앨리스 Util 스킬(대시) 전용 FOV 펀치 연출 — 해당 GA(UFT_AliceStealthDashSkill)에서 호출한다.
+	UFUNCTION(BlueprintCallable, Category = "FieryTale | Camera")
+	void PlayUtilSkillFovPunch();
+
 	//	FollowCamera의 FOV를 기본값(DefaultFov)으로 되돌리는 연출 — 모든 FOV 원복은 이 함수 하나로 통일한다.
 	//	Duration이 0 이하면 즉시(스냅) 적용하고 진행 중이던 연출/예약된 자동 복귀는 취소한다.
 	UFUNCTION(BlueprintCallable, Category = "FieryTale | Camera")

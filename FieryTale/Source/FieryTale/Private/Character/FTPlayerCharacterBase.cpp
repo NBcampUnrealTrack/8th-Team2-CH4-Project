@@ -598,22 +598,23 @@ void AFTPlayerCharacterBase::OnPressQ()
 	ActivateAbilityByInputTag(FTTags::FTAbilities::UltimateSkill, true);
 
 	// TODO:: 테스트용, 스킬 종류따라 적용하도록 수정해야 함
-	static const TArray<FVector2D> UltimateFovKeys =
+	/*static const TArray<FVector2D> UltimateFovKeys =
 	{
 		FVector2D(0.f,   0.f),
 		FVector2D(0.15f, -0.1f),
 		FVector2D(0.5f,  1.1f),
-		FVector2D(0.75f, 0.9f),
 		FVector2D(1.f,   1.f)
 	};
-	PlayCameraFovPunch(60.f, 0.5f, 0.3f, 0.5f, GetOrBuildFovCurve(UltimateFovCurve, UltimateFovKeys));
+	PlayCameraFovPunch(60.f, 0.5f, 0.3f, 0.5f, GetOrBuildFovCurve(UltimateFovCurve, UltimateFovKeys));*/
 }
 
 void AFTPlayerCharacterBase::OnShift()
 {
 	ActivateAbilityByInputTag(FTTags::FTAbilities::UtilSkill, true);
+}
 
-	// TODO:: 테스트용, 스킬 종류따라 적용하도록 수정해야 함
+void AFTPlayerCharacterBase::PlayUtilSkillFovPunch()
+{
 	static const TArray<FVector2D> UtilFovKeys =
 	{
 		FVector2D(0.f,   0.f),
