@@ -18,6 +18,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystem/Abilities/Minion/DataAsset/FT_MinionData.h"
 #include "Engine/OverlapResult.h"
+#include "Object/FT_MinionSpawner.h"
 
 UFT_Minion_Brain::UFT_Minion_Brain()
 {
@@ -267,6 +268,17 @@ void UFT_Minion_Brain::ExecuteAILogic()
         if (MinionChar)
         {
             AFT_WayPoint* TargetWP = MinionChar->GetCurrentTargetWayPoint();
+
+            // [안전망 추가]: 어떤 이유로든 풀링 후 WayPoint가 유실되었다면 스포너에게서 다시 받아옵니다.
+            if (!TargetWP)
+            {
+                if (AFT_MinionSpawner* Spawner = MinionChar->GetOwningSpawner())
+                {
+                    TargetWP = Spawner->GetInitialWayPoint();
+                    MinionChar->SetCurrentTargetWayPoint(TargetWP);
+                }
+            }
+            
             if (TargetWP)
             {
                 float DistanceToWP = FVector::Dist(MinionChar->GetActorLocation(), TargetWP->GetActorLocation());

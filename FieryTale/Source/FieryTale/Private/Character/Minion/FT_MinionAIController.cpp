@@ -1,4 +1,4 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Character/Minion/FT_MinionAIController.h"
@@ -20,8 +20,8 @@ AFT_MinionAIController::AFT_MinionAIController()
 
     if (SightConfig && MinionPerceptionComponent)
     {
-        SightConfig->SightRadius = 1500.f;
-        SightConfig->LoseSightRadius = 1800.f;
+        SightConfig->SightRadius = 800.f;
+        SightConfig->LoseSightRadius = 1000.f;
         SightConfig->PeripheralVisionAngleDegrees = 90.f;
         SightConfig->SetMaxAge(3.f);
         

@@ -63,14 +63,23 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         
         MontageTask->ReadyForActivation();
     }
+    
     // 노티파이(Notify) 설정 누락으로 인한 공격 씹힘 방지:
     // 플레이어 평타(NormalAttack)처럼 어빌리티 실행 시점에 즉각적으로(혹은 약간의 선딜레이 후) 공격을 강제 판정합니다.
     if (UWorld* World = GetWorld())
     {
-        World->GetTimerManager().SetTimer(DebugNoMontageTimerHandle, [this]()
+        bool bHasMontage = (MontageTask != nullptr);
+        
+        World->GetTimerManager().SetTimer(DebugNoMontageTimerHandle, [this, bHasMontage, Handle, ActorInfo, ActivationInfo]()
         {
             FGameplayEventData DummyEventData;
             OnMontageTargetedEvent(DummyEventData);
+            
+            // 몽타주가 아예 등록되지 않았다면, 타이머 발동 직후 어빌리티를 강제로 종료하여 쿨타임 무한 대기에 빠지는 것을 방지합니다.
+            if (!bHasMontage)
+            {
+                EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+            }
         }, 0.25f, false); // 애니메이션 싱크를 위해 0.25초 후 발사 (필요 시 0.0f로 즉시 발사 가능)
     }
 }

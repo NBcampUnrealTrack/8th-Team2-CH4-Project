@@ -60,6 +60,7 @@ public:
     
     /** 풀링 시스템: 소속 스포너 할당 */
     void SetOwningSpawner(AFT_MinionSpawner* InSpawner) { OwningSpawner = InSpawner; }
+    AFT_MinionSpawner* GetOwningSpawner() const { return OwningSpawner; }
 
     /** 스폰 대기열 진입용 풀링 초기화 */
     void ReinitializeForPool(const FTransform& NewTransform, UFT_MinionData* NewData, const FGameplayTag& NewTeamTag);

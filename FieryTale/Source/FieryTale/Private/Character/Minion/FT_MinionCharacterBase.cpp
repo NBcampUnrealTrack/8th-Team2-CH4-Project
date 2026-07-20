@@ -17,6 +17,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Abilities/GameplayAbility.h" // UGameplayAbility 불완전 타입(Incomplete type) 컴파일 에러 방지
 
 AFT_MinionCharacterBase::AFT_MinionCharacterBase()
 {
@@ -418,7 +419,6 @@ void AFT_MinionCharacterBase::Die(AController* KillerController)
 
     if (!AbilitySystemComponent) return;
 
-    AbilitySystemComponent->AddLooseGameplayTag(FTTags::FTStates::Core::Dead, 1, EGameplayTagReplicationState::TagAndCountToAll);
     
     if (AFT_MinionAIController* FTC = Cast<AFT_MinionAIController>(GetController()))
     {
@@ -461,11 +461,16 @@ void AFT_MinionCharacterBase::OnRep_IsActiveInPool()
     {
         if (GetCapsuleComponent())
         {
+            // 죽을 때 NoCollision으로 바뀐 프로필을 완벽히 Pawn 기본값으로 복구합니다 (클라이언트 포함)
+            GetCapsuleComponent()->SetCollisionProfileName(TEXT("Pawn"));
             GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
             GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
         }
         if (GetMesh())
         {
+            // 죽을 때 90도 꺾여 쓰러진(Dead) 시체 회전값을 기본값(서서 앞을 보는 -90도)으로 복구합니다
+            GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+            GetMesh()->SetCollisionProfileName(TEXT("CharacterMesh"));
             GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
         }
     }
@@ -489,38 +494,69 @@ void AFT_MinionCharacterBase::OnRep_IsActiveInPool()
 
 void AFT_MinionCharacterBase::ReinitializeForPool(const FTransform& NewTransform, UFT_MinionData* NewData, const FGameplayTag& NewTeamTag)
 {
-    // 위치 초기화
+    // [1] 완전 퓨어한 상태로 모든 어빌리티(액티브/패시브/뇌) 삭제
+    if (HasAuthority() && AbilitySystemComponent)
+    {
+        AbilitySystemComponent->ClearAllAbilities();
+    }
+
+    // [2] 위치 초기화
     SetActorTransform(NewTransform, false, nullptr, ETeleportType::ResetPhysics);
 
-    // 데이터 교체
+    // [3] 컨트롤러 부활 보장
+    if (HasAuthority() && GetController() == nullptr)
+    {
+        SpawnDefaultController();
+    }
+
+    // [4] 치매(과거 길찾기 흔적) 초기화
+    if (AAIController* AIC = Cast<AAIController>(GetController()))
+    {
+        AIC->StopMovement();
+        AIC->ClearFocus(EAIFocusPriority::Gameplay);
+    }
+
+    // [5] 데이터 교체
     SetMinionDataAndTeam(NewData, NewTeamTag);
 
+    // [6] 상태이상 및 사망 태그 완전 소각
     if (AbilitySystemComponent)
     {
-        AbilitySystemComponent->RemoveLooseGameplayTag(FTTags::FTStates::Core::Dead, 1);
+        AbilitySystemComponent->SetLooseGameplayTagCount(FTTags::FTStates::Core::Dead, 0);
         
-        // 모든 Gameplay Effect 제거
         FGameplayEffectQuery Query;
         AbilitySystemComponent->RemoveActiveEffects(Query);
     }
 
+    // [7] 체력 등 기본 속성 롤백
     if (AbilitySystemComponent && NewData)
     {
         AbilitySystemComponent->SetNumericAttributeBase(UFT_AttributeSet::GetHealthAttribute(), NewData->DefaultMaxHealth);
     }
 
-    // 부활(활성화)
-    bIsActiveInPool = true;
-    OnRep_IsActiveInPool();
-    
-    // 시체 회전 복구
+    // [8] 시체 회전 복구 및 물리엔진(콜리전) 100% 부활
     if (GetMesh())
     {
         GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
     }
+    
+    bIsActiveInPool = true;
+    OnRep_IsActiveInPool();
 
+    // [9] 이동 컴포넌트 족쇄 풀기 (중력, 회전 복구)
     if (GetCharacterMovement())
     {
         GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
+        GetCharacterMovement()->GravityScale = 1.0f; 
+        GetCharacterMovement()->bOrientRotationToMovement = true; 
+        GetCharacterMovement()->Velocity = FVector::ZeroVector; 
+        bUseControllerRotationYaw = false; 
+        GetCharacterMovement()->UpdateComponentVelocity();
+    }
+    
+    // [10] 마치 처음 태어난 것처럼 인프라(모든 스킬, 메시, 재질, 무기 부착) 재가동
+    if (HasAuthority())
+    {
+        InitializeMinionInfrastructures();
     }
 }

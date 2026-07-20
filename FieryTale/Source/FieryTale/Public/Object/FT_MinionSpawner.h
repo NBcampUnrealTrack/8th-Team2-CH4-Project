@@ -35,6 +35,8 @@ public:
     /** 풀링: 미니언이 죽은 후 시체 기간이 끝나면 자신을 반환하는 인터페이스 */
     void ReturnMinionToPool(AFT_MinionCharacterBase* Minion);
 
+    AFT_WayPoint* GetInitialWayPoint() const { return InitialWayPoint; }
+
 protected:
     virtual void BeginPlay() override;
 

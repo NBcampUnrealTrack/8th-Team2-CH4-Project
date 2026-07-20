@@ -169,12 +169,14 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
         return;
     }
 
-    // 물리 동결 방어선 타설: 스포너 위치 기준 좌우 분산 오프셋 주입
+    // 물리 동결 방어선 타설: 스포너 위치 기준 좌우/전후 분산 오프셋 넓게 주입 (겹침 최소화)
     FVector SpawnerLocation = GetActorLocation();
     FRotator SpawnRotation = GetActorRotation();
     
-    float RandomOffset = FMath::FRandRange(-60.0f, 60.0f);
-    FVector AggregatedOffset = GetActorRightVector() * RandomOffset;
+    // 캡슐 반지름을 고려해 미니언들이 겹치지 않도록 넓게 분산시킵니다.
+    float RandomOffsetY = FMath::FRandRange(-150.0f, 150.0f);
+    float RandomOffsetX = FMath::FRandRange(-150.0f, 150.0f);
+    FVector AggregatedOffset = (GetActorRightVector() * RandomOffsetY) + (GetActorForwardVector() * RandomOffsetX);
     
     FVector FinalSpawnLocation = SpawnerLocation + AggregatedOffset;
     FTransform SpawnTransform(SpawnRotation, FinalSpawnLocation);
@@ -195,33 +197,14 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
         
         if (GetWorld() && PooledMinion->GetCapsuleComponent())
         {
-            FVector StartLoc = SpawnTransform.GetLocation();
-            FVector EndLoc = StartLoc - FVector(0.0f, 0.0f, 1000.0f);
-            
-            FCollisionQueryParams QueryParams;
-            QueryParams.AddIgnoredActor(this);
-            QueryParams.AddIgnoredActor(PooledMinion);
-            
-            FHitResult FloorHit;
-            if (GetWorld()->LineTraceSingleByChannel(FloorHit, StartLoc, EndLoc, ECC_Visibility, QueryParams))
-            {
-                float CapsuleHalfHeight = PooledMinion->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-                FVector CorrectionLocation = FloorHit.ImpactPoint + FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
-                
-                if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
-                {
-                    FNavLocation ProjectedNavLoc;
-                    if (NavSys->ProjectPointToNavigation(CorrectionLocation, ProjectedNavLoc, FVector(100.f, 100.f, 100.f)))
-                    {
-                        CorrectionLocation = ProjectedNavLoc.Location + FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
-                    }
-                }
-                FinalSpawnTransform.SetLocation(CorrectionLocation);
-            }
+            float CapsuleHalfHeight = PooledMinion->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+            // 스포너 위치에서 캡슐 절반 높이만큼 올리고, 얇은 바닥을 뚫고 지나가지 않도록 50.0f 공중에서 떨어뜨립니다.
+            FVector SafeLocation = SpawnTransform.GetLocation() + FVector(0.0f, 0.0f, CapsuleHalfHeight + 50.0f);
+            FinalSpawnTransform.SetLocation(SafeLocation);
         }
 
-        PooledMinion->ReinitializeForPool(FinalSpawnTransform, TargetData, SpawnerTeamTag);
         PooledMinion->SetCurrentTargetWayPoint(InitialWayPoint);
+        PooledMinion->ReinitializeForPool(FinalSpawnTransform, TargetData, SpawnerTeamTag);
     }
     else
     {
@@ -242,35 +225,14 @@ void AFT_MinionSpawner::SpawnMinionFromQueue()
             SpawnedMinion->SetMinionDataAndTeam(TargetData, SpawnerTeamTag);
             SpawnedMinion->SetCurrentTargetWayPoint(InitialWayPoint);
             
-            FTransform FinalSpawnTransform = SpawnTransform;
-            if (GetWorld() && SpawnedMinion->GetCapsuleComponent())
-            {
-                FVector StartLoc = SpawnTransform.GetLocation();
-                FVector EndLoc = StartLoc - FVector(0.0f, 0.0f, 1000.0f);
-                
-                FCollisionQueryParams QueryParams;
-                QueryParams.AddIgnoredActor(this);
-                QueryParams.AddIgnoredActor(SpawnedMinion);
-                
-                FHitResult FloorHit;
-                if (GetWorld()->LineTraceSingleByChannel(FloorHit, StartLoc, EndLoc, ECC_Visibility, QueryParams))
-                {
-                    float CapsuleHalfHeight = SpawnedMinion->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-                    FVector CorrectionLocation = FloorHit.ImpactPoint + FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
-                    
-                    if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
-                    {
-                        FNavLocation ProjectedNavLoc;
-                        if (NavSys->ProjectPointToNavigation(CorrectionLocation, ProjectedNavLoc, FVector(100.f, 100.f, 100.f)))
-                        {
-                            CorrectionLocation = ProjectedNavLoc.Location + FVector(0.0f, 0.0f, CapsuleHalfHeight + 2.0f);
-                        }
-                    }
-                    FinalSpawnTransform.SetLocation(CorrectionLocation);
-                }
-            }
+            // 스포너 위치에서 캡슐 절반 높이만큼 올리고, 얇은 바닥을 뚫고 지나가지 않도록 추가 여유 공간(50.0f)을 띄워서 스폰합니다.
+            // 엔진의 자체 충돌 보정(AdjustIfPossible)이 적용된 트랜스폼에 Z축 오프셋을 직접 더해서 강제합니다.
+            FTransform AdjustedTransform = SpawnedMinion->GetTransform();
+            float CapsuleHalfHeight = SpawnedMinion->GetCapsuleComponent() ? SpawnedMinion->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.0f;
+            FVector SafeLocation = AdjustedTransform.GetLocation() + FVector(0.0f, 0.0f, CapsuleHalfHeight + 50.0f);
+            AdjustedTransform.SetLocation(SafeLocation);
             
-            SpawnedMinion->FinishSpawning(FinalSpawnTransform);
+            SpawnedMinion->FinishSpawning(AdjustedTransform);
 
             if (UCharacterMovementComponent* MoveComp = SpawnedMinion->GetCharacterMovement())
             {
