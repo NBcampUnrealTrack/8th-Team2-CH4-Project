@@ -63,47 +63,15 @@ void UFT_MinionAttackBase::ActivateAbility(const FGameplayAbilitySpecHandle Hand
         
         MontageTask->ReadyForActivation();
     }
-    // 몽타주가 없을 경우 가상 딜레이 후 공격을 실행합니다.
-    else
+    // 노티파이(Notify) 설정 누락으로 인한 공격 씹힘 방지:
+    // 플레이어 평타(NormalAttack)처럼 어빌리티 실행 시점에 즉각적으로(혹은 약간의 선딜레이 후) 공격을 강제 판정합니다.
+    if (UWorld* World = GetWorld())
     {
-        if (UWorld* World = GetWorld())
+        World->GetTimerManager().SetTimer(DebugNoMontageTimerHandle, [this]()
         {
-            World->GetTimerManager().SetTimer(DebugNoMontageTimerHandle, [this]()
-            {
-                // 지연 시간 만료 시 강제로 공격 판정 실행
-                FGameplayEventData DummyEventData;
-                OnMontageTargetedEvent(DummyEventData);
-                
-                // 이후 어빌리티 종료
-                if (UWorld* InnerWorld = GetWorld())
-                {
-                    InnerWorld->GetTimerManager().SetTimer(DebugNoMontageTimerHandle, [this]()
-                    {
-                        OnMontageCompletedOrCancelled();
-                    }, 0.2f, false);
-                }
-            }, 0.5f, false);
-        }
-        else
-        {
-            EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-        }
-        return;
-    }
-
-    // 몽타주 노티파이 시점에 게임플레이 이벤트를 대기하는 태스크 실행
-    ActiveWaitEventTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
-        this, 
-        FTTags::FTCombat::AnimNotify_Attack, 
-        nullptr, 
-        false, 
-        false
-    );
-
-    if (ActiveWaitEventTask)
-    {
-        ActiveWaitEventTask->EventReceived.AddDynamic(this, &UFT_MinionAttackBase::OnMontageTargetedEvent);
-        ActiveWaitEventTask->ReadyForActivation();
+            FGameplayEventData DummyEventData;
+            OnMontageTargetedEvent(DummyEventData);
+        }, 0.25f, false); // 애니메이션 싱크를 위해 0.25초 후 발사 (필요 시 0.0f로 즉시 발사 가능)
     }
 }
 
@@ -160,9 +128,10 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
     }
     
     // 투사체 클래스 획득
-    TSoftClassPtr<AFT_ProjectileBase> TargetProjectileClass = nullptr;
-    if (MinionChar)
+    TSoftClassPtr<AFT_ProjectileBase> TargetProjectileClass = ProjectileClass; // 어빌리티 자체 설정값을 기본으로 사용
+    if (MinionChar && !MinionChar->GetMinionProjectileClass().IsNull())
     {
+        // 미니언 데이터에 투사체가 명시되어 있다면 그걸로 덮어씌움 (우선순위)
         TargetProjectileClass = MinionChar->GetMinionProjectileClass();
     }
     
@@ -174,10 +143,19 @@ void UFT_MinionAttackBase::OnMontageTargetedEvent(FGameplayEventData EventData)
         if (World && LoadedProjectileClass)
         {
             // 스폰 위치 계산
-            FVector ChestLocation = AvatarChar->GetActorLocation() + FVector(0.f, 0.f, 50.f); 
-            FVector SpawnLocation = ChestLocation + (AvatarChar->GetActorForwardVector() * 50.f);
+            // 스폰 위치 계산 (미니언 전용 무기 소켓 추적 파이프라인 활용)
+            FVector SpawnLocation;
+            if (MinionChar)
+            {
+                SpawnLocation = MinionChar->GetAttackLaunchTransform(TEXT("R_Hand_FirePoint")).GetLocation();
+            }
+            else
+            {
+                // Fallback for non-minions (though this ability is minion-only)
+                SpawnLocation = AvatarChar->GetActorLocation() + FVector(0.f, 0.f, 50.f) + (AvatarChar->GetActorForwardVector() * 50.f);
+            }
 
-            // 타격점 높이 동기화
+            // 타격점 높이 동기화 (투사체가 위/아래로 너무 쏠리지 않도록, 소켓 출발 높이 기준으로 유지)
             FVector TargetCenterLocation = TargetActor->GetActorLocation();
             TargetCenterLocation.Z = SpawnLocation.Z; 
         

@@ -60,6 +60,18 @@ AFT_MinionCharacterBase::AFT_MinionCharacterBase()
     // 무브먼트 리플리케이션 선로 개통
     ACharacter::SetReplicateMovement(true);
 
+    // 💡 부드럽게 이동 방향을 바라보도록 회전 동기화 설정
+    bUseControllerRotationPitch = false;
+    bUseControllerRotationYaw = false;
+    bUseControllerRotationRoll = false;
+
+    if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+    {
+        MoveComp->bOrientRotationToMovement = true;
+        MoveComp->bUseControllerDesiredRotation = true; // 정지 후 공격 시 AI 포커스(적) 방향으로 자연스럽게 회전
+        MoveComp->RotationRate = FRotator(0.0f, 600.0f, 0.0f); // 부드러운 회전 속도 (Yaw)
+    }
+
     AIControllerClass = AFT_MinionAIController::StaticClass();
     AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
