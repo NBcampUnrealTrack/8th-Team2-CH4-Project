@@ -171,7 +171,8 @@ void UFT_NormalAttack::PerformLineTraceLogic(UFT_WeaponData* InWeaponData, AFTPl
     QueryParams.AddIgnoredActor(InCharacter);
     QueryParams.bReturnPhysicalMaterial = false;
 
-    bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_Visibility, QueryParams);
+    // 전용 무기 트레이스 채널(WeaponTrace = ECC_GameTraceChannel1)을 사용합니다.
+    bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECollisionChannel::ECC_GameTraceChannel1, QueryParams);
 
     if (bHit && HitResult.GetActor())
     {
