@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "GameplayTags/FTTags.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Character/FTPlayerCharacterBase.h"
 
 UFT_AladdinFlySkill::UFT_AladdinFlySkill()
     : FlyDuration(5.0f)
@@ -70,12 +71,31 @@ void UFT_AladdinFlySkill::ActivateAbility(const FGameplayAbilitySpecHandle Handl
         }
     }
 
-    // 비행 중 속도 감소 페널티 적용 (부모 클래스 기능 사용)
-    ApplyMovementPenalty();
+    // 앨리스 유틸과 동일한 속도 증가 이펙트 적용
+    AFTPlayerCharacterBase* PlayerCharacter = Cast<AFTPlayerCharacterBase>(Character);
     
-    // 이동 모드를 비행으로 변경
-    MoveComp->SetMovementMode(EMovementMode::MOVE_Flying);
-    Character->LaunchCharacter(FVector(0.0f, 0.0f, 250.0f), false, true);
+    if (DashSpeedGameplayEffectClass)
+    {
+        FGameplayEffectSpecHandle SpeedSpecHandle = MakeOutgoingGameplayEffectSpec(DashSpeedGameplayEffectClass, GetAbilityLevel());
+        if (SpeedSpecHandle.IsValid() && SpeedSpecHandle.Data.IsValid())
+        {
+            SpeedSpecHandle.Data->GetContext().AddInstigator(Character, Character);
+            SpeedSpecHandle.Data->GetContext().AddSourceObject(Character);
+
+            DashSpeedActiveHandle = SourceASC->ApplyGameplayEffectSpecToSelf(*SpeedSpecHandle.Data.Get());
+        }
+    }
+    else
+    {
+        // 이펙트 클래스가 설정되지 않은 경우를 위한 폴백 (이동 속도 1.5배)
+        ApplyMovementPenalty(1.5f);
+    }
+    
+    // FOV 펀치 효과로 시각적인 속도감 추가
+    if (PlayerCharacter)
+    {
+        PlayerCharacter->PlayUtilSkillFovPunch();
+    }
     
     // 지속 시간 타이머 설정
     if (GetWorld())
@@ -115,14 +135,26 @@ void UFT_AladdinFlySkill::EndAbility(const FGameplayAbilitySpecHandle Handle, co
 
     if (Character && Character->GetCharacterMovement())
     {
-        // 걷기 모드로 복귀
-        Character->GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
+        // 걷기 모드로 복귀 방어 코드 (혹시 모를 상황 대비)
+        if (Character->GetCharacterMovement()->MovementMode == EMovementMode::MOVE_Flying)
+        {
+            Character->GetCharacterMovement()->SetMovementMode(EMovementMode::MOVE_Walking);
+        }
     }
 
     if (SourceASC)
     {
-        // 속도 감소 이펙트 해제 (부모 클래스 기능 사용)
-        RemoveMovementPenalty();
+        // 가속 이펙트 해제 (이펙트 클래스가 설정된 경우)
+        if (DashSpeedActiveHandle.IsValid())
+        {
+            SourceASC->RemoveActiveGameplayEffect(DashSpeedActiveHandle);
+            DashSpeedActiveHandle.Invalidate();
+        }
+        else
+        {
+            // 폴백으로 사용된 속도 증가 버프 해제
+            RemoveMovementPenalty();
+        }
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

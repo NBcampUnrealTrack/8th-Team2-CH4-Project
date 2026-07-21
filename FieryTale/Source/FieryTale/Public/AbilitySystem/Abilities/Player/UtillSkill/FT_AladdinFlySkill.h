@@ -40,4 +40,11 @@ protected:
     /** 비행 지속 시간 (기본값 5.0초) */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin Spec")
     float FlyDuration;
+
+    /** 이동 속도 증가 이펙트 클래스 (앨리스 유틸과 동일하게 사용) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FieryTale|Aladdin Spec")
+    TSubclassOf<UGameplayEffect> DashSpeedGameplayEffectClass;
+
+    /** 적용된 속도 증가 이펙트의 핸들 */
+    FActiveGameplayEffectHandle DashSpeedActiveHandle;
 };
