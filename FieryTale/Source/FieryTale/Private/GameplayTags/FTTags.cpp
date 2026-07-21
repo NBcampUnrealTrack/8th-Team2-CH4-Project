@@ -123,6 +123,18 @@ namespace GameplayCue
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(RedHud_SkillCast_UtilSkill, "GameplayCue.RedHood.SkillCast.UtilSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(RedHud_SkillCast_UltimateSkill, "GameplayCue.RedHood.SkillCast.UltimateSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
 	
+	// 알라딘
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aladdin_SkillCast, "GameplayCue.Aladdin.SkillCast", "알라딘 스킬 시전 순간의 머즐/차지 연출 격발용 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aladdin_SkillCast_AttackSkill, "GameplayCue.Aladdin.SkillCast.AttackSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aladdin_SkillCast_UtilSkill, "GameplayCue.Aladdin.SkillCast.UtilSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Aladdin_SkillCast_UltimateSkill, "GameplayCue.Aladdin.SkillCast.UltimateSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	
+	// 카구야
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Kaguya_SkillCast, "GameplayCue.Kaguya.SkillCast", "카구야 스킬 시전 순간의 머즐/차지 연출 격발용 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Kaguya_SkillCast_AttackSkill, "GameplayCue.Kaguya.SkillCast.AttackSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Kaguya_SkillCast_UtilSkill, "GameplayCue.Kaguya.SkillCast.UtilSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Kaguya_SkillCast_UltimateSkill, "GameplayCue.Kaguya.SkillCast.UltimateSkill", "RMB 보조 공격 및 강공격 스킬 시전 순간의 머즐/차지 연출 격발 큐");
+	
 	
 	// 공용 디버프 
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Debuff_Stunned, "GameplayCue.Debuff.Stunned", "기절: 모든 행동이 불가능해지는 상태이상 디버프 태그");
